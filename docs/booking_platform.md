@@ -14,8 +14,10 @@
 6. [Database Design](#database-design)
 7. [API Design](#api-design)
 8. [Implementation Details](#implementation-details)
-9. [Testing Strategy](#testing-strategy)
-10. [Deployment](#deployment)
+9. [Rate Limiting Implementation](#rate-limiting-implementation)
+10. [Testing Strategy](#testing-strategy)
+11. [Deployment](#deployment)
+12. [Project Names](#project-names)
 
 ---
 
@@ -24,6 +26,7 @@
 ### What We're Building
 
 A property booking platform where:
+
 - **Guests** search and book properties
 - **Hosts** list properties and manage availability
 - **Core Problem**: Prevent double bookings when multiple users try to book the same property for the same dates simultaneously
@@ -40,22 +43,25 @@ A property booking platform where:
 
 ### Problem 1: Preventing Double Bookings (CRITICAL)
 
-**The Problem**: 
+**The Problem**:
 When two users try to book the same property for overlapping dates at the same time, both might succeed, causing a double booking.
 
 **Why It Happens**:
+
 - User A checks availability → sees property is available
 - User B checks availability → also sees property is available
 - User A creates booking → succeeds
 - User B creates booking → also succeeds (WRONG!)
 
 **Solution**: Multi-layer concurrency control
+
 1. **Distributed Lock** (Redis): Lock the property + date range before checking availability
 2. **Database Transaction** with pessimistic locking: `SELECT ... FOR UPDATE` to lock rows
 3. **Optimistic Locking**: Version field to detect concurrent modifications
 4. **Idempotency Keys**: Prevent duplicate booking requests
 
 **Implementation Flow**:
+
 ```
 1. Check availability in Redis cache (fast path)
 2. Acquire distributed lock: lock:property:{id}:{check_in}:{check_out}
@@ -70,15 +76,17 @@ When two users try to book the same property for overlapping dates at the same t
 
 ### Problem 2: Real-Time Availability Management
 
-**The Problem**: 
+**The Problem**:
 Maintaining accurate availability across thousands of properties with millions of date combinations, updated instantly as bookings are made.
 
 **Solution**: Hybrid caching strategy
+
 - **Redis Cache**: Hot data (next 90 days) for fast lookups
 - **PostgreSQL**: Source of truth for all dates
 - **Event-driven updates**: Invalidate cache when bookings change
 
 **Data Structure**:
+
 ```
 Redis: property:{id}:availability:{date} → {available: boolean, price: number}
 PostgreSQL: availability_calendar table with date ranges
@@ -88,10 +96,11 @@ PostgreSQL: availability_calendar table with date ranges
 
 ### Problem 3: Fast Location-Based Search
 
-**The Problem**: 
+**The Problem**:
 Finding properties near a location quickly, even with thousands of properties.
 
-**Solution**: 
+**Solution**:
+
 - **PostGIS** for geospatial queries
 - **Spatial indexes** (GIST) for fast location searches
 - **Redis caching** for popular search queries
@@ -100,10 +109,11 @@ Finding properties near a location quickly, even with thousands of properties.
 
 ### Problem 4: Secure Payment Processing
 
-**The Problem**: 
+**The Problem**:
 Processing payments reliably, handling failures, and preventing duplicate charges.
 
 **Solution**:
+
 - **Idempotent payment API**: Unique payment tokens
 - **Payment state machine**: Clear states (pending → processing → succeeded/failed)
 - **Webhook handling**: Async payment status updates
@@ -115,22 +125,25 @@ Processing payments reliably, handling failures, and preventing duplicate charge
 
 ### Feature 1: Waitlist & Auto-Rebooking System
 
-**The Problem**: 
+**The Problem**:
 When a property is fully booked, users miss out. If someone cancels, the slot often goes unfilled because interested users don't know it's available again.
 
-**The Solution**: 
+**The Solution**:
+
 - Users can join a waitlist for fully booked properties
 - When a cancellation happens, waitlisted users are automatically notified
 - First-come-first-served booking opportunity (with time limit)
 - Prevents empty slots and maximizes host revenue
 
 **Why It Stands Out**:
+
 - **Increases bookings by 15-20%** (fills cancelled slots automatically)
 - **Better user experience** - Users don't have to keep checking availability
 - **Host benefit** - Reduces lost revenue from cancellations
 - **Competitive advantage** - Most platforms don't offer this
 
 **Technical Implementation**:
+
 ```
 1. User joins waitlist → Store in waitlist table with priority (timestamp)
 2. Cancellation happens → Trigger event
@@ -141,6 +154,7 @@ When a property is fully booked, users miss out. If someone cancels, the slot of
 ```
 
 **Database Schema**:
+
 ```sql
 CREATE TABLE waitlist (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -158,7 +172,7 @@ CREATE TABLE waitlist (
   UNIQUE(property_id, user_id, check_in_date, check_out_date)
 );
 
-CREATE INDEX idx_waitlist_property_dates ON waitlist(property_id, check_in_date, check_out_date, priority) 
+CREATE INDEX idx_waitlist_property_dates ON waitlist(property_id, check_in_date, check_out_date, priority)
   WHERE state = 'waitlisted';
 CREATE INDEX idx_waitlist_user ON waitlist(user_id, state);
 CREATE INDEX idx_waitlist_state ON waitlist(state, expires_at) WHERE state IN ('invited', 'booking_in_progress');
@@ -173,20 +187,20 @@ CREATE TABLE slot_reservations (
   reserved_until TIMESTAMP NOT NULL,
   status VARCHAR(20) DEFAULT 'reserved', -- reserved, booked, expired, released
   created_at TIMESTAMP DEFAULT NOW(),
-  
+
   -- Prevent overlapping reservations for same property/dates
   EXCLUDE USING GIST (
     property_id WITH =,
     daterange(check_in_date, check_out_date) WITH &&
   ) WHERE (status IN ('reserved', 'booked')),
-  
+
   -- One active reservation per waitlist entry
   UNIQUE(waitlist_entry_id) WHERE (status = 'reserved')
 );
 
-CREATE INDEX idx_slot_reservations_active ON slot_reservations(property_id, check_in_date, check_out_date) 
+CREATE INDEX idx_slot_reservations_active ON slot_reservations(property_id, check_in_date, check_out_date)
   WHERE status = 'reserved';
-CREATE INDEX idx_slot_reservations_expiry ON slot_reservations(reserved_until) 
+CREATE INDEX idx_slot_reservations_expiry ON slot_reservations(reserved_until)
   WHERE status = 'reserved';
 
 -- Booking invitations track the invitation lifecycle
@@ -205,17 +219,18 @@ CREATE TABLE booking_invitations (
   accepted_at TIMESTAMP
 );
 
-CREATE INDEX idx_booking_invitations_active ON booking_invitations(status, expires_at) 
+CREATE INDEX idx_booking_invitations_active ON booking_invitations(status, expires_at)
   WHERE status = 'active';
 CREATE INDEX idx_booking_invitations_user ON booking_invitations(user_id, status);
 ```
 
 **Implementation Flow**:
+
 ```typescript
 // When cancellation happens
 async handleCancellation(bookingId: string) {
   const booking = await this.getBooking(bookingId);
-  
+
   // STEP 1: Identify affected inventory
   const affectedInventory = {
     propertyId: booking.propertyId,
@@ -225,7 +240,7 @@ async handleCancellation(bookingId: string) {
     roomId: booking.roomId, // If multi-room property
     propertyType: booking.propertyType
   };
-  
+
   // STEP 2: Query waitlist ordered by priority
   const waitlistEntries = await this.waitlistRepo.findByPropertyAndDates(
     affectedInventory.propertyId,
@@ -237,21 +252,21 @@ async handleCancellation(bookingId: string) {
       limit: 100 // Get enough to filter
     }
   );
-  
+
   if (waitlistEntries.length === 0) {
     // No waitlist - release inventory to general availability
     await this.releaseInventoryToGeneral(affectedInventory);
     return;
   }
-  
+
   // STEP 3: Pick top N users (configurable, default: 1 for fairness, up to 3 for high demand)
   const topN = this.calculateTopN(waitlistEntries.length); // Returns 1-3 based on demand
   const selectedUsers = waitlistEntries.slice(0, topN);
-  
+
   // STEP 4: Create booking invitations with expiry
   const bookingWindowDuration = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
   const expiresAt = new Date(Date.now() + bookingWindowDuration);
-  
+
   const invitations = await Promise.all(
     selectedUsers.map(async (waitlistEntry) => {
       // Create slot reservation to prevent double booking
@@ -262,7 +277,7 @@ async handleCancellation(bookingId: string) {
         waitlistEntryId: waitlistEntry.id,
         reservedUntil: expiresAt
       });
-      
+
       // Create booking invitation
       const invitation = await this.createBookingInvitation({
         waitlistEntryId: waitlistEntry.id,
@@ -273,7 +288,7 @@ async handleCancellation(bookingId: string) {
         expiresAt,
         bookingWindowDuration
       });
-      
+
       // Update waitlist entry state
       await this.waitlistRepo.update(waitlistEntry.id, {
         state: WaitlistState.INVITED,
@@ -281,18 +296,18 @@ async handleCancellation(bookingId: string) {
         notifiedAt: new Date(),
         expiresAt
       });
-      
+
       return invitation;
     })
   );
-  
+
   // STEP 5: Send notifications
   await Promise.all(
-    invitations.map(invitation => 
+    invitations.map(invitation =>
       this.notificationService.sendWaitlistInvitation(invitation)
     )
   );
-  
+
   // Schedule expiry checks for each invitation
   invitations.forEach(invitation => {
     this.scheduleInvitationExpiry(invitation.id, invitation.expiresAt);
@@ -342,7 +357,7 @@ interface AffectedInventory {
   }): Promise<SlotReservation> {
   const lockKey = `lock:slot:${params.propertyId}:${params.checkInDate}`;
   const lock = await this.redis.acquireLock(lockKey, 5000);
-  
+
   try {
     return await this.dataSource.transaction(async (manager) => {
       // Check for conflicts with pessimistic lock
@@ -354,11 +369,11 @@ interface AffectedInventory {
         .andWhere('sr.status = :status', { status: 'reserved' })
         .setLock('pessimistic_write')
         .getCount();
-      
+
       if (conflicts > 0) {
         throw new ConflictException('Slot already reserved');
       }
-      
+
       // Create reservation
       return await manager.save(SlotReservation, {
         propertyId: params.propertyId,
@@ -385,7 +400,7 @@ private async createBookingInvitation(params: {
   bookingWindowDuration: number;
 }): Promise<BookingInvitation> {
   const waitlistEntry = await this.waitlistRepo.findById(params.waitlistEntryId);
-  
+
   return await this.bookingInvitationRepo.create({
     waitlistEntryId: params.waitlistEntryId,
     slotReservationId: params.slotReservationId,
@@ -412,7 +427,7 @@ private async releaseInventoryToGeneral(inventory: AffectedInventory): Promise<v
 // Helper: Schedule invitation expiry check
 private scheduleInvitationExpiry(invitationId: string, expiresAt: Date): void {
   const delay = expiresAt.getTime() - Date.now();
-  
+
   if (delay > 0) {
     this.expiryQueue.add(
       'check-invitation-expiry',
@@ -427,22 +442,25 @@ private scheduleInvitationExpiry(invitationId: string, expiresAt: Date): void {
 
 ### Feature 2: Smart Price Drop Alerts
 
-**The Problem**: 
+**The Problem**:
 Users are price-sensitive but don't want to constantly check if prices have dropped. Hosts want to fill empty slots but don't know who to notify.
 
 **The Solution**:
+
 - Users can set price alerts for properties they're interested in
 - When price drops below their threshold, instant notification
 - Automatic booking option (optional) - "Book automatically if price drops to X"
 - Helps hosts fill last-minute slots with dynamic pricing
 
 **Why It Stands Out**:
+
 - **Increases conversions by 25-30%** (price-sensitive users get notified)
 - **Reduces host vacancy** - Fills empty slots with price drops
 - **User retention** - Keeps users engaged even if they don't book immediately
 - **Data-driven pricing** - Hosts can see demand signals from alert subscriptions
 
 **Technical Implementation**:
+
 ```
 1. User sets price alert → Store alert with target price
 2. Price changes (host updates or dynamic pricing) → Check alerts
@@ -452,6 +470,7 @@ Users are price-sensitive but don't want to constantly check if prices have drop
 ```
 
 **Database Schema**:
+
 ```sql
 CREATE TABLE price_alerts (
   id UUID PRIMARY KEY,
@@ -471,16 +490,17 @@ CREATE INDEX idx_price_alerts_user ON price_alerts(user_id, status) WHERE status
 ```
 
 **Implementation Flow**:
+
 ```typescript
 // When price changes (host update or dynamic pricing)
 async onPriceChange(propertyId: string, newPrice: number) {
   // Find active alerts for this property
   const alerts = await this.priceAlertRepo.findActiveByProperty(propertyId);
-  
+
   for (const alert of alerts) {
     if (newPrice <= alert.targetPrice) {
       // Price dropped to target!
-      
+
       if (alert.autoBook) {
         // Auto-booking enabled - create booking automatically
         await this.autoBookFromAlert(alert, newPrice);
@@ -488,7 +508,7 @@ async onPriceChange(propertyId: string, newPrice: number) {
         // Just notify user
         await this.notificationService.sendPriceDropAlert(alert, newPrice);
       }
-      
+
       // Mark alert as triggered
       await this.priceAlertRepo.update(alert.id, {
         status: 'triggered',
@@ -507,7 +527,7 @@ async autoBookFromAlert(alert: PriceAlert, price: number) {
       alert.propertyId,
       // Use default dates or alert-specific dates
     );
-    
+
     if (isAvailable) {
       // Create booking automatically
       const booking = await this.bookingService.createBooking({
@@ -516,7 +536,7 @@ async autoBookFromAlert(alert: PriceAlert, price: number) {
         // ... other booking details
         totalPrice: price,
       }, generateIdempotencyKey());
-      
+
       // Notify user of auto-booking
       await this.notificationService.sendAutoBookingConfirmation(booking);
     }
@@ -528,6 +548,7 @@ async autoBookFromAlert(alert: PriceAlert, price: number) {
 ```
 
 **Business Value**:
+
 - **For Guests**: Never miss a good deal, get notified when prices drop
 - **For Hosts**: Fill empty slots by automatically notifying price-sensitive users
 - **For Platform**: Higher conversion rates, better user engagement, more bookings
@@ -546,18 +567,19 @@ async autoBookFromAlert(alert: PriceAlert, price: number) {
 
 ```typescript
 enum WaitlistState {
-  WAITLISTED = 'waitlisted',           // User on waitlist, no slot available
-  INVITED = 'invited',                 // Slot available, booking window active
+  WAITLISTED = 'waitlisted', // User on waitlist, no slot available
+  INVITED = 'invited', // Slot available, booking window active
   BOOKING_IN_PROGRESS = 'booking_in_progress', // User clicked "Book Now"
-  BOOKING_CONFIRMED = 'booking_confirmed',     // Payment successful, confirmed
-  EXPIRED = 'expired',                 // Booking window expired
-  CANCELLED = 'cancelled'              // User removed from waitlist
+  BOOKING_CONFIRMED = 'booking_confirmed', // Payment successful, confirmed
+  EXPIRED = 'expired', // Booking window expired
+  CANCELLED = 'cancelled', // User removed from waitlist
 }
 ```
 
 **UI Design Requirements:**
 
 1. **Waitlisted State** (No availability):
+
    - Badge: "On Waitlist" (gray, secondary)
    - Icon: Clock icon
    - Message: "You're on the waitlist. We'll notify you if a spot opens up."
@@ -567,6 +589,7 @@ enum WaitlistState {
    - Clear disclaimer: "Waitlist does not guarantee availability"
 
 2. **Invited State** (Slot available):
+
    - Badge: "Booking Available" (green, prominent)
    - Icon: Bell with checkmark
    - Countdown timer: "Reserve within 2:00:00"
@@ -589,25 +612,29 @@ const MESSAGES = {
   JOIN_WAITLIST: {
     title: "You're on the waitlist!",
     body: "We'll notify you immediately if a spot opens up for these dates. This does not guarantee availability.",
-    disclaimer: "Waitlist does not guarantee booking. You'll receive a notification if availability opens."
+    disclaimer:
+      "Waitlist does not guarantee booking. You'll receive a notification if availability opens.",
   },
-  
+
   INVITED: {
-    title: "Booking Available - Act Fast!",
-    body: "A spot opened up! You have exclusive access for the next 2 hours to book this property.",
-    urgency: "This exclusive window expires in {time}. Other waitlisted users may be notified if you don't book.",
-    cta: "Book Now"
+    title: 'Booking Available - Act Fast!',
+    body: 'A spot opened up! You have exclusive access for the next 2 hours to book this property.',
+    urgency:
+      "This exclusive window expires in {time}. Other waitlisted users may be notified if you don't book.",
+    cta: 'Book Now',
   },
-  
+
   EXPIRED: {
-    title: "Booking Window Expired",
-    body: "Your exclusive booking window has expired. The spot may have been offered to other waitlisted users.",
-    action: "You can join the waitlist again if the property is still unavailable."
-  }
+    title: 'Booking Window Expired',
+    body: 'Your exclusive booking window has expired. The spot may have been offered to other waitlisted users.',
+    action:
+      'You can join the waitlist again if the property is still unavailable.',
+  },
 };
 ```
 
 **Travel Planning Rules:**
+
 - ✅ **Allowed**: Only when `status === 'booking_confirmed'` AND `payment_status === 'paid'`
 - ❌ **Not Allowed**: During `waitlisted` or `invited` states
 - Clear UI: Disable "Plan Trip" button until confirmed
@@ -641,31 +668,33 @@ const STATE_TRANSITIONS: Record<WaitlistState, WaitlistState[]> = {
   [WaitlistState.INVITED]: [
     WaitlistState.BOOKING_IN_PROGRESS,
     WaitlistState.EXPIRED,
-    WaitlistState.CANCELLED
+    WaitlistState.CANCELLED,
   ],
   [WaitlistState.BOOKING_IN_PROGRESS]: [
     WaitlistState.BOOKING_CONFIRMED,
     WaitlistState.INVITED, // If payment fails
-    WaitlistState.EXPIRED
+    WaitlistState.EXPIRED,
   ],
   [WaitlistState.BOOKING_CONFIRMED]: [], // Terminal state
   [WaitlistState.EXPIRED]: [WaitlistState.WAITLISTED], // Can rejoin
-  [WaitlistState.CANCELLED]: [] // Terminal state
+  [WaitlistState.CANCELLED]: [], // Terminal state
 };
 ```
 
 #### Information Access Rules
 
 **Property Address, Host Contact, Check-in Instructions:**
+
 - ✅ **Visible**: `invited`, `booking_in_progress`, `booking_confirmed`
 - ❌ **Hidden**: `waitlisted`, `expired`, `cancelled`
 - **Reason**: Only show when user has active booking opportunity
 
 **Database-Level Enforcement:**
+
 ```sql
 -- Add state column with check constraint
-ALTER TABLE waitlist 
-ADD COLUMN state VARCHAR(30) DEFAULT 'waitlisted' 
+ALTER TABLE waitlist
+ADD COLUMN state VARCHAR(30) DEFAULT 'waitlisted'
 CHECK (state IN ('waitlisted', 'invited', 'booking_in_progress', 'booking_confirmed', 'expired', 'cancelled'));
 
 -- Add slot reservation tracking
@@ -678,26 +707,26 @@ ADD COLUMN slot_reservation_id UUID REFERENCES slot_reservations(id);
 ```typescript
 async handleBookingWindowExpiry(waitlistEntryId: string) {
   const entry = await this.waitlistRepo.findById(waitlistEntryId);
-  
-  if (entry.state !== WaitlistState.INVITED && 
+
+  if (entry.state !== WaitlistState.INVITED &&
       entry.state !== WaitlistState.BOOKING_IN_PROGRESS) {
     return; // Already handled
   }
-  
+
   // Release slot reservation
   if (entry.slotReservationId) {
     await this.slotReservationService.release(entry.slotReservationId);
   }
-  
+
   // Update state
   await this.waitlistRepo.update(entry.id, {
     state: WaitlistState.EXPIRED,
     expiresAt: new Date()
   });
-  
+
   // Notify user
   await this.notificationService.sendExpiryNotification(entry);
-  
+
   // Offer to next user in queue
   await this.offerSlotToNextUser(entry.propertyId, entry.checkInDate, entry.checkOutDate);
 }
@@ -706,6 +735,7 @@ async handleBookingWindowExpiry(waitlistEntryId: string) {
 #### Double Booking Prevention
 
 **Slot Reservation System:**
+
 ```typescript
 interface SlotReservation {
   id: string;
@@ -723,7 +753,7 @@ async offerSlotToUser(waitlistEntry: WaitlistEntry): Promise<SlotReservation> {
   // Use distributed lock to prevent race conditions
   const lockKey = `lock:slot:${waitlistEntry.propertyId}:${waitlistEntry.checkInDate}`;
   const lock = await this.redis.acquireLock(lockKey, 5000);
-  
+
   try {
     // Check if slot is already reserved
     const existingReservation = await this.slotReservationRepo.findActive(
@@ -731,11 +761,11 @@ async offerSlotToUser(waitlistEntry: WaitlistEntry): Promise<SlotReservation> {
       waitlistEntry.checkInDate,
       waitlistEntry.checkOutDate
     );
-    
+
     if (existingReservation) {
       throw new ConflictException('Slot already reserved by another user');
     }
-    
+
     // Create reservation
     const reservation = await this.slotReservationRepo.create({
       propertyId: waitlistEntry.propertyId,
@@ -745,7 +775,7 @@ async offerSlotToUser(waitlistEntry: WaitlistEntry): Promise<SlotReservation> {
       reservedUntil: addHours(new Date(), 2), // 2 hour window
       status: 'reserved'
     });
-    
+
     // Update waitlist entry
     await this.waitlistRepo.update(waitlistEntry.id, {
       state: WaitlistState.INVITED,
@@ -753,7 +783,7 @@ async offerSlotToUser(waitlistEntry: WaitlistEntry): Promise<SlotReservation> {
       notifiedAt: new Date(),
       expiresAt: reservation.reservedUntil
     });
-    
+
     return reservation;
   } finally {
     await this.redis.releaseLock(lockKey, lock);
@@ -762,6 +792,7 @@ async offerSlotToUser(waitlistEntry: WaitlistEntry): Promise<SlotReservation> {
 ```
 
 **Database Constraints:**
+
 ```sql
 -- Prevent overlapping slot reservations
 CREATE TABLE slot_reservations (
@@ -773,7 +804,7 @@ CREATE TABLE slot_reservations (
   reserved_until TIMESTAMP NOT NULL,
   status VARCHAR(20) DEFAULT 'reserved',
   created_at TIMESTAMP DEFAULT NOW(),
-  
+
   -- Prevent overlapping reservations for same property/dates
   EXCLUDE USING GIST (
     property_id WITH =,
@@ -781,8 +812,8 @@ CREATE TABLE slot_reservations (
   ) WHERE (status = 'reserved' OR status = 'booked')
 );
 
-CREATE INDEX idx_slot_reservations_active 
-ON slot_reservations(property_id, check_in_date, check_out_date) 
+CREATE INDEX idx_slot_reservations_active
+ON slot_reservations(property_id, check_in_date, check_out_date)
 WHERE status IN ('reserved', 'booked');
 ```
 
@@ -795,18 +826,20 @@ WHERE status IN ('reserved', 'booked');
 **Recommendation: 2 hours**
 
 **Reasoning:**
+
 - **Too Short (< 1 hour)**: Users may miss notifications, creates pressure
 - **Too Long (> 4 hours)**: Slots stay locked too long, reduces fill rate
 - **2 Hours**: Balance between user convenience and slot fill speed
 - **Configurable**: Allow hosts to set custom windows (1-4 hours)
 
 **Implementation:**
+
 ```typescript
 const BOOKING_WINDOW_DURATION = {
   DEFAULT: 2 * 60 * 60 * 1000, // 2 hours in milliseconds
-  MIN: 1 * 60 * 60 * 1000,      // 1 hour minimum
-  MAX: 4 * 60 * 60 * 1000,      // 4 hours maximum
-  HOST_CONFIGURABLE: true
+  MIN: 1 * 60 * 60 * 1000, // 1 hour minimum
+  MAX: 4 * 60 * 60 * 1000, // 4 hours maximum
+  HOST_CONFIGURABLE: true,
 };
 ```
 
@@ -815,16 +848,18 @@ const BOOKING_WINDOW_DURATION = {
 **Recommendation: Sequential (One at a Time)**
 
 **Why Sequential:**
+
 - Prevents race conditions
 - Fair first-come-first-served
 - Easier to track and debug
 - Better user experience (no confusion)
 
 **Implementation:**
+
 ```typescript
 async handleCancellation(bookingId: string) {
   const booking = await this.getBooking(bookingId);
-  
+
   // Find top priority waitlist entry
   const topEntry = await this.waitlistRepo.findTopPriority(
     booking.propertyId,
@@ -832,19 +867,19 @@ async handleCancellation(bookingId: string) {
     booking.checkOutDate,
     { state: WaitlistState.WAITLISTED }
   );
-  
+
   if (!topEntry) {
     // No waitlist, release to general availability
     await this.releaseAvailability(booking);
     return;
   }
-  
+
   // Reserve slot for this user
   const reservation = await this.offerSlotToUser(topEntry);
-  
+
   // Send notification
   await this.notificationService.sendWaitlistInvitation(topEntry, reservation);
-  
+
   // Schedule expiry check
   await this.scheduleExpiryCheck(reservation.id, reservation.reservedUntil);
 }
@@ -861,7 +896,7 @@ async handleCancellationWithBatch(bookingId: string) {
     booking.checkInDate,
     booking.checkOutDate
   );
-  
+
   if (waitlistCount > 50) {
     // Notify top 3 users simultaneously
     const topEntries = await this.waitlistRepo.findTopN(3, {
@@ -870,7 +905,7 @@ async handleCancellationWithBatch(bookingId: string) {
       checkOutDate: booking.checkOutDate,
       state: WaitlistState.WAITLISTED
     });
-    
+
     // First to book wins (race condition handled by slot reservation)
     for (const entry of topEntries) {
       await this.offerSlotToUser(entry); // Each creates separate reservation
@@ -891,14 +926,14 @@ async handleCancellationWithBatch(bookingId: string) {
 // Priority = timestamp in milliseconds (lower = earlier = higher priority)
 async joinWaitlist(dto: JoinWaitlistDto): Promise<WaitlistEntry> {
   const priority = Date.now(); // Current timestamp
-  
+
   const entry = await this.waitlistRepo.create({
     ...dto,
     priority,
     state: WaitlistState.WAITLISTED,
     createdAt: new Date()
   });
-  
+
   return entry;
 }
 
@@ -921,6 +956,7 @@ async findTopPriority(
 ```
 
 **Transparency:**
+
 - Show user their position: "You're #5 on the waitlist"
 - Update position in real-time
 - Show estimated wait time (based on historical cancellation rates)
@@ -934,16 +970,16 @@ async findTopPriority(
 ```typescript
 async processWaitlistBooking(waitlistEntryId: string, paymentMethod: string) {
   const entry = await this.waitlistRepo.findById(waitlistEntryId);
-  
+
   if (entry.state !== WaitlistState.INVITED) {
     throw new BadRequestException('Booking window expired or invalid state');
   }
-  
+
   // Update state to prevent other operations
   await this.waitlistRepo.update(entry.id, {
     state: WaitlistState.BOOKING_IN_PROGRESS
   });
-  
+
   try {
     // Attempt payment
     const payment = await this.paymentService.processPayment({
@@ -951,7 +987,7 @@ async processWaitlistBooking(waitlistEntryId: string, paymentMethod: string) {
       amount: entry.totalPrice,
       method: paymentMethod
     });
-    
+
     if (payment.status === 'succeeded') {
       // Create confirmed booking
       const booking = await this.bookingService.createConfirmedBooking({
@@ -961,18 +997,18 @@ async processWaitlistBooking(waitlistEntryId: string, paymentMethod: string) {
         checkOutDate: entry.checkOutDate,
         totalPrice: entry.totalPrice
       });
-      
+
       // Update waitlist entry
       await this.waitlistRepo.update(entry.id, {
         state: WaitlistState.BOOKING_CONFIRMED,
         bookingId: booking.id
       });
-      
+
       // Mark slot reservation as booked
       await this.slotReservationRepo.update(entry.slotReservationId, {
         status: 'booked'
       });
-      
+
       return booking;
     } else {
       // Payment failed - return to invited state
@@ -1014,18 +1050,18 @@ interface BookingAttempt {
 // On app return, check for active booking attempts
 async resumeBooking(waitlistEntryId: string): Promise<BookingAttempt | null> {
   const attempt = await this.bookingAttemptRepo.findActive(waitlistEntryId);
-  
+
   if (attempt && attempt.expiresAt > new Date()) {
     // Resume booking
     return attempt;
   }
-  
+
   // Check if waitlist entry still valid
   const entry = await this.waitlistRepo.findById(waitlistEntryId);
   if (entry.state === WaitlistState.INVITED && entry.expiresAt > new Date()) {
     return null; // Can start fresh booking
   }
-  
+
   return null; // Window expired
 }
 ```
@@ -1047,41 +1083,41 @@ async bookFromWaitlist(
   // 1. Check idempotency
   const existing = await this.bookingRepo.findByToken(idempotencyKey);
   if (existing) return existing;
-  
+
   const entry = await this.waitlistRepo.findById(waitlistEntryId);
-  
+
   // 2. Acquire distributed lock
   const lockKey = `lock:waitlist-booking:${waitlistEntryId}`;
   const lock = await this.redis.acquireLock(lockKey, 30000);
-  
+
   try {
     // 3. Re-validate state in database (pessimistic lock)
     const lockedEntry = await this.waitlistRepo.findOneWithLock(waitlistEntryId);
-    
+
     if (lockedEntry.state !== WaitlistState.INVITED) {
       throw new ConflictException('Booking window expired or already booked');
     }
-    
+
     if (lockedEntry.expiresAt <= new Date()) {
       throw new ConflictException('Booking window expired');
     }
-    
+
     // 4. Check slot reservation still valid
     const reservation = await this.slotReservationRepo.findById(
       lockedEntry.slotReservationId
     );
-    
+
     if (reservation.status !== 'reserved') {
       throw new ConflictException('Slot no longer available');
     }
-    
+
     // 5. Create booking in transaction
     return await this.dataSource.transaction(async (manager) => {
       // Update waitlist entry
       await manager.update(WaitlistEntry, lockedEntry.id, {
         state: WaitlistState.BOOKING_IN_PROGRESS
       });
-      
+
       // Create booking
       const booking = await manager.save(Booking, {
         propertyId: entry.propertyId,
@@ -1091,12 +1127,12 @@ async bookFromWaitlist(
         bookingToken: idempotencyKey,
         status: 'pending'
       });
-      
+
       // Update slot reservation
       await manager.update(SlotReservation, reservation.id, {
         status: 'booked'
       });
-      
+
       return booking;
     });
   } finally {
@@ -1130,11 +1166,12 @@ const NOTIFICATION_TEMPLATES = {
       Best regards,
       The Booking Team
     `,
-    disclaimer: "Waitlist does not guarantee booking. Availability is subject to cancellations."
+    disclaimer:
+      'Waitlist does not guarantee booking. Availability is subject to cancellations.',
   },
-  
+
   SLOT_AVAILABLE: {
-    subject: "🎉 Booking Available - Act Fast!",
+    subject: '🎉 Booking Available - Act Fast!',
     body: `
       Hi {userName},
       
@@ -1154,12 +1191,12 @@ const NOTIFICATION_TEMPLATES = {
       
       Don't miss out!
     `,
-    urgency: "moderate", // moderate, high, critical
-    cta: "Book Now"
+    urgency: 'moderate', // moderate, high, critical
+    cta: 'Book Now',
   },
-  
+
   WINDOW_EXPIRED: {
-    subject: "Booking Window Expired",
+    subject: 'Booking Window Expired',
     body: `
       Hi {userName},
       
@@ -1172,11 +1209,11 @@ const NOTIFICATION_TEMPLATES = {
       - Browse other available properties
       
       We'll notify you again if another spot opens up.
-    `
+    `,
   },
-  
+
   BOOKING_CONFIRMED: {
-    subject: "✅ Booking Confirmed!",
+    subject: '✅ Booking Confirmed!',
     body: `
       Hi {userName},
       
@@ -1191,32 +1228,35 @@ const NOTIFICATION_TEMPLATES = {
       [View Booking Details] [Plan Your Trip]
       
       Your booking is now confirmed and you can proceed with travel planning.
-    `
-  }
+    `,
+  },
 };
 ```
 
 #### Urgency Communication
 
 **Guidelines:**
+
 - ✅ **Moderate Urgency**: "You have 2 hours to book"
 - ✅ **Clear Deadline**: Show countdown timer
 - ❌ **Avoid**: "Last chance!", "Only 5 minutes left!" (creates panic)
 - ✅ **Transparency**: "If you don't book, the spot may be offered to others"
 
 **UI Countdown Timer:**
+
 ```typescript
 <CountdownTimer
   expiresAt={waitlistEntry.expiresAt}
   onExpire={() => handleExpiry()}
   warningThreshold={15 * 60 * 1000} // 15 min warning
-  criticalThreshold={5 * 60 * 1000}  // 5 min critical
+  criticalThreshold={5 * 60 * 1000} // 5 min critical
 />
 ```
 
 #### Priority Access vs Guarantee
 
 **Clear Messaging:**
+
 - ❌ **Never say**: "Guaranteed booking", "Reserved for you"
 - ✅ **Always say**: "Exclusive booking opportunity", "Priority access", "First chance to book"
 - ✅ **Disclaimers**: "Subject to availability", "Not confirmed until payment"
@@ -1251,6 +1291,7 @@ interface HostWaitlistDashboard {
 ```
 
 **Host Visibility:**
+
 - ✅ Number of users on waitlist (aggregate, not individual names for privacy)
 - ✅ Demand by date range
 - ✅ Conversion metrics
@@ -1260,6 +1301,7 @@ interface HostWaitlistDashboard {
 #### Host Protection
 
 **Overbooking Prevention:**
+
 ```sql
 -- Database constraint prevents overlapping bookings
 ALTER TABLE bookings
@@ -1271,11 +1313,13 @@ EXCLUDE USING GIST (
 ```
 
 **Conflicting Bookings:**
+
 - Slot reservation system prevents double-offers
 - Database constraints prevent overlapping confirmed bookings
 - Real-time availability updates
 
 **Guest Misunderstandings:**
+
 - Clear T&Cs: "Waitlist does not guarantee booking"
 - Automated email disclaimers
 - Support team training materials
@@ -1284,6 +1328,7 @@ EXCLUDE USING GIST (
 #### Flexible Cancellation Policies
 
 **Incentive System:**
+
 ```typescript
 // Hosts with flexible cancellation get priority in waitlist notifications
 interface HostCancellationPolicy {
@@ -1296,12 +1341,12 @@ interface HostCancellationPolicy {
 async calculateWaitlistPriority(entry: WaitlistEntry): Promise<number> {
   const property = await this.propertyRepo.findById(entry.propertyId);
   const basePriority = entry.priority; // Timestamp
-  
+
   if (property.cancellationPolicy === 'flexible') {
     // Boost priority by 10% (lower number = higher priority)
     return basePriority * 0.9;
   }
-  
+
   return basePriority;
 }
 ```
@@ -1330,22 +1375,22 @@ async createPriceAlertWithAutoBook(dto: CreatePriceAlertDto): Promise<PriceAlert
   if (!dto.consent?.step1 || !dto.consent?.step2 || !dto.consent?.step3) {
     throw new BadRequestException('Explicit consent required for auto-booking');
   }
-  
+
   // Step 2: Validate price ceiling
   if (!dto.priceCeiling || dto.priceCeiling <= 0) {
     throw new BadRequestException('Price ceiling required for auto-booking');
   }
-  
+
   // Step 3: Pre-authorize payment method
   const paymentMethod = await this.paymentService.validatePaymentMethod(
     dto.paymentMethodId,
     dto.userId
   );
-  
+
   if (!paymentMethod.isValid) {
     throw new BadRequestException('Invalid or expired payment method');
   }
-  
+
   // Step 4: Create alert with consent tracking
   const alert = await this.priceAlertRepo.create({
     ...dto,
@@ -1354,15 +1399,16 @@ async createPriceAlertWithAutoBook(dto: CreatePriceAlertDto): Promise<PriceAlert
     consent: dto.consent,
     status: 'active'
   });
-  
+
   // Step 5: Send confirmation email with consent details
   await this.notificationService.sendAutoBookConsentConfirmation(alert);
-  
+
   return alert;
 }
 ```
 
 **UI Consent Flow:**
+
 ```
 1. [ ] I want to receive price drop alerts
 2. [ ] I want to enable automatic booking when price drops
@@ -1385,7 +1431,7 @@ async triggerAutoBooking(alert: PriceAlert, newPrice: number): Promise<Booking |
     await this.notificationService.sendPriceDropAlert(alert, newPrice);
     return null;
   }
-  
+
   // 2. Calculate final amount (including fees, taxes)
   const finalAmount = await this.calculateTotalPrice({
     propertyId: alert.propertyId,
@@ -1393,14 +1439,14 @@ async triggerAutoBooking(alert: PriceAlert, newPrice: number): Promise<Booking |
     checkIn: alert.checkInDate,
     checkOut: alert.checkOutDate
   });
-  
+
   // 3. Check if final amount exceeds ceiling
   if (finalAmount > alert.priceCeiling) {
     // Final amount exceeds ceiling - notify user
     await this.notificationService.sendPriceExceededCeiling(alert, finalAmount);
     return null;
   }
-  
+
   // 4. Show final amount in notification before auto-booking
   await this.notificationService.sendAutoBookWarning(alert, {
     basePrice: newPrice,
@@ -1408,16 +1454,16 @@ async triggerAutoBooking(alert: PriceAlert, newPrice: number): Promise<Booking |
     total: finalAmount,
     willBookIn: '10 minutes' // Give user chance to cancel
   });
-  
+
   // 5. Wait 10 minutes for user cancellation
   await this.delay(10 * 60 * 1000);
-  
+
   // 6. Check if user cancelled
   const updatedAlert = await this.priceAlertRepo.findById(alert.id);
   if (updatedAlert.status === 'cancelled') {
     return null;
   }
-  
+
   // 7. Proceed with auto-booking
   return await this.executeAutoBooking(alert, finalAmount);
 }
@@ -1438,7 +1484,7 @@ async preAuthorizePaymentMethod(
     amount,
     purpose: 'price_alert_auto_booking'
   });
-  
+
   // Store pre-authorization
   await this.preAuthorizationRepo.create({
     userId,
@@ -1447,7 +1493,7 @@ async preAuthorizePaymentMethod(
     preAuthToken: preAuth.token,
     expiresAt: addDays(new Date(), 30) // Valid for 30 days
   });
-  
+
   return preAuth;
 }
 
@@ -1457,13 +1503,13 @@ async verifyPreAuthorization(alert: PriceAlert): Promise<boolean> {
     alert.userId,
     alert.paymentMethodId
   );
-  
+
   if (!preAuth || preAuth.expiresAt < new Date()) {
     // Pre-auth expired - notify user to update payment method
     await this.notificationService.sendPreAuthExpired(alert);
     return false;
   }
-  
+
   return true;
 }
 ```
@@ -1477,7 +1523,7 @@ async handlePriceChangeWithAvailability(
   availabilityStatus: 'available' | 'unavailable'
 ) {
   const alerts = await this.priceAlertRepo.findActiveByProperty(propertyId);
-  
+
   for (const alert of alerts) {
     if (newPrice <= alert.targetPrice) {
       if (availabilityStatus === 'available') {
@@ -1529,13 +1575,13 @@ BEGIN
   IF OLD.state = 'waitlisted' AND NEW.state NOT IN ('invited', 'cancelled') THEN
     RAISE EXCEPTION 'Invalid state transition from waitlisted';
   END IF;
-  
+
   IF OLD.state = 'invited' AND NEW.state NOT IN ('booking_in_progress', 'expired', 'cancelled') THEN
     RAISE EXCEPTION 'Invalid state transition from invited';
   END IF;
-  
+
   -- Add more transition validations...
-  
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -1562,7 +1608,7 @@ async createBooking(
   if (existing) {
     return existing; // Idempotent - return existing booking
   }
-  
+
   // Proceed with booking creation...
   // Idempotency key stored in booking_token column
 }
@@ -1576,7 +1622,7 @@ async reserveSlot(propertyId: string, checkIn: Date, checkOut: Date): Promise<Sl
   // Layer 1: Distributed lock (Redis)
   const redisLockKey = `lock:slot:${propertyId}:${checkIn}`;
   const redisLock = await this.redis.acquireLock(redisLockKey, 30000);
-  
+
   try {
     // Layer 2: Database transaction with pessimistic lock
     return await this.dataSource.transaction(async (manager) => {
@@ -1589,11 +1635,11 @@ async reserveSlot(propertyId: string, checkIn: Date, checkOut: Date): Promise<Sl
         .andWhere('sr.status IN (:...statuses)', { statuses: ['reserved', 'booked'] })
         .setLock('pessimistic_write') // FOR UPDATE
         .getCount();
-      
+
       if (conflicts > 0) {
         throw new ConflictException('Slot already reserved');
       }
-      
+
       // Create reservation
       return await manager.save(SlotReservation, {
         propertyId,
@@ -1616,10 +1662,10 @@ async reserveSlot(propertyId: string, checkIn: Date, checkOut: Date): Promise<Sl
 // When creating slot reservation
 async createSlotReservation(reservation: SlotReservation): Promise<void> {
   await this.slotReservationRepo.save(reservation);
-  
+
   // Schedule expiry check using Bull queue
   const delay = reservation.reservedUntil.getTime() - Date.now();
-  
+
   await this.expiryQueue.add(
     'check-slot-expiry',
     { reservationId: reservation.id },
@@ -1640,11 +1686,11 @@ export class ExpiryProcessor {
   @Process('check-slot-expiry')
   async handleSlotExpiry(job: Job<{ reservationId: string }>) {
     const reservation = await this.slotReservationRepo.findById(job.data.reservationId);
-    
+
     if (!reservation) {
       return; // Already handled
     }
-    
+
     // Check if still reserved and expired
     if (reservation.status === 'reserved' && reservation.reservedUntil <= new Date()) {
       await this.handleBookingWindowExpiry(reservation.waitlistEntryId);
@@ -1660,7 +1706,7 @@ export class ExpiryProcessor {
 @Cron('*/5 * * * *')
 async checkExpiredReservations() {
   const expired = await this.slotReservationRepo.findExpired();
-  
+
   for (const reservation of expired) {
     await this.handleBookingWindowExpiry(reservation.waitlistEntryId);
   }
@@ -1674,18 +1720,18 @@ async checkExpiredReservations() {
 async recoverInconsistentStates() {
   // 1. Find reservations that expired but weren't processed
   const expiredReservations = await this.slotReservationRepo.findExpiredUnprocessed();
-  
+
   for (const reservation of expiredReservations) {
     await this.handleBookingWindowExpiry(reservation.waitlistEntryId);
   }
-  
+
   // 2. Find bookings in progress that timed out
   const stuckBookings = await this.bookingRepo.findStuckInProgress();
-  
+
   for (const booking of stuckBookings) {
     // Check if payment succeeded
     const payment = await this.paymentService.getPaymentStatus(booking.id);
-    
+
     if (payment.status === 'succeeded') {
       // Payment succeeded but booking not confirmed - recover
       await this.confirmBooking(booking.id);
@@ -1694,10 +1740,10 @@ async recoverInconsistentStates() {
       await this.releaseBookingSlot(booking);
     }
   }
-  
+
   // 3. Find waitlist entries in invalid states
   const invalidEntries = await this.waitlistRepo.findInvalidStates();
-  
+
   for (const entry of invalidEntries) {
     // Reset to valid state
     if (entry.expiresAt < new Date() && entry.state === 'invited') {
@@ -1727,7 +1773,7 @@ const TERMS_AND_CONDITIONS = {
     5. Property details (address, host contact) are only available after booking confirmation.
     6. We are not liable for travel plans made before booking confirmation.
   `,
-  
+
   priceAlerts: `
     PRICE ALERT TERMS:
     
@@ -1737,7 +1783,7 @@ const TERMS_AND_CONDITIONS = {
     4. You can cancel auto-booking within 10 minutes of notification.
     5. Failed auto-booking attempts will result in notification-only alerts.
   `,
-  
+
   autoBooking: `
     AUTO-BOOKING CONSENT:
     
@@ -1746,11 +1792,12 @@ const TERMS_AND_CONDITIONS = {
     2. Charges up to your specified price ceiling (including fees and taxes).
     3. Immediate booking creation upon successful payment.
     4. Standard cancellation policies apply to auto-booked reservations.
-  `
+  `,
 };
 ```
 
 **User Acceptance Tracking:**
+
 ```sql
 CREATE TABLE user_consents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1784,18 +1831,18 @@ interface WaitlistDispute {
 async investigateDispute(disputeId: string): Promise<DisputeInvestigation> {
   const dispute = await this.disputeRepo.findById(disputeId);
   const entry = await this.waitlistRepo.findById(dispute.waitlistEntryId);
-  
+
   // Gather evidence
   const evidence = {
     waitlistEntry: entry,
     notifications: await this.notificationRepo.findByWaitlistEntry(entry.id),
-    slotReservation: entry.slotReservationId 
+    slotReservation: entry.slotReservationId
       ? await this.slotReservationRepo.findById(entry.slotReservationId)
       : null,
     userActivity: await this.userActivityRepo.findByUser(dispute.userId),
     systemLogs: await this.systemLogRepo.findRelevant(entry.id)
   };
-  
+
   return {
     dispute,
     evidence,
@@ -1843,7 +1890,7 @@ const SUPPORT_RESPONSES = {
     
     Next steps: {resolution}
   `,
-  
+
   expired_window: `
     We understand your booking window expired before you could complete your booking.
     
@@ -1853,7 +1900,7 @@ const SUPPORT_RESPONSES = {
     - Notified you of this resolution
     
     We recommend enabling push notifications to receive instant alerts.
-  `
+  `,
 };
 ```
 
@@ -1870,22 +1917,22 @@ interface WaitlistMetrics {
   totalInvitationsSent: number;
   totalBookingsFromWaitlist: number;
   conversionRate: number; // bookings / invitations
-  
+
   // Timing metrics
   averageTimeToInvite: number; // Time from join to invite
   averageTimeToBook: number; // Time from invite to book
   averageBookingWindowUtilization: number; // % of window used before booking
-  
+
   // Fill rate
   cancelledSlotsFilled: number;
   cancelledSlotsTotal: number;
   fillRate: number; // filled / total
-  
+
   // User satisfaction
   complaintsCount: number;
   refundsCount: number;
   dropOffRate: number; // Users who leave waitlist before invite
-  
+
   // System health
   notificationDeliveryRate: number;
   averageNotificationLatency: number; // Time from cancellation to notification
@@ -1899,14 +1946,14 @@ async calculateWaitlistMetrics(
 ): Promise<WaitlistMetrics> {
   // Aggregate metrics from database
   const joins = await this.waitlistRepo.count({ createdAt: Between(startDate, endDate) });
-  const invitations = await this.waitlistRepo.count({ 
-    notifiedAt: Between(startDate, endDate) 
+  const invitations = await this.waitlistRepo.count({
+    notifiedAt: Between(startDate, endDate)
   });
-  const bookings = await this.waitlistRepo.count({ 
+  const bookings = await this.waitlistRepo.count({
     state: 'booking_confirmed',
     updatedAt: Between(startDate, endDate)
   });
-  
+
   return {
     totalWaitlistJoins: joins,
     totalInvitationsSent: invitations,
@@ -1920,6 +1967,7 @@ async calculateWaitlistMetrics(
 #### Health Signals
 
 **Working Well:**
+
 - ✅ Conversion rate > 30%
 - ✅ Fill rate > 60%
 - ✅ Notification delivery rate > 95%
@@ -1929,12 +1977,14 @@ async calculateWaitlistMetrics(
 - ✅ Zero race condition detections
 
 **Creating Confusion:**
+
 - ⚠️ Conversion rate < 20% (users don't understand)
 - ⚠️ Complaints > 3% of waitlist joins
 - ⚠️ High drop-off rate (> 40%)
 - ⚠️ Many support tickets about "missed notifications"
 
 **Hurting Trust:**
+
 - 🚨 Complaints > 5% of waitlist joins
 - 🚨 Refund rate > 2%
 - 🚨 Any double bookings
@@ -1950,13 +2000,13 @@ const METRIC_THRESHOLDS = {
     doubleBookings: 1, // Any double booking
     notificationDelivery: 0.90 // < 90% delivery
   },
-  
+
   TWEAK_FEATURE: {
     conversionRate: 0.20, // < 20% conversion
     fillRate: 0.50, // < 50% fill rate
     complaints: 0.03 // 3% complaint rate
   },
-  
+
   ROLLBACK_FEATURE: {
     complaints: 0.10, // 10% complaint rate
     doubleBookings: 3, // 3+ double bookings
@@ -1969,7 +2019,7 @@ async monitorWaitlistHealth(): Promise<HealthCheckResult> {
     subDays(new Date(), 7), // Last 7 days
     new Date()
   );
-  
+
   if (metrics.complaintsCount / metrics.totalWaitlistJoins > METRIC_THRESHOLDS.PAUSE_FEATURE.complaints) {
     return {
       status: 'critical',
@@ -1977,7 +2027,7 @@ async monitorWaitlistHealth(): Promise<HealthCheckResult> {
       message: 'Complaint rate exceeds threshold. Pausing waitlist feature.'
     };
   }
-  
+
   if (metrics.doubleBookingAttempts > 0) {
     return {
       status: 'critical',
@@ -1985,9 +2035,9 @@ async monitorWaitlistHealth(): Promise<HealthCheckResult> {
       message: 'Double booking detected. Pausing feature for investigation.'
     };
   }
-  
+
   // ... other checks
-  
+
   return { status: 'healthy', action: 'CONTINUE' };
 }
 ```
@@ -1999,13 +2049,14 @@ async monitorWaitlistHealth(): Promise<HealthCheckResult> {
 #### Data Integration
 
 **Dynamic Pricing:**
+
 ```typescript
 // Use waitlist data to inform pricing
 async calculateDynamicPrice(propertyId: string, date: Date): Promise<number> {
   const basePrice = await this.getBasePrice(propertyId);
   const waitlistCount = await this.waitlistRepo.countByDate(propertyId, date);
   const demandLevel = this.calculateDemandLevel(waitlistCount);
-  
+
   // Higher waitlist = higher demand = higher price
   const multiplier = {
     low: 1.0,      // 0-5 waitlisted
@@ -2013,18 +2064,19 @@ async calculateDynamicPrice(propertyId: string, date: Date): Promise<number> {
     high: 1.2,     // 16-30 waitlisted
     very_high: 1.3 // 31+ waitlisted
   }[demandLevel];
-  
+
   return basePrice * multiplier;
 }
 ```
 
 **Demand Forecasting:**
+
 ```typescript
 // Predict future demand based on waitlist patterns
 async forecastDemand(propertyId: string, dateRange: DateRange): Promise<DemandForecast> {
   const historicalWaitlist = await this.waitlistRepo.findHistorical(propertyId, dateRange);
   const cancellationPatterns = await this.analyzeCancellationPatterns(propertyId);
-  
+
   return {
     predictedWaitlistSize: this.predictWaitlistSize(historicalWaitlist),
     predictedCancellationRate: this.predictCancellationRate(cancellationPatterns),
@@ -2034,11 +2086,12 @@ async forecastDemand(propertyId: string, dateRange: DateRange): Promise<DemandFo
 ```
 
 **Host Recommendations:**
+
 ```typescript
 // Recommend properties to hosts based on waitlist demand
 async getHostRecommendations(hostId: string): Promise<HostRecommendation[]> {
   const properties = await this.propertyRepo.findByHost(hostId);
-  
+
   return properties.map(property => ({
     propertyId: property.id,
     recommendation: this.generateRecommendation(property),
@@ -2054,6 +2107,7 @@ async getHostRecommendations(hostId: string): Promise<HostRecommendation[]> {
 #### Premium Features
 
 **Premium Host Tools:**
+
 - Advanced waitlist analytics
 - Custom booking window durations
 - Priority notification settings
@@ -2061,6 +2115,7 @@ async getHostRecommendations(hostId: string): Promise<HostRecommendation[]> {
 - Integration with pricing tools
 
 **Marketing Differentiators:**
+
 - "Never miss a booking" - Fill cancelled slots automatically
 - "Smart demand management" - Data-driven insights
 - "Fair waitlist system" - Transparent, first-come-first-served
@@ -2068,6 +2123,7 @@ async getHostRecommendations(hostId: string): Promise<HostRecommendation[]> {
 #### Competitive Advantage
 
 **Why Hard to Replicate:**
+
 1. **Complex State Management**: Multi-state system with strict transitions
 2. **Race Condition Handling**: Multi-layer locking and reservation system
 3. **Data Integration**: Deep integration with pricing and forecasting
@@ -2081,6 +2137,7 @@ async getHostRecommendations(hostId: string): Promise<HostRecommendation[]> {
 #### The Problem: Multiple Users, One Slot
 
 **Scenario:**
+
 - 100 users on waitlist for same property/dates
 - Cancellation occurs
 - Who gets notified?
@@ -2103,7 +2160,7 @@ interface SlotReservation {
 // When cancellation occurs
 async handleCancellation(bookingId: string) {
   const booking = await this.getBooking(bookingId);
-  
+
   // STEP 1: Create availability slot (not yet reserved)
   const availabilitySlot = await this.availabilityService.createSlot({
     propertyId: booking.propertyId,
@@ -2111,7 +2168,7 @@ async handleCancellation(bookingId: string) {
     checkOutDate: booking.checkOutDate,
     status: 'available_for_waitlist'
   });
-  
+
   // STEP 2: Find top priority waitlist entry
   const topEntry = await this.waitlistRepo.findTopPriority(
     booking.propertyId,
@@ -2119,25 +2176,25 @@ async handleCancellation(bookingId: string) {
     booking.checkOutDate,
     { state: WaitlistState.WAITLISTED }
   );
-  
+
   if (!topEntry) {
     // No waitlist - release to general availability
     await this.availabilityService.releaseToGeneral(availabilitySlot.id);
     return;
   }
-  
+
   // STEP 3: Atomically reserve slot for this user (prevents race conditions)
   const reservation = await this.reserveSlotExclusively(
     availabilitySlot.id,
     topEntry.id
   );
-  
+
   if (!reservation) {
     // Reservation failed (shouldn't happen, but handle gracefully)
     await this.availabilityService.releaseToGeneral(availabilitySlot.id);
     return;
   }
-  
+
   // STEP 4: Update waitlist entry state
   await this.waitlistRepo.update(topEntry.id, {
     state: WaitlistState.INVITED,
@@ -2145,10 +2202,10 @@ async handleCancellation(bookingId: string) {
     notifiedAt: new Date(),
     expiresAt: reservation.reservedUntil
   });
-  
+
   // STEP 5: Send notification
   await this.notificationService.sendWaitlistInvitation(topEntry, reservation);
-  
+
   // STEP 6: Schedule expiry check
   await this.scheduleExpiryCheck(reservation.id, reservation.reservedUntil);
 }
@@ -2161,7 +2218,7 @@ async reserveSlotExclusively(
   // Use distributed lock + database transaction
   const lockKey = `lock:slot-reservation:${availabilitySlotId}`;
   const lock = await this.redis.acquireLock(lockKey, 5000);
-  
+
   try {
     return await this.dataSource.transaction(async (manager) => {
       // Check if slot already reserved (pessimistic lock)
@@ -2171,12 +2228,12 @@ async reserveSlotExclusively(
         .andWhere('sr.status = :status', { status: 'reserved' })
         .setLock('pessimistic_write')
         .getOne();
-      
+
       if (existingReservation) {
         // Already reserved by another process/user
         return null;
       }
-      
+
       // Create reservation
       const reservation = await manager.save(SlotReservation, {
         availabilitySlotId,
@@ -2184,13 +2241,13 @@ async reserveSlotExclusively(
         reservedUntil: addHours(new Date(), 2), // 2 hour window
         status: 'reserved'
       });
-      
+
       // Mark availability slot as reserved
       await manager.update(AvailabilitySlot, availabilitySlotId, {
         status: 'reserved_for_waitlist',
         reservationId: reservation.id
       });
-      
+
       return reservation;
     });
   } finally {
@@ -2221,17 +2278,17 @@ async bookFromWaitlist(
   additionalProperties?: string[] // User wants to book multiple
 ): Promise<Booking[]> {
   const entry = await this.waitlistRepo.findById(waitlistEntryId);
-  
+
   if (entry.state !== WaitlistState.INVITED) {
     throw new BadRequestException('Invalid waitlist state');
   }
-  
+
   // Book the reserved slot
   const primaryBooking = await this.bookReservedSlot(entry);
-  
+
   // If user wants additional properties, check availability
   const additionalBookings: Booking[] = [];
-  
+
   if (additionalProperties && additionalProperties.length > 0) {
     for (const propertyId of additionalProperties) {
       // Check if available (not reserved for other waitlist users)
@@ -2240,7 +2297,7 @@ async bookFromWaitlist(
         entry.checkInDate,
         entry.checkOutDate
       );
-      
+
       if (isAvailable) {
         // Book additional property (standard booking flow)
         const booking = await this.bookingService.createBooking({
@@ -2249,12 +2306,12 @@ async bookFromWaitlist(
           checkInDate: entry.checkInDate,
           checkOutDate: entry.checkOutDate
         }, generateIdempotencyKey());
-        
+
         additionalBookings.push(booking);
       }
     }
   }
-  
+
   return [primaryBooking, ...additionalBookings];
 }
 
@@ -2270,9 +2327,9 @@ async checkGeneralAvailability(
     checkIn,
     checkOut
   );
-  
+
   // Only available if no active reservations
-  return reservations.filter(r => 
+  return reservations.filter(r =>
     r.status === 'reserved' && r.reservedUntil > new Date()
   ).length === 0;
 }
@@ -2291,7 +2348,7 @@ CREATE TABLE availability_slots (
   status VARCHAR(30) DEFAULT 'available_for_waitlist',
   reservation_id UUID REFERENCES slot_reservations(id),
   created_at TIMESTAMP DEFAULT NOW(),
-  
+
   -- Prevent overlapping slots for same property/room
   EXCLUDE USING GIST (
     property_id WITH =,
@@ -2308,20 +2365,20 @@ CREATE TABLE slot_reservations (
   reserved_until TIMESTAMP NOT NULL,
   status VARCHAR(20) DEFAULT 'reserved',
   created_at TIMESTAMP DEFAULT NOW(),
-  
+
   -- One reservation per slot
   UNIQUE(availability_slot_id) WHERE (status = 'reserved'),
-  
+
   -- One active reservation per waitlist entry
   UNIQUE(waitlist_entry_id) WHERE (status = 'reserved')
 );
 
-CREATE INDEX idx_slot_reservations_active 
-ON slot_reservations(availability_slot_id, status) 
+CREATE INDEX idx_slot_reservations_active
+ON slot_reservations(availability_slot_id, status)
 WHERE status = 'reserved';
 
-CREATE INDEX idx_slot_reservations_expiry 
-ON slot_reservations(reserved_until) 
+CREATE INDEX idx_slot_reservations_expiry
+ON slot_reservations(reserved_until)
 WHERE status = 'reserved';
 ```
 
@@ -2371,6 +2428,7 @@ This comprehensive design addresses all critical questions with production-ready
 ## Tech Stack
 
 ### Core Framework
+
 - **NestJS** (TypeScript) - Backend framework
 - **TypeORM** - Database ORM
 - **PostgreSQL** - Primary database
@@ -2379,11 +2437,13 @@ This comprehensive design addresses all critical questions with production-ready
 - **Bull** - Background job queue
 
 ### External Services
+
 - **Payment Gateway**: Cashfree (or similar)
 - **Email Service**: SendGrid (for booking confirmations)
 - **Storage**: Azure Blob Storage (for property images)
 
 ### Infrastructure
+
 - **Docker** - Containerization
 - **Azure** - Cloud hosting (or AWS/GCP)
 
@@ -2441,6 +2501,7 @@ This comprehensive design addresses all critical questions with production-ready
 ### Core Tables
 
 #### Properties
+
 ```sql
 CREATE TABLE properties (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2462,6 +2523,7 @@ CREATE INDEX idx_properties_city ON properties(city) WHERE status = 'active';
 ```
 
 #### Bookings
+
 ```sql
 CREATE TABLE bookings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2480,12 +2542,13 @@ CREATE TABLE bookings (
   CONSTRAINT check_dates CHECK (check_out_date > check_in_date)
 );
 
-CREATE INDEX idx_bookings_property_dates ON bookings(property_id, check_in_date, check_out_date) 
+CREATE INDEX idx_bookings_property_dates ON bookings(property_id, check_in_date, check_out_date)
   WHERE status = 'confirmed';
 CREATE INDEX idx_bookings_guest ON bookings(guest_id);
 ```
 
 #### Availability Calendar
+
 ```sql
 CREATE TABLE availability_calendar (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2502,6 +2565,7 @@ CREATE INDEX idx_availability_property_date ON availability_calendar(property_id
 ```
 
 #### Users
+
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2515,6 +2579,7 @@ CREATE TABLE users (
 ```
 
 #### Waitlist (Standout Feature)
+
 ```sql
 CREATE TABLE waitlist (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2534,6 +2599,7 @@ CREATE INDEX idx_waitlist_user ON waitlist(user_id);
 ```
 
 #### Price Alerts (Standout Feature)
+
 ```sql
 CREATE TABLE price_alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2559,6 +2625,7 @@ CREATE INDEX idx_price_alerts_user ON price_alerts(user_id, status) WHERE status
 ### Core Endpoints
 
 #### Search & Discovery
+
 ```
 GET /api/v1/properties/search
   Query params: location, check_in, check_out, guests, price_min, price_max, radius
@@ -2573,6 +2640,7 @@ GET /api/v1/properties/:id/availability
 ```
 
 #### Booking
+
 ```
 POST /api/v1/bookings
   Headers: X-Idempotency-Key (required)
@@ -2587,6 +2655,7 @@ PATCH /api/v1/bookings/:id/cancel
 ```
 
 #### Payment
+
 ```
 POST /api/v1/payments
   Body: { booking_id, amount, payment_method }
@@ -2597,6 +2666,7 @@ POST /api/v1/webhooks/payment
 ```
 
 #### Waitlist (Standout Feature)
+
 ```
 POST /api/v1/waitlist
   Body: { property_id, check_in_date, check_out_date }
@@ -2613,6 +2683,7 @@ POST /api/v1/waitlist/:id/book
 ```
 
 #### Price Alerts (Standout Feature)
+
 ```
 POST /api/v1/price-alerts
   Body: { property_id, target_price, auto_book (optional) }
@@ -2645,7 +2716,10 @@ export class BookingService {
     private paymentService: PaymentService,
   ) {}
 
-  async createBooking(dto: CreateBookingDto, idempotencyKey: string): Promise<Booking> {
+  async createBooking(
+    dto: CreateBookingDto,
+    idempotencyKey: string,
+  ): Promise<Booking> {
     // 1. Check idempotency
     const existing = await this.bookingRepo.findByToken(idempotencyKey);
     if (existing) return existing;
@@ -2654,7 +2728,7 @@ export class BookingService {
     const isAvailable = await this.checkAvailabilityFast(
       dto.propertyId,
       dto.checkInDate,
-      dto.checkOutDate
+      dto.checkOutDate,
     );
     if (!isAvailable) {
       throw new ConflictException('Property not available for selected dates');
@@ -2663,15 +2737,16 @@ export class BookingService {
     // 3. Acquire distributed lock
     const lockKey = `lock:booking:${dto.propertyId}:${dto.checkInDate}:${dto.checkOutDate}`;
     const lock = await this.redis.acquireLock(lockKey, 30000); // 30s timeout
-    
+
     try {
       // 4. Re-validate with database lock
-      const isReallyAvailable = await this.availabilityRepo.checkAvailabilityWithLock(
-        dto.propertyId,
-        dto.checkInDate,
-        dto.checkOutDate
-      );
-      
+      const isReallyAvailable =
+        await this.availabilityRepo.checkAvailabilityWithLock(
+          dto.propertyId,
+          dto.checkInDate,
+          dto.checkOutDate,
+        );
+
       if (!isReallyAvailable) {
         throw new ConflictException('Property not available');
       }
@@ -2690,7 +2765,7 @@ export class BookingService {
           manager,
           dto.propertyId,
           dto.checkInDate,
-          dto.checkOutDate
+          dto.checkOutDate,
         );
 
         return newBooking;
@@ -2700,7 +2775,11 @@ export class BookingService {
       await this.paymentService.processPayment(booking.id);
 
       // 7. Invalidate cache
-      await this.invalidateAvailabilityCache(dto.propertyId, dto.checkInDate, dto.checkOutDate);
+      await this.invalidateAvailabilityCache(
+        dto.propertyId,
+        dto.checkInDate,
+        dto.checkOutDate,
+      );
 
       return booking;
     } finally {
@@ -2712,7 +2791,7 @@ export class BookingService {
   private async checkAvailabilityFast(
     propertyId: string,
     checkIn: Date,
-    checkOut: Date
+    checkOut: Date,
   ): Promise<boolean> {
     // Check Redis cache for quick availability
     const dates = this.getDateRange(checkIn, checkOut);
@@ -2730,7 +2809,7 @@ export class BookingService {
     manager: EntityManager,
     propertyId: string,
     checkIn: Date,
-    checkOut: Date
+    checkOut: Date,
   ): Promise<void> {
     const dates = this.getDateRange(checkIn, checkOut);
     for (const date of dates) {
@@ -2741,7 +2820,7 @@ export class BookingService {
           date,
           available: false,
         },
-        ['propertyId', 'date']
+        ['propertyId', 'date'],
       );
     }
   }
@@ -2756,7 +2835,7 @@ export class AvailabilityRepository {
   async checkAvailabilityWithLock(
     propertyId: string,
     checkIn: Date,
-    checkOut: Date
+    checkOut: Date,
   ): Promise<boolean> {
     const result = await this.dataSource
       .createQueryBuilder()
@@ -2786,13 +2865,13 @@ export class RedisService {
       lockValue,
       'PX', // milliseconds
       ttl,
-      'NX' // only set if not exists
+      'NX', // only set if not exists
     );
-    
+
     if (!acquired) {
       throw new ConflictException('Could not acquire lock');
     }
-    
+
     return lockValue;
   }
 
@@ -2836,16 +2915,20 @@ export class SearchService {
           lng: coordinates.lng,
           lat: coordinates.lat,
           radius: criteria.radius * 1000, // km to meters
-        }
+        },
       );
     }
 
     // Price filter
     if (criteria.priceMin) {
-      query.andWhere('property.base_price >= :priceMin', { priceMin: criteria.priceMin });
+      query.andWhere('property.base_price >= :priceMin', {
+        priceMin: criteria.priceMin,
+      });
     }
     if (criteria.priceMax) {
-      query.andWhere('property.base_price <= :priceMax', { priceMax: criteria.priceMax });
+      query.andWhere('property.base_price <= :priceMax', {
+        priceMax: criteria.priceMax,
+      });
     }
 
     // Availability filter
@@ -2858,7 +2941,7 @@ export class SearchService {
           AND ac.date < :checkOut
           AND ac.available = false
         )`,
-        { checkIn: criteria.checkIn, checkOut: criteria.checkOut }
+        { checkIn: criteria.checkIn, checkOut: criteria.checkOut },
       );
     }
 
@@ -2869,11 +2952,2959 @@ export class SearchService {
 
 ---
 
+## Rate Limiting Implementation
+
+### Overview
+
+Rate limiting protects your API from abuse, ensures fair resource allocation, and maintains service stability. This implementation uses **Redis** without external libraries, implementing industry-standard algorithms from scratch.
+
+### Rate Limiting Algorithms
+
+#### 1. Sliding Window Log Algorithm
+
+Most accurate algorithm that tracks each request timestamp. Perfect for strict rate limiting.
+
+**How it works**:
+
+1. Store timestamp of each request in a sorted set
+2. Remove timestamps outside the current window
+3. Count remaining requests
+4. Allow/deny based on count vs limit
+
+**Pros**: Very accurate, no boundary issues
+**Cons**: Higher memory usage for high-traffic endpoints
+
+#### 2. Token Bucket Algorithm
+
+Allows bursting while maintaining average rate. Ideal for APIs that need flexibility.
+
+**How it works**:
+
+1. Bucket holds tokens, refilled at a steady rate
+2. Each request consumes one token
+3. If bucket is empty, request is denied
+4. Bucket has maximum capacity (burst limit)
+
+**Pros**: Allows bursts, smooth rate limiting
+**Cons**: Slightly more complex implementation
+
+#### 3. Fixed Window Counter (Simple)
+
+Divides time into fixed windows and counts requests per window.
+
+**How it works**:
+
+1. Create a counter for current time window
+2. Increment on each request
+3. Reset when window expires
+
+**Pros**: Simple, low memory
+**Cons**: Boundary burst problem (2x requests at window edges)
+
+---
+
+### Project Structure
+
+```
+src/
+├── modules/
+│   └── rate-limiter/
+│       ├── rate-limiter.module.ts
+│       ├── rate-limiter.service.ts
+│       ├── rate-limiter.guard.ts
+│       ├── decorators/
+│       │   ├── rate-limit.decorator.ts
+│       │   └── skip-rate-limit.decorator.ts
+│       ├── strategies/
+│       │   ├── rate-limit-strategy.interface.ts
+│       │   ├── sliding-window.strategy.ts
+│       │   ├── token-bucket.strategy.ts
+│       │   └── fixed-window.strategy.ts
+│       ├── interfaces/
+│       │   └── rate-limit-config.interface.ts
+│       └── exceptions/
+│           └── rate-limit-exceeded.exception.ts
+```
+
+---
+
+### Core Interfaces
+
+#### rate-limit-config.interface.ts
+
+```typescript
+export interface RateLimitConfig {
+  /** Unique identifier for this rate limit rule */
+  name: string;
+
+  /** Maximum requests allowed in the time window */
+  limit: number;
+
+  /** Time window in seconds */
+  windowSeconds: number;
+
+  /** Strategy to use: 'sliding-window' | 'token-bucket' | 'fixed-window' */
+  strategy: RateLimitStrategy;
+
+  /** For token bucket: tokens added per second */
+  refillRate?: number;
+
+  /** For token bucket: maximum bucket capacity (burst limit) */
+  bucketCapacity?: number;
+
+  /** Key prefix for Redis */
+  keyPrefix?: string;
+
+  /** Whether to skip rate limiting for certain conditions */
+  skipIf?: (context: ExecutionContext) => boolean;
+
+  /** Custom error message */
+  errorMessage?: string;
+
+  /** Block duration in seconds after limit exceeded (optional penalty) */
+  blockDuration?: number;
+}
+
+export type RateLimitStrategy =
+  | 'sliding-window'
+  | 'token-bucket'
+  | 'fixed-window';
+
+export interface RateLimitResult {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetAt: number; // Unix timestamp
+  retryAfter?: number; // Seconds until next allowed request
+}
+
+export interface RateLimitInfo {
+  'X-RateLimit-Limit': number;
+  'X-RateLimit-Remaining': number;
+  'X-RateLimit-Reset': number;
+  'Retry-After'?: number;
+}
+```
+
+---
+
+### Rate Limit Strategy Interface
+
+#### rate-limit-strategy.interface.ts
+
+```typescript
+import {
+  RateLimitConfig,
+  RateLimitResult,
+} from '../interfaces/rate-limit-config.interface';
+
+export interface IRateLimitStrategy {
+  /**
+   * Check if request is allowed and consume quota
+   * @param key - Unique identifier for the client/endpoint
+   * @param config - Rate limit configuration
+   * @returns Rate limit result with remaining quota info
+   */
+  consume(key: string, config: RateLimitConfig): Promise<RateLimitResult>;
+
+  /**
+   * Get current rate limit status without consuming quota
+   * @param key - Unique identifier for the client/endpoint
+   * @param config - Rate limit configuration
+   */
+  getStatus(key: string, config: RateLimitConfig): Promise<RateLimitResult>;
+
+  /**
+   * Reset rate limit for a specific key
+   * @param key - Unique identifier to reset
+   */
+  reset(key: string): Promise<void>;
+}
+```
+
+---
+
+### Sliding Window Log Strategy
+
+#### sliding-window.strategy.ts
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { Redis } from 'ioredis';
+import { InjectRedis } from '../redis/redis.decorator';
+import { IRateLimitStrategy } from './rate-limit-strategy.interface';
+import {
+  RateLimitConfig,
+  RateLimitResult,
+} from '../interfaces/rate-limit-config.interface';
+
+@Injectable()
+export class SlidingWindowStrategy implements IRateLimitStrategy {
+  constructor(@InjectRedis() private readonly redis: Redis) {}
+
+  async consume(
+    key: string,
+    config: RateLimitConfig,
+  ): Promise<RateLimitResult> {
+    const now = Date.now();
+    const windowStart = now - config.windowSeconds * 1000;
+    const redisKey = `${config.keyPrefix || 'ratelimit'}:sliding:${key}`;
+
+    // Lua script for atomic sliding window operation
+    const luaScript = `
+      local key = KEYS[1]
+      local now = tonumber(ARGV[1])
+      local window_start = tonumber(ARGV[2])
+      local limit = tonumber(ARGV[3])
+      local window_seconds = tonumber(ARGV[4])
+
+      -- Remove expired entries
+      redis.call('ZREMRANGEBYSCORE', key, '-inf', window_start)
+
+      -- Count current requests in window
+      local current_count = redis.call('ZCARD', key)
+
+      if current_count < limit then
+        -- Add current request with timestamp as score
+        redis.call('ZADD', key, now, now .. ':' .. math.random())
+        redis.call('PEXPIRE', key, window_seconds * 1000)
+        return {1, limit - current_count - 1, current_count + 1}
+      else
+        -- Get oldest entry to calculate retry time
+        local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+        local retry_after = 0
+        if oldest[2] then
+          retry_after = math.ceil((tonumber(oldest[2]) + window_seconds * 1000 - now) / 1000)
+        end
+        return {0, 0, current_count, retry_after}
+      end
+    `;
+
+    const result = (await this.redis.eval(
+      luaScript,
+      1,
+      redisKey,
+      now,
+      windowStart,
+      config.limit,
+      config.windowSeconds,
+    )) as number[];
+
+    const [allowed, remaining, count, retryAfter] = result;
+
+    return {
+      allowed: allowed === 1,
+      limit: config.limit,
+      remaining: Math.max(0, remaining),
+      resetAt: Math.ceil((now + config.windowSeconds * 1000) / 1000),
+      retryAfter: retryAfter > 0 ? retryAfter : undefined,
+    };
+  }
+
+  async getStatus(
+    key: string,
+    config: RateLimitConfig,
+  ): Promise<RateLimitResult> {
+    const now = Date.now();
+    const windowStart = now - config.windowSeconds * 1000;
+    const redisKey = `${config.keyPrefix || 'ratelimit'}:sliding:${key}`;
+
+    // Remove expired and count without adding
+    await this.redis.zremrangebyscore(redisKey, '-inf', windowStart);
+    const count = await this.redis.zcard(redisKey);
+
+    return {
+      allowed: count < config.limit,
+      limit: config.limit,
+      remaining: Math.max(0, config.limit - count),
+      resetAt: Math.ceil((now + config.windowSeconds * 1000) / 1000),
+    };
+  }
+
+  async reset(key: string): Promise<void> {
+    const pattern = `ratelimit:sliding:${key}*`;
+    const keys = await this.redis.keys(pattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+  }
+}
+```
+
+---
+
+### Token Bucket Strategy
+
+#### token-bucket.strategy.ts
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { Redis } from 'ioredis';
+import { InjectRedis } from '../redis/redis.decorator';
+import { IRateLimitStrategy } from './rate-limit-strategy.interface';
+import {
+  RateLimitConfig,
+  RateLimitResult,
+} from '../interfaces/rate-limit-config.interface';
+
+@Injectable()
+export class TokenBucketStrategy implements IRateLimitStrategy {
+  constructor(@InjectRedis() private readonly redis: Redis) {}
+
+  async consume(
+    key: string,
+    config: RateLimitConfig,
+  ): Promise<RateLimitResult> {
+    const now = Date.now();
+    const redisKey = `${config.keyPrefix || 'ratelimit'}:bucket:${key}`;
+
+    // Default values
+    const capacity = config.bucketCapacity || config.limit;
+    const refillRate = config.refillRate || config.limit / config.windowSeconds;
+
+    // Lua script for atomic token bucket operation
+    const luaScript = `
+      local key = KEYS[1]
+      local now = tonumber(ARGV[1])
+      local capacity = tonumber(ARGV[2])
+      local refill_rate = tonumber(ARGV[3])
+      local tokens_to_consume = 1
+
+      -- Get current bucket state
+      local bucket = redis.call('HMGET', key, 'tokens', 'last_refill')
+      local tokens = tonumber(bucket[1])
+      local last_refill = tonumber(bucket[2])
+
+      -- Initialize bucket if it doesn't exist
+      if not tokens then
+        tokens = capacity
+        last_refill = now
+      end
+
+      -- Calculate tokens to add based on time elapsed
+      local time_elapsed = (now - last_refill) / 1000 -- Convert to seconds
+      local tokens_to_add = time_elapsed * refill_rate
+      tokens = math.min(capacity, tokens + tokens_to_add)
+
+      -- Try to consume token
+      if tokens >= tokens_to_consume then
+        tokens = tokens - tokens_to_consume
+        redis.call('HMSET', key, 'tokens', tokens, 'last_refill', now)
+        redis.call('PEXPIRE', key, 86400000) -- 24 hour expiry
+        return {1, math.floor(tokens), 0}
+      else
+        -- Calculate time until next token
+        local tokens_needed = tokens_to_consume - tokens
+        local wait_time = math.ceil(tokens_needed / refill_rate)
+        redis.call('HMSET', key, 'tokens', tokens, 'last_refill', now)
+        redis.call('PEXPIRE', key, 86400000)
+        return {0, 0, wait_time}
+      end
+    `;
+
+    const result = (await this.redis.eval(
+      luaScript,
+      1,
+      redisKey,
+      now,
+      capacity,
+      refillRate,
+    )) as number[];
+
+    const [allowed, remaining, retryAfter] = result;
+
+    return {
+      allowed: allowed === 1,
+      limit: capacity,
+      remaining: Math.max(0, remaining),
+      resetAt: Math.ceil(now / 1000 + (capacity - remaining) / refillRate),
+      retryAfter: retryAfter > 0 ? retryAfter : undefined,
+    };
+  }
+
+  async getStatus(
+    key: string,
+    config: RateLimitConfig,
+  ): Promise<RateLimitResult> {
+    const now = Date.now();
+    const redisKey = `${config.keyPrefix || 'ratelimit'}:bucket:${key}`;
+
+    const capacity = config.bucketCapacity || config.limit;
+    const refillRate = config.refillRate || config.limit / config.windowSeconds;
+
+    const bucket = await this.redis.hmget(redisKey, 'tokens', 'last_refill');
+    let tokens = parseFloat(bucket[0] || String(capacity));
+    const lastRefill = parseInt(bucket[1] || String(now), 10);
+
+    // Calculate current tokens
+    const timeElapsed = (now - lastRefill) / 1000;
+    tokens = Math.min(capacity, tokens + timeElapsed * refillRate);
+
+    return {
+      allowed: tokens >= 1,
+      limit: capacity,
+      remaining: Math.floor(tokens),
+      resetAt: Math.ceil(now / 1000 + (capacity - tokens) / refillRate),
+    };
+  }
+
+  async reset(key: string): Promise<void> {
+    const pattern = `ratelimit:bucket:${key}*`;
+    const keys = await this.redis.keys(pattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+  }
+}
+```
+
+---
+
+### Fixed Window Counter Strategy
+
+#### fixed-window.strategy.ts
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { Redis } from 'ioredis';
+import { InjectRedis } from '../redis/redis.decorator';
+import { IRateLimitStrategy } from './rate-limit-strategy.interface';
+import {
+  RateLimitConfig,
+  RateLimitResult,
+} from '../interfaces/rate-limit-config.interface';
+
+@Injectable()
+export class FixedWindowStrategy implements IRateLimitStrategy {
+  constructor(@InjectRedis() private readonly redis: Redis) {}
+
+  async consume(
+    key: string,
+    config: RateLimitConfig,
+  ): Promise<RateLimitResult> {
+    const now = Date.now();
+    const windowKey = Math.floor(now / (config.windowSeconds * 1000));
+    const redisKey = `${
+      config.keyPrefix || 'ratelimit'
+    }:fixed:${key}:${windowKey}`;
+
+    // Lua script for atomic increment and check
+    const luaScript = `
+      local key = KEYS[1]
+      local limit = tonumber(ARGV[1])
+      local window_seconds = tonumber(ARGV[2])
+
+      local current = redis.call('INCR', key)
+      
+      if current == 1 then
+        redis.call('EXPIRE', key, window_seconds)
+      end
+
+      if current <= limit then
+        return {1, limit - current}
+      else
+        local ttl = redis.call('TTL', key)
+        return {0, 0, ttl}
+      end
+    `;
+
+    const result = (await this.redis.eval(
+      luaScript,
+      1,
+      redisKey,
+      config.limit,
+      config.windowSeconds,
+    )) as number[];
+
+    const [allowed, remaining, ttl] = result;
+    const windowEnd = (windowKey + 1) * config.windowSeconds;
+
+    return {
+      allowed: allowed === 1,
+      limit: config.limit,
+      remaining: Math.max(0, remaining),
+      resetAt: windowEnd,
+      retryAfter: ttl > 0 ? ttl : undefined,
+    };
+  }
+
+  async getStatus(
+    key: string,
+    config: RateLimitConfig,
+  ): Promise<RateLimitResult> {
+    const now = Date.now();
+    const windowKey = Math.floor(now / (config.windowSeconds * 1000));
+    const redisKey = `${
+      config.keyPrefix || 'ratelimit'
+    }:fixed:${key}:${windowKey}`;
+
+    const count = parseInt((await this.redis.get(redisKey)) || '0', 10);
+    const windowEnd = (windowKey + 1) * config.windowSeconds;
+
+    return {
+      allowed: count < config.limit,
+      limit: config.limit,
+      remaining: Math.max(0, config.limit - count),
+      resetAt: windowEnd,
+    };
+  }
+
+  async reset(key: string): Promise<void> {
+    const pattern = `ratelimit:fixed:${key}*`;
+    const keys = await this.redis.keys(pattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+  }
+}
+```
+
+---
+
+### Rate Limiter Service
+
+#### rate-limiter.service.ts
+
+```typescript
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Redis } from 'ioredis';
+import { InjectRedis } from '../redis/redis.decorator';
+import { SlidingWindowStrategy } from './strategies/sliding-window.strategy';
+import { TokenBucketStrategy } from './strategies/token-bucket.strategy';
+import { FixedWindowStrategy } from './strategies/fixed-window.strategy';
+import { IRateLimitStrategy } from './strategies/rate-limit-strategy.interface';
+import {
+  RateLimitConfig,
+  RateLimitResult,
+  RateLimitStrategy,
+} from './interfaces/rate-limit-config.interface';
+
+@Injectable()
+export class RateLimiterService implements OnModuleInit {
+  private strategies: Map<RateLimitStrategy, IRateLimitStrategy>;
+
+  constructor(
+    @InjectRedis() private readonly redis: Redis,
+    private readonly slidingWindowStrategy: SlidingWindowStrategy,
+    private readonly tokenBucketStrategy: TokenBucketStrategy,
+    private readonly fixedWindowStrategy: FixedWindowStrategy,
+  ) {}
+
+  onModuleInit() {
+    this.strategies = new Map([
+      ['sliding-window', this.slidingWindowStrategy],
+      ['token-bucket', this.tokenBucketStrategy],
+      ['fixed-window', this.fixedWindowStrategy],
+    ]);
+  }
+
+  /**
+   * Check and consume rate limit quota
+   */
+  async consume(
+    identifier: string,
+    config: RateLimitConfig,
+  ): Promise<RateLimitResult> {
+    const strategy = this.getStrategy(config.strategy);
+    const key = this.buildKey(identifier, config);
+
+    // Check if blocked (optional penalty feature)
+    if (config.blockDuration) {
+      const isBlocked = await this.isBlocked(key);
+      if (isBlocked) {
+        const ttl = await this.redis.ttl(`${key}:blocked`);
+        return {
+          allowed: false,
+          limit: config.limit,
+          remaining: 0,
+          resetAt: Math.ceil(Date.now() / 1000) + ttl,
+          retryAfter: ttl,
+        };
+      }
+    }
+
+    const result = await strategy.consume(key, config);
+
+    // Apply block if limit exceeded and blockDuration configured
+    if (!result.allowed && config.blockDuration) {
+      await this.applyBlock(key, config.blockDuration);
+    }
+
+    return result;
+  }
+
+  /**
+   * Get current rate limit status without consuming
+   */
+  async getStatus(
+    identifier: string,
+    config: RateLimitConfig,
+  ): Promise<RateLimitResult> {
+    const strategy = this.getStrategy(config.strategy);
+    const key = this.buildKey(identifier, config);
+    return strategy.getStatus(key, config);
+  }
+
+  /**
+   * Reset rate limit for a specific identifier
+   */
+  async reset(identifier: string, config: RateLimitConfig): Promise<void> {
+    const strategy = this.getStrategy(config.strategy);
+    const key = this.buildKey(identifier, config);
+    await strategy.reset(key);
+    await this.redis.del(`${key}:blocked`);
+  }
+
+  /**
+   * Generate rate limit headers for response
+   */
+  generateHeaders(result: RateLimitResult): Record<string, string | number> {
+    const headers: Record<string, string | number> = {
+      'X-RateLimit-Limit': result.limit,
+      'X-RateLimit-Remaining': result.remaining,
+      'X-RateLimit-Reset': result.resetAt,
+    };
+
+    if (result.retryAfter) {
+      headers['Retry-After'] = result.retryAfter;
+    }
+
+    return headers;
+  }
+
+  private getStrategy(strategyName: RateLimitStrategy): IRateLimitStrategy {
+    const strategy = this.strategies.get(strategyName);
+    if (!strategy) {
+      throw new Error(`Unknown rate limit strategy: ${strategyName}`);
+    }
+    return strategy;
+  }
+
+  private buildKey(identifier: string, config: RateLimitConfig): string {
+    return `${config.name}:${identifier}`;
+  }
+
+  private async isBlocked(key: string): Promise<boolean> {
+    const blocked = await this.redis.exists(`${key}:blocked`);
+    return blocked === 1;
+  }
+
+  private async applyBlock(key: string, duration: number): Promise<void> {
+    await this.redis.setex(`${key}:blocked`, duration, '1');
+  }
+}
+```
+
+---
+
+### Rate Limit Decorator
+
+#### rate-limit.decorator.ts
+
+```typescript
+import { SetMetadata, applyDecorators, UseGuards } from '@nestjs/common';
+import { RateLimitConfig } from '../interfaces/rate-limit-config.interface';
+import { RateLimiterGuard } from '../rate-limiter.guard';
+
+export const RATE_LIMIT_KEY = 'rate_limit_config';
+
+/**
+ * Apply rate limiting to a route or controller
+ *
+ * @example
+ * // Basic usage - 100 requests per minute using sliding window
+ * @RateLimit({
+ *   name: 'api-general',
+ *   limit: 100,
+ *   windowSeconds: 60,
+ *   strategy: 'sliding-window',
+ * })
+ *
+ * @example
+ * // Token bucket for bursty traffic - allows bursts up to 50, refills at 10/sec
+ * @RateLimit({
+ *   name: 'api-search',
+ *   limit: 100,
+ *   windowSeconds: 60,
+ *   strategy: 'token-bucket',
+ *   bucketCapacity: 50,
+ *   refillRate: 10,
+ * })
+ *
+ * @example
+ * // Strict rate limit for sensitive endpoints with penalty
+ * @RateLimit({
+ *   name: 'payment-api',
+ *   limit: 10,
+ *   windowSeconds: 60,
+ *   strategy: 'sliding-window',
+ *   blockDuration: 300, // 5 minute block after limit exceeded
+ * })
+ */
+export const RateLimit = (config: RateLimitConfig) => {
+  return applyDecorators(
+    SetMetadata(RATE_LIMIT_KEY, config),
+    UseGuards(RateLimiterGuard),
+  );
+};
+
+/**
+ * Preset rate limits for common use cases
+ */
+export const RateLimitPresets = {
+  /** Public API: 100 requests/minute */
+  public: (): RateLimitConfig => ({
+    name: 'public-api',
+    limit: 100,
+    windowSeconds: 60,
+    strategy: 'sliding-window',
+  }),
+
+  /** Authenticated API: 1000 requests/minute */
+  authenticated: (): RateLimitConfig => ({
+    name: 'authenticated-api',
+    limit: 1000,
+    windowSeconds: 60,
+    strategy: 'sliding-window',
+  }),
+
+  /** Payment/Sensitive endpoints: 10 requests/minute with penalty */
+  payment: (): RateLimitConfig => ({
+    name: 'payment-api',
+    limit: 10,
+    windowSeconds: 60,
+    strategy: 'sliding-window',
+    blockDuration: 300,
+  }),
+
+  /** Search with burst support: 200/min average, burst up to 30 */
+  search: (): RateLimitConfig => ({
+    name: 'search-api',
+    limit: 200,
+    windowSeconds: 60,
+    strategy: 'token-bucket',
+    bucketCapacity: 30,
+    refillRate: 3.33,
+  }),
+
+  /** Login attempts: 5 per 15 minutes with 30 min block */
+  login: (): RateLimitConfig => ({
+    name: 'login-attempt',
+    limit: 5,
+    windowSeconds: 900,
+    strategy: 'sliding-window',
+    blockDuration: 1800,
+  }),
+
+  /** Password reset: 3 per hour */
+  passwordReset: (): RateLimitConfig => ({
+    name: 'password-reset',
+    limit: 3,
+    windowSeconds: 3600,
+    strategy: 'sliding-window',
+  }),
+
+  /** File upload: 20 per hour */
+  upload: (): RateLimitConfig => ({
+    name: 'file-upload',
+    limit: 20,
+    windowSeconds: 3600,
+    strategy: 'fixed-window',
+  }),
+};
+
+/**
+ * Shorthand decorators using presets
+ */
+export const PublicRateLimit = () => RateLimit(RateLimitPresets.public());
+export const AuthenticatedRateLimit = () =>
+  RateLimit(RateLimitPresets.authenticated());
+export const PaymentRateLimit = () => RateLimit(RateLimitPresets.payment());
+export const SearchRateLimit = () => RateLimit(RateLimitPresets.search());
+export const LoginRateLimit = () => RateLimit(RateLimitPresets.login());
+```
+
+---
+
+### Skip Rate Limit Decorator
+
+#### skip-rate-limit.decorator.ts
+
+```typescript
+import { SetMetadata } from '@nestjs/common';
+
+export const SKIP_RATE_LIMIT_KEY = 'skip_rate_limit';
+
+/**
+ * Skip rate limiting for this route
+ * Useful for health checks, internal endpoints, etc.
+ */
+export const SkipRateLimit = () => SetMetadata(SKIP_RATE_LIMIT_KEY, true);
+```
+
+---
+
+### Rate Limiter Guard
+
+#### rate-limiter.guard.ts
+
+```typescript
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Request, Response } from 'express';
+import { RateLimiterService } from './rate-limiter.service';
+import { RATE_LIMIT_KEY } from './decorators/rate-limit.decorator';
+import { SKIP_RATE_LIMIT_KEY } from './decorators/skip-rate-limit.decorator';
+import { RateLimitConfig } from './interfaces/rate-limit-config.interface';
+
+@Injectable()
+export class RateLimiterGuard implements CanActivate {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly rateLimiterService: RateLimiterService,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Check if rate limiting should be skipped
+    const skipRateLimit = this.reflector.getAllAndOverride<boolean>(
+      SKIP_RATE_LIMIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (skipRateLimit) {
+      return true;
+    }
+
+    // Get rate limit config from decorator
+    const config = this.reflector.getAllAndOverride<RateLimitConfig>(
+      RATE_LIMIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (!config) {
+      return true; // No rate limit configured
+    }
+
+    // Check custom skip condition
+    if (config.skipIf && config.skipIf(context)) {
+      return true;
+    }
+
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
+
+    // Build identifier: prefer user ID, fallback to IP
+    const identifier = this.getIdentifier(request, config);
+
+    // Check rate limit
+    const result = await this.rateLimiterService.consume(identifier, config);
+
+    // Set rate limit headers
+    const headers = this.rateLimiterService.generateHeaders(result);
+    Object.entries(headers).forEach(([key, value]) => {
+      response.setHeader(key, value);
+    });
+
+    if (!result.allowed) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          error: 'Too Many Requests',
+          message:
+            config.errorMessage ||
+            'Rate limit exceeded. Please try again later.',
+          retryAfter: result.retryAfter,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    return true;
+  }
+
+  private getIdentifier(request: Request, config: RateLimitConfig): string {
+    // Priority: User ID > API Key > IP Address
+    const userId = (request as any).user?.id;
+    if (userId) {
+      return `user:${userId}`;
+    }
+
+    const apiKey = request.headers['x-api-key'] as string;
+    if (apiKey) {
+      return `apikey:${apiKey}`;
+    }
+
+    // Get client IP (handle proxies)
+    const ip = this.getClientIp(request);
+    return `ip:${ip}`;
+  }
+
+  private getClientIp(request: Request): string {
+    // Check for forwarded headers (when behind proxy/load balancer)
+    const forwardedFor = request.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const ips = Array.isArray(forwardedFor)
+        ? forwardedFor[0]
+        : forwardedFor.split(',')[0];
+      return ips.trim();
+    }
+
+    const realIp = request.headers['x-real-ip'];
+    if (realIp) {
+      return Array.isArray(realIp) ? realIp[0] : realIp;
+    }
+
+    return request.ip || request.socket.remoteAddress || 'unknown';
+  }
+}
+```
+
+---
+
+### Rate Limit Exceeded Exception
+
+#### rate-limit-exceeded.exception.ts
+
+```typescript
+import { HttpException, HttpStatus } from '@nestjs/common';
+
+export class RateLimitExceededException extends HttpException {
+  constructor(
+    retryAfter?: number,
+    message = 'Rate limit exceeded. Please try again later.',
+  ) {
+    super(
+      {
+        statusCode: HttpStatus.TOO_MANY_REQUESTS,
+        error: 'Too Many Requests',
+        message,
+        retryAfter,
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+}
+```
+
+---
+
+### Rate Limiter Module
+
+#### rate-limiter.module.ts
+
+```typescript
+import { Module, Global } from '@nestjs/common';
+import { RateLimiterService } from './rate-limiter.service';
+import { RateLimiterGuard } from './rate-limiter.guard';
+import { SlidingWindowStrategy } from './strategies/sliding-window.strategy';
+import { TokenBucketStrategy } from './strategies/token-bucket.strategy';
+import { FixedWindowStrategy } from './strategies/fixed-window.strategy';
+import { RedisModule } from '../redis/redis.module';
+
+@Global()
+@Module({
+  imports: [RedisModule],
+  providers: [
+    RateLimiterService,
+    RateLimiterGuard,
+    SlidingWindowStrategy,
+    TokenBucketStrategy,
+    FixedWindowStrategy,
+  ],
+  exports: [RateLimiterService, RateLimiterGuard],
+})
+export class RateLimiterModule {}
+```
+
+---
+
+### Usage Examples
+
+#### Controller Level Rate Limiting
+
+```typescript
+import { Controller, Get, Post, Body } from '@nestjs/common';
+import {
+  RateLimit,
+  PublicRateLimit,
+  AuthenticatedRateLimit,
+  PaymentRateLimit,
+  LoginRateLimit,
+} from '../rate-limiter/decorators/rate-limit.decorator';
+import { SkipRateLimit } from '../rate-limiter/decorators/skip-rate-limit.decorator';
+
+// Apply to entire controller
+@Controller('properties')
+@AuthenticatedRateLimit()
+export class PropertyController {
+  @Get()
+  findAll() {
+    // Uses controller-level rate limit (1000/min)
+  }
+
+  // Override with stricter limit for creation
+  @Post()
+  @RateLimit({
+    name: 'property-create',
+    limit: 10,
+    windowSeconds: 3600,
+    strategy: 'sliding-window',
+  })
+  create(@Body() dto: CreatePropertyDto) {
+    // Only 10 property creations per hour
+  }
+
+  @Get('health')
+  @SkipRateLimit()
+  healthCheck() {
+    // No rate limiting for health checks
+  }
+}
+
+@Controller('auth')
+export class AuthController {
+  @Post('login')
+  @LoginRateLimit() // 5 attempts per 15 min, 30 min block
+  login(@Body() dto: LoginDto) {
+    // Strict rate limiting for login attempts
+  }
+
+  @Post('forgot-password')
+  @RateLimit({
+    name: 'forgot-password',
+    limit: 3,
+    windowSeconds: 3600,
+    strategy: 'sliding-window',
+    blockDuration: 3600, // 1 hour block after 3 attempts
+  })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    // Very strict for password reset
+  }
+}
+
+@Controller('search')
+export class SearchController {
+  @Get()
+  @RateLimit({
+    name: 'property-search',
+    limit: 200,
+    windowSeconds: 60,
+    strategy: 'token-bucket',
+    bucketCapacity: 30, // Allow burst of 30
+    refillRate: 3.33, // ~200 per minute average
+  })
+  search(@Query() query: SearchQueryDto) {
+    // Allows burst traffic for search
+  }
+}
+
+@Controller('bookings')
+export class BookingController {
+  @Post()
+  @PaymentRateLimit() // 10/min with 5 min block
+  createBooking(@Body() dto: CreateBookingDto) {
+    // Strict rate limiting for bookings
+  }
+
+  @Post(':id/payment')
+  @RateLimit({
+    name: 'booking-payment',
+    limit: 5,
+    windowSeconds: 60,
+    strategy: 'sliding-window',
+    blockDuration: 600, // 10 min block
+    errorMessage: 'Too many payment attempts. Please wait before trying again.',
+  })
+  processPayment(@Param('id') id: string) {
+    // Very strict for payment processing
+  }
+}
+```
+
+---
+
+### Global Rate Limiting Middleware
+
+For applying default rate limits globally without decorators.
+
+#### global-rate-limit.middleware.ts
+
+```typescript
+import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Request, Response, NextFunction } from 'express';
+import { RateLimiterService } from './rate-limiter.service';
+import { RateLimitConfig } from './interfaces/rate-limit-config.interface';
+
+@Injectable()
+export class GlobalRateLimitMiddleware implements NestMiddleware {
+  private readonly defaultConfig: RateLimitConfig = {
+    name: 'global-api',
+    limit: 100,
+    windowSeconds: 60,
+    strategy: 'sliding-window',
+  };
+
+  constructor(private readonly rateLimiterService: RateLimiterService) {}
+
+  async use(req: Request, res: Response, next: NextFunction) {
+    // Skip for certain paths
+    const skipPaths = ['/health', '/metrics', '/favicon.ico'];
+    if (skipPaths.some((path) => req.path.startsWith(path))) {
+      return next();
+    }
+
+    // Get identifier
+    const identifier = this.getIdentifier(req);
+
+    // Check rate limit
+    const result = await this.rateLimiterService.consume(
+      identifier,
+      this.defaultConfig,
+    );
+
+    // Set headers
+    const headers = this.rateLimiterService.generateHeaders(result);
+    Object.entries(headers).forEach(([key, value]) => {
+      res.setHeader(key, String(value));
+    });
+
+    if (!result.allowed) {
+      return res.status(429).json({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: 'Global rate limit exceeded.',
+        retryAfter: result.retryAfter,
+      });
+    }
+
+    next();
+  }
+
+  private getIdentifier(req: Request): string {
+    const userId = (req as any).user?.id;
+    if (userId) return `user:${userId}`;
+
+    const apiKey = req.headers['x-api-key'] as string;
+    if (apiKey) return `apikey:${apiKey}`;
+
+    const forwardedFor = req.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const ip = Array.isArray(forwardedFor)
+        ? forwardedFor[0]
+        : forwardedFor.split(',')[0];
+      return `ip:${ip.trim()}`;
+    }
+
+    return `ip:${req.ip || req.socket.remoteAddress || 'unknown'}`;
+  }
+}
+```
+
+---
+
+### Multi-Tier Rate Limiting
+
+Apply multiple rate limits (per-second, per-minute, per-hour) to a single endpoint.
+
+#### multi-tier-rate-limit.decorator.ts
+
+```typescript
+import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common';
+import { RateLimitConfig } from '../interfaces/rate-limit-config.interface';
+
+export const MULTI_RATE_LIMIT_KEY = 'multi_rate_limit_config';
+
+export interface MultiTierRateLimitConfig {
+  tiers: RateLimitConfig[];
+}
+
+/**
+ * Apply multiple rate limit tiers
+ * All tiers must pass for request to be allowed
+ *
+ * @example
+ * @MultiTierRateLimit({
+ *   tiers: [
+ *     { name: 'api-second', limit: 10, windowSeconds: 1, strategy: 'fixed-window' },
+ *     { name: 'api-minute', limit: 100, windowSeconds: 60, strategy: 'sliding-window' },
+ *     { name: 'api-hour', limit: 1000, windowSeconds: 3600, strategy: 'sliding-window' },
+ *   ],
+ * })
+ */
+export const MultiTierRateLimit = (config: MultiTierRateLimitConfig) => {
+  return applyDecorators(
+    SetMetadata(MULTI_RATE_LIMIT_KEY, config),
+    UseGuards(MultiTierRateLimiterGuard),
+  );
+};
+```
+
+#### multi-tier-rate-limiter.guard.ts
+
+```typescript
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Request, Response } from 'express';
+import { RateLimiterService } from './rate-limiter.service';
+import {
+  MULTI_RATE_LIMIT_KEY,
+  MultiTierRateLimitConfig,
+} from './decorators/multi-tier-rate-limit.decorator';
+
+@Injectable()
+export class MultiTierRateLimiterGuard implements CanActivate {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly rateLimiterService: RateLimiterService,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const config = this.reflector.getAllAndOverride<MultiTierRateLimitConfig>(
+      MULTI_RATE_LIMIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (!config || !config.tiers.length) {
+      return true;
+    }
+
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
+    const identifier = this.getIdentifier(request);
+
+    // Check all tiers
+    for (const tierConfig of config.tiers) {
+      const result = await this.rateLimiterService.consume(
+        identifier,
+        tierConfig,
+      );
+
+      // Set headers for the most restrictive tier
+      const headers = this.rateLimiterService.generateHeaders(result);
+      Object.entries(headers).forEach(([key, value]) => {
+        // Only set if not already set or if this tier is more restrictive
+        const existing = response.getHeader(key);
+        if (
+          !existing ||
+          (key === 'X-RateLimit-Remaining' && value < existing)
+        ) {
+          response.setHeader(key, value);
+        }
+      });
+
+      if (!result.allowed) {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.TOO_MANY_REQUESTS,
+            error: 'Too Many Requests',
+            message: `Rate limit exceeded for ${tierConfig.name}`,
+            retryAfter: result.retryAfter,
+            tier: tierConfig.name,
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    return true;
+  }
+
+  private getIdentifier(request: Request): string {
+    const userId = (request as any).user?.id;
+    if (userId) return `user:${userId}`;
+
+    const apiKey = request.headers['x-api-key'] as string;
+    if (apiKey) return `apikey:${apiKey}`;
+
+    const forwardedFor = request.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const ip = Array.isArray(forwardedFor)
+        ? forwardedFor[0]
+        : forwardedFor.split(',')[0];
+      return `ip:${ip.trim()}`;
+    }
+
+    return `ip:${request.ip || request.socket.remoteAddress || 'unknown'}`;
+  }
+}
+```
+
+---
+
+### Rate Limiting Best Practices
+
+#### 1. Choose the Right Algorithm
+
+| Use Case                | Recommended Algorithm  | Why                          |
+| ----------------------- | ---------------------- | ---------------------------- |
+| General API             | Sliding Window         | Accurate, no boundary issues |
+| Burst-friendly (search) | Token Bucket           | Allows temporary spikes      |
+| Simple counters         | Fixed Window           | Low memory, simple           |
+| Login/Security          | Sliding Window + Block | Prevents brute force         |
+
+#### 2. Key Design Principles
+
+```typescript
+// Good: Granular keys for different resources
+const key = `${config.name}:${resourceType}:${resourceId}:${userId}`;
+
+// Bad: Too broad, affects all users
+const key = `global`;
+
+// Good: Separate limits for read vs write
+@Get() @RateLimit({ limit: 1000, ... }) findAll() {}
+@Post() @RateLimit({ limit: 100, ... }) create() {}
+```
+
+#### 3. Recommended Limits by Endpoint Type
+
+```typescript
+// Public endpoints (unauthenticated)
+{ limit: 100, windowSeconds: 60 }     // 100/min
+
+// Authenticated read operations
+{ limit: 1000, windowSeconds: 60 }    // 1000/min
+
+// Authenticated write operations
+{ limit: 100, windowSeconds: 60 }     // 100/min
+
+// Sensitive operations (payments)
+{ limit: 10, windowSeconds: 60 }      // 10/min
+
+// Authentication attempts
+{ limit: 5, windowSeconds: 900 }      // 5 per 15 min
+
+// Password reset
+{ limit: 3, windowSeconds: 3600 }     // 3/hour
+
+// File uploads
+{ limit: 20, windowSeconds: 3600 }    // 20/hour
+```
+
+#### 4. Redis Memory Optimization
+
+```typescript
+// Use short key prefixes
+keyPrefix: 'rl'; // Instead of 'rate_limit'
+
+// Set appropriate TTLs
+// Sliding window: auto-expires with window
+// Token bucket: 24 hour max
+// Fixed window: equals window duration
+
+// For high-traffic: use Redis Cluster
+// Lua scripts are atomic and efficient
+```
+
+#### 5. Monitoring and Alerting
+
+```typescript
+// Log rate limit events for monitoring
+@Injectable()
+export class RateLimitLogger {
+  constructor(private readonly logger: Logger) {}
+
+  logRateLimitHit(
+    identifier: string,
+    config: RateLimitConfig,
+    allowed: boolean,
+  ) {
+    if (!allowed) {
+      this.logger.warn(`Rate limit exceeded`, {
+        identifier,
+        rule: config.name,
+        limit: config.limit,
+        window: config.windowSeconds,
+      });
+    }
+  }
+}
+
+// Prometheus metrics
+export const rateLimitMetrics = {
+  requestsTotal: new Counter({
+    name: 'rate_limit_requests_total',
+    help: 'Total rate limited requests',
+    labelNames: ['rule', 'allowed'],
+  }),
+  currentUsage: new Gauge({
+    name: 'rate_limit_current_usage',
+    help: 'Current rate limit usage',
+    labelNames: ['rule', 'identifier'],
+  }),
+};
+```
+
+---
+
+### Testing Rate Limiting
+
+#### rate-limiter.service.spec.ts
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { RateLimiterService } from './rate-limiter.service';
+import { SlidingWindowStrategy } from './strategies/sliding-window.strategy';
+import { TokenBucketStrategy } from './strategies/token-bucket.strategy';
+import { FixedWindowStrategy } from './strategies/fixed-window.strategy';
+import { RateLimitConfig } from './interfaces/rate-limit-config.interface';
+import Redis from 'ioredis-mock';
+
+describe('RateLimiterService', () => {
+  let service: RateLimiterService;
+  let redis: Redis;
+
+  beforeEach(async () => {
+    redis = new Redis();
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        RateLimiterService,
+        SlidingWindowStrategy,
+        TokenBucketStrategy,
+        FixedWindowStrategy,
+        { provide: 'REDIS_CLIENT', useValue: redis },
+      ],
+    }).compile();
+
+    service = module.get<RateLimiterService>(RateLimiterService);
+    service.onModuleInit();
+  });
+
+  afterEach(async () => {
+    await redis.flushall();
+  });
+
+  describe('Sliding Window Strategy', () => {
+    const config: RateLimitConfig = {
+      name: 'test-sliding',
+      limit: 5,
+      windowSeconds: 60,
+      strategy: 'sliding-window',
+    };
+
+    it('should allow requests within limit', async () => {
+      for (let i = 0; i < 5; i++) {
+        const result = await service.consume('user:123', config);
+        expect(result.allowed).toBe(true);
+        expect(result.remaining).toBe(4 - i);
+      }
+    });
+
+    it('should deny requests exceeding limit', async () => {
+      // Exhaust limit
+      for (let i = 0; i < 5; i++) {
+        await service.consume('user:123', config);
+      }
+
+      // Next request should be denied
+      const result = await service.consume('user:123', config);
+      expect(result.allowed).toBe(false);
+      expect(result.remaining).toBe(0);
+      expect(result.retryAfter).toBeDefined();
+    });
+
+    it('should isolate different users', async () => {
+      // User 1 exhausts limit
+      for (let i = 0; i < 5; i++) {
+        await service.consume('user:1', config);
+      }
+
+      // User 2 should still have quota
+      const result = await service.consume('user:2', config);
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(4);
+    });
+  });
+
+  describe('Token Bucket Strategy', () => {
+    const config: RateLimitConfig = {
+      name: 'test-bucket',
+      limit: 10,
+      windowSeconds: 60,
+      strategy: 'token-bucket',
+      bucketCapacity: 5,
+      refillRate: 1, // 1 token per second
+    };
+
+    it('should allow burst up to capacity', async () => {
+      // Should allow 5 rapid requests (bucket capacity)
+      for (let i = 0; i < 5; i++) {
+        const result = await service.consume('user:123', config);
+        expect(result.allowed).toBe(true);
+      }
+
+      // 6th request should fail (bucket empty)
+      const result = await service.consume('user:123', config);
+      expect(result.allowed).toBe(false);
+    });
+
+    it('should refill tokens over time', async () => {
+      // Exhaust bucket
+      for (let i = 0; i < 5; i++) {
+        await service.consume('user:123', config);
+      }
+
+      // Wait for refill (mock time)
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
+      // Should have 1 token now
+      const result = await service.consume('user:123', config);
+      expect(result.allowed).toBe(true);
+    });
+  });
+
+  describe('Block Duration', () => {
+    const config: RateLimitConfig = {
+      name: 'test-block',
+      limit: 3,
+      windowSeconds: 60,
+      strategy: 'sliding-window',
+      blockDuration: 300,
+    };
+
+    it('should block after limit exceeded', async () => {
+      // Exhaust limit
+      for (let i = 0; i < 3; i++) {
+        await service.consume('user:123', config);
+      }
+
+      // Trigger block
+      const blocked = await service.consume('user:123', config);
+      expect(blocked.allowed).toBe(false);
+
+      // Subsequent requests should be blocked even with new window
+      const stillBlocked = await service.consume('user:123', config);
+      expect(stillBlocked.allowed).toBe(false);
+      expect(stillBlocked.retryAfter).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Header Generation', () => {
+    it('should generate correct headers', () => {
+      const result = {
+        allowed: true,
+        limit: 100,
+        remaining: 95,
+        resetAt: 1700000000,
+        retryAfter: undefined,
+      };
+
+      const headers = service.generateHeaders(result);
+
+      expect(headers['X-RateLimit-Limit']).toBe(100);
+      expect(headers['X-RateLimit-Remaining']).toBe(95);
+      expect(headers['X-RateLimit-Reset']).toBe(1700000000);
+      expect(headers['Retry-After']).toBeUndefined();
+    });
+
+    it('should include Retry-After when rate limited', () => {
+      const result = {
+        allowed: false,
+        limit: 100,
+        remaining: 0,
+        resetAt: 1700000000,
+        retryAfter: 45,
+      };
+
+      const headers = service.generateHeaders(result);
+
+      expect(headers['Retry-After']).toBe(45);
+    });
+  });
+});
+```
+
+---
+
+### Algorithm Comparison Summary
+
+| Algorithm              | Accuracy | Memory                     | Burst Handling        | Best For                        |
+| ---------------------- | -------- | -------------------------- | --------------------- | ------------------------------- |
+| **Sliding Window Log** | Highest  | Higher (stores timestamps) | Smooth                | Strict APIs, security endpoints |
+| **Token Bucket**       | High     | Low                        | Excellent             | APIs with bursty traffic        |
+| **Fixed Window**       | Medium   | Lowest                     | Poor (boundary issue) | Simple counters, low-stakes     |
+
+---
+
 ## Testing Strategy
+
+### Overview
+
+Testing is structured in three layers:
+
+1. **Unit Tests** - Test individual functions/methods in isolation
+2. **Integration Tests** - Test module interactions with real database/cache
+3. **E2E Tests** - Test complete API flows
+
+### Project Structure for Tests
+
+```
+src/
+├── modules/
+│   ├── booking/
+│   │   ├── booking.service.ts
+│   │   ├── booking.controller.ts
+│   │   ├── booking.service.spec.ts        # Unit tests
+│   │   └── booking.controller.spec.ts     # Unit tests
+│   ├── property/
+│   │   ├── property.service.spec.ts
+│   │   └── property.controller.spec.ts
+│   └── auth/
+│       └── auth.service.spec.ts
+├── common/
+│   └── guards/
+│       └── jwt-auth.guard.spec.ts
+test/
+├── integration/
+│   ├── booking.integration.spec.ts        # Integration tests
+│   └── property.integration.spec.ts
+├── e2e/
+│   ├── booking.e2e-spec.ts                # E2E tests
+│   └── auth.e2e-spec.ts
+├── mocks/
+│   ├── repositories.mock.ts
+│   ├── services.mock.ts
+│   └── redis.mock.ts
+├── fixtures/
+│   ├── users.fixture.ts
+│   ├── properties.fixture.ts
+│   └── bookings.fixture.ts
+└── jest.config.ts
+```
+
+---
+
+### Jest Configuration
+
+#### Install Dependencies
+
+```bash
+npm install --save-dev jest @types/jest ts-jest @nestjs/testing supertest @types/supertest
+```
+
+#### jest.config.ts
+
+```typescript
+import type { Config } from 'jest';
+
+const config: Config = {
+  moduleFileExtensions: ['js', 'json', 'ts'],
+  rootDir: '.',
+  testRegex: '.*\\.spec\\.ts$',
+  transform: {
+    '^.+\\.(t|j)s$': 'ts-jest',
+  },
+  collectCoverageFrom: [
+    'src/**/*.(t|j)s',
+    '!src/**/*.module.ts',
+    '!src/main.ts',
+  ],
+  coverageDirectory: './coverage',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/src/', '<rootDir>/test/'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@test/(.*)$': '<rootDir>/test/$1',
+  },
+  setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
+  // Run unit and integration tests separately
+  projects: [
+    {
+      displayName: 'unit',
+      testMatch: ['<rootDir>/src/**/*.spec.ts'],
+    },
+    {
+      displayName: 'integration',
+      testMatch: ['<rootDir>/test/integration/**/*.spec.ts'],
+    },
+    {
+      displayName: 'e2e',
+      testMatch: ['<rootDir>/test/e2e/**/*.spec.ts'],
+    },
+  ],
+};
+
+export default config;
+```
+
+#### test/setup.ts
+
+```typescript
+// Global test setup
+jest.setTimeout(30000); // 30 seconds for integration tests
+
+// Clean up after all tests
+afterAll(async () => {
+  // Close database connections, etc.
+});
+```
+
+#### package.json scripts
+
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "test:unit": "jest --selectProjects unit",
+    "test:integration": "jest --selectProjects integration",
+    "test:e2e": "jest --selectProjects e2e",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand"
+  }
+}
+```
+
+---
+
+### Unit Tests
+
+Unit tests mock all dependencies to test logic in isolation.
+
+#### booking.service.spec.ts
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { BookingService } from './booking.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Booking } from './entities/booking.entity';
+import { AvailabilityService } from '../availability/availability.service';
+import { RedisService } from '../redis/redis.service';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Repository, DataSource, QueryRunner } from 'typeorm';
+
+// Mock factory functions
+const mockRepository = () => ({
+  find: jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  createQueryBuilder: jest.fn(),
+});
+
+const mockRedisService = () => ({
+  acquireLock: jest.fn(),
+  releaseLock: jest.fn(),
+  get: jest.fn(),
+  set: jest.fn(),
+  del: jest.fn(),
+});
+
+const mockAvailabilityService = () => ({
+  checkAvailability: jest.fn(),
+  blockDates: jest.fn(),
+  unblockDates: jest.fn(),
+});
+
+const mockQueryRunner = () => ({
+  connect: jest.fn(),
+  startTransaction: jest.fn(),
+  commitTransaction: jest.fn(),
+  rollbackTransaction: jest.fn(),
+  release: jest.fn(),
+  manager: {
+    findOne: jest.fn(),
+    save: jest.fn(),
+  },
+});
+
+describe('BookingService', () => {
+  let service: BookingService;
+  let bookingRepository: jest.Mocked<Repository<Booking>>;
+  let redisService: jest.Mocked<RedisService>;
+  let availabilityService: jest.Mocked<AvailabilityService>;
+  let dataSource: jest.Mocked<DataSource>;
+  let queryRunner: jest.Mocked<QueryRunner>;
+
+  beforeEach(async () => {
+    queryRunner = mockQueryRunner() as any;
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        BookingService,
+        {
+          provide: getRepositoryToken(Booking),
+          useFactory: mockRepository,
+        },
+        {
+          provide: RedisService,
+          useFactory: mockRedisService,
+        },
+        {
+          provide: AvailabilityService,
+          useFactory: mockAvailabilityService,
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            createQueryRunner: jest.fn().mockReturnValue(queryRunner),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<BookingService>(BookingService);
+    bookingRepository = module.get(getRepositoryToken(Booking));
+    redisService = module.get(RedisService);
+    availabilityService = module.get(AvailabilityService);
+    dataSource = module.get(DataSource);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('createBooking', () => {
+    const createBookingDto = {
+      propertyId: 'property-123',
+      checkIn: new Date('2024-06-01'),
+      checkOut: new Date('2024-06-05'),
+      guests: 2,
+    };
+    const userId = 'user-123';
+    const idempotencyKey = 'idem-key-123';
+
+    it('should create a booking successfully', async () => {
+      // Arrange
+      const expectedBooking = {
+        id: 'booking-123',
+        ...createBookingDto,
+        userId,
+        status: 'pending',
+        totalPrice: 500,
+      };
+
+      redisService.acquireLock.mockResolvedValue(true);
+      availabilityService.checkAvailability.mockResolvedValue(true);
+      queryRunner.manager.save.mockResolvedValue(expectedBooking);
+      redisService.releaseLock.mockResolvedValue(undefined);
+
+      // Act
+      const result = await service.createBooking(
+        createBookingDto,
+        userId,
+        idempotencyKey,
+      );
+
+      // Assert
+      expect(redisService.acquireLock).toHaveBeenCalledWith(
+        expect.stringContaining('property-123'),
+        expect.any(Number),
+      );
+      expect(availabilityService.checkAvailability).toHaveBeenCalledWith(
+        createBookingDto.propertyId,
+        createBookingDto.checkIn,
+        createBookingDto.checkOut,
+      );
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(redisService.releaseLock).toHaveBeenCalled();
+      expect(result).toEqual(expectedBooking);
+    });
+
+    it('should throw ConflictException when dates are not available', async () => {
+      // Arrange
+      redisService.acquireLock.mockResolvedValue(true);
+      availabilityService.checkAvailability.mockResolvedValue(false);
+
+      // Act & Assert
+      await expect(
+        service.createBooking(createBookingDto, userId, idempotencyKey),
+      ).rejects.toThrow(ConflictException);
+
+      expect(redisService.releaseLock).toHaveBeenCalled();
+      expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException when lock cannot be acquired', async () => {
+      // Arrange
+      redisService.acquireLock.mockResolvedValue(false);
+
+      // Act & Assert
+      await expect(
+        service.createBooking(createBookingDto, userId, idempotencyKey),
+      ).rejects.toThrow(ConflictException);
+
+      expect(availabilityService.checkAvailability).not.toHaveBeenCalled();
+    });
+
+    it('should rollback transaction on error', async () => {
+      // Arrange
+      redisService.acquireLock.mockResolvedValue(true);
+      availabilityService.checkAvailability.mockResolvedValue(true);
+      queryRunner.manager.save.mockRejectedValue(new Error('Database error'));
+
+      // Act & Assert
+      await expect(
+        service.createBooking(createBookingDto, userId, idempotencyKey),
+      ).rejects.toThrow('Database error');
+
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(queryRunner.release).toHaveBeenCalled();
+      expect(redisService.releaseLock).toHaveBeenCalled();
+    });
+  });
+
+  describe('getBookingById', () => {
+    it('should return a booking when found', async () => {
+      // Arrange
+      const expectedBooking = { id: 'booking-123', status: 'confirmed' };
+      bookingRepository.findOne.mockResolvedValue(expectedBooking as Booking);
+
+      // Act
+      const result = await service.getBookingById('booking-123');
+
+      // Assert
+      expect(result).toEqual(expectedBooking);
+      expect(bookingRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'booking-123' },
+        relations: expect.any(Array),
+      });
+    });
+
+    it('should throw NotFoundException when booking not found', async () => {
+      // Arrange
+      bookingRepository.findOne.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.getBookingById('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('cancelBooking', () => {
+    it('should cancel a booking and unblock dates', async () => {
+      // Arrange
+      const existingBooking = {
+        id: 'booking-123',
+        propertyId: 'property-123',
+        checkIn: new Date('2024-06-01'),
+        checkOut: new Date('2024-06-05'),
+        status: 'confirmed',
+        userId: 'user-123',
+      };
+
+      bookingRepository.findOne.mockResolvedValue(existingBooking as Booking);
+      bookingRepository.save.mockResolvedValue({
+        ...existingBooking,
+        status: 'cancelled',
+      } as Booking);
+
+      // Act
+      const result = await service.cancelBooking('booking-123', 'user-123');
+
+      // Assert
+      expect(result.status).toBe('cancelled');
+      expect(availabilityService.unblockDates).toHaveBeenCalledWith(
+        existingBooking.propertyId,
+        existingBooking.checkIn,
+        existingBooking.checkOut,
+      );
+    });
+
+    it('should throw error when cancelling already cancelled booking', async () => {
+      // Arrange
+      const cancelledBooking = {
+        id: 'booking-123',
+        status: 'cancelled',
+        userId: 'user-123',
+      };
+      bookingRepository.findOne.mockResolvedValue(cancelledBooking as Booking);
+
+      // Act & Assert
+      await expect(
+        service.cancelBooking('booking-123', 'user-123'),
+      ).rejects.toThrow();
+    });
+  });
+});
+```
+
+---
+
+#### property.service.spec.ts
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { PropertyService } from './property.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Property } from './entities/property.entity';
+import { RedisService } from '../redis/redis.service';
+import { NotFoundException } from '@nestjs/common';
+
+describe('PropertyService', () => {
+  let service: PropertyService;
+  let propertyRepository: any;
+  let redisService: any;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PropertyService,
+        {
+          provide: getRepositoryToken(Property),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+            createQueryBuilder: jest.fn(() => ({
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              leftJoinAndSelect: jest.fn().mockReturnThis(),
+              orderBy: jest.fn().mockReturnThis(),
+              take: jest.fn().mockReturnThis(),
+              skip: jest.fn().mockReturnThis(),
+              getManyAndCount: jest.fn(),
+            })),
+          },
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<PropertyService>(PropertyService);
+    propertyRepository = module.get(getRepositoryToken(Property));
+    redisService = module.get(RedisService);
+  });
+
+  describe('searchProperties', () => {
+    it('should return cached results when available', async () => {
+      // Arrange
+      const cachedData = JSON.stringify({
+        properties: [{ id: '1', title: 'Beach House' }],
+        total: 1,
+      });
+      redisService.get.mockResolvedValue(cachedData);
+
+      // Act
+      const result = await service.searchProperties({
+        location: 'Miami',
+        checkIn: '2024-06-01',
+        checkOut: '2024-06-05',
+      });
+
+      // Assert
+      expect(redisService.get).toHaveBeenCalled();
+      expect(propertyRepository.createQueryBuilder).not.toHaveBeenCalled();
+      expect(result.properties).toHaveLength(1);
+    });
+
+    it('should query database when cache miss', async () => {
+      // Arrange
+      redisService.get.mockResolvedValue(null);
+      const queryBuilder = propertyRepository.createQueryBuilder();
+      queryBuilder.getManyAndCount.mockResolvedValue([
+        [{ id: '1', title: 'Beach House' }],
+        1,
+      ]);
+
+      // Act
+      const result = await service.searchProperties({
+        location: 'Miami',
+        checkIn: '2024-06-01',
+        checkOut: '2024-06-05',
+      });
+
+      // Assert
+      expect(propertyRepository.createQueryBuilder).toHaveBeenCalled();
+      expect(redisService.set).toHaveBeenCalled(); // Cache the result
+      expect(result.properties).toHaveLength(1);
+    });
+  });
+
+  describe('getPropertyById', () => {
+    it('should return property with relations', async () => {
+      // Arrange
+      const property = {
+        id: 'prop-123',
+        title: 'Beach House',
+        host: { id: 'host-123', name: 'John' },
+        amenities: [{ id: 'a1', name: 'WiFi' }],
+      };
+      propertyRepository.findOne.mockResolvedValue(property);
+
+      // Act
+      const result = await service.getPropertyById('prop-123');
+
+      // Assert
+      expect(result).toEqual(property);
+      expect(propertyRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'prop-123' },
+        relations: expect.arrayContaining(['host', 'amenities', 'images']),
+      });
+    });
+
+    it('should throw NotFoundException when property not found', async () => {
+      // Arrange
+      propertyRepository.findOne.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.getPropertyById('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+});
+```
+
+---
+
+#### auth.service.spec.ts
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { AuthService } from './auth.service';
+import { JwtService } from '@nestjs/jwt';
+import { UserService } from '../user/user.service';
+import { UnauthorizedException, ConflictException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+
+jest.mock('bcrypt');
+
+describe('AuthService', () => {
+  let service: AuthService;
+  let userService: any;
+  let jwtService: any;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        {
+          provide: UserService,
+          useValue: {
+            findByEmail: jest.fn(),
+            create: jest.fn(),
+          },
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            sign: jest.fn(),
+            verify: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<AuthService>(AuthService);
+    userService = module.get(UserService);
+    jwtService = module.get(JwtService);
+  });
+
+  describe('login', () => {
+    it('should return tokens on successful login', async () => {
+      // Arrange
+      const user = {
+        id: 'user-123',
+        email: 'test@example.com',
+        password: 'hashedPassword',
+        role: 'guest',
+      };
+      userService.findByEmail.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      jwtService.sign.mockReturnValue('jwt-token');
+
+      // Act
+      const result = await service.login({
+        email: 'test@example.com',
+        password: 'password123',
+      });
+
+      // Assert
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+      expect(jwtService.sign).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw UnauthorizedException for invalid credentials', async () => {
+      // Arrange
+      userService.findByEmail.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        service.login({ email: 'test@example.com', password: 'wrong' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException for wrong password', async () => {
+      // Arrange
+      const user = { id: 'user-123', password: 'hashedPassword' };
+      userService.findByEmail.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      // Act & Assert
+      await expect(
+        service.login({ email: 'test@example.com', password: 'wrong' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('register', () => {
+    it('should create user and return tokens', async () => {
+      // Arrange
+      userService.findByEmail.mockResolvedValue(null);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
+      userService.create.mockResolvedValue({
+        id: 'user-123',
+        email: 'new@example.com',
+        role: 'guest',
+      });
+      jwtService.sign.mockReturnValue('jwt-token');
+
+      // Act
+      const result = await service.register({
+        email: 'new@example.com',
+        password: 'password123',
+        name: 'John Doe',
+      });
+
+      // Assert
+      expect(result).toHaveProperty('accessToken');
+      expect(userService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'new@example.com',
+          password: 'hashedPassword',
+        }),
+      );
+    });
+
+    it('should throw ConflictException if email exists', async () => {
+      // Arrange
+      userService.findByEmail.mockResolvedValue({ id: 'existing-user' });
+
+      // Act & Assert
+      await expect(
+        service.register({
+          email: 'existing@example.com',
+          password: 'password123',
+          name: 'John',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+});
+```
+
+---
+
+### Controller Tests
+
+#### booking.controller.spec.ts
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { BookingController } from './booking.controller';
+import { BookingService } from './booking.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CreateBookingDto } from './dto/create-booking.dto';
+
+describe('BookingController', () => {
+  let controller: BookingController;
+  let bookingService: any;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [BookingController],
+      providers: [
+        {
+          provide: BookingService,
+          useValue: {
+            createBooking: jest.fn(),
+            getBookingById: jest.fn(),
+            getUserBookings: jest.fn(),
+            cancelBooking: jest.fn(),
+          },
+        },
+      ],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    controller = module.get<BookingController>(BookingController);
+    bookingService = module.get(BookingService);
+  });
+
+  describe('POST /bookings', () => {
+    it('should create a booking', async () => {
+      // Arrange
+      const createDto: CreateBookingDto = {
+        propertyId: 'prop-123',
+        checkIn: new Date('2024-06-01'),
+        checkOut: new Date('2024-06-05'),
+        guests: 2,
+      };
+      const mockUser = { id: 'user-123' };
+      const mockBooking = { id: 'booking-123', ...createDto };
+
+      bookingService.createBooking.mockResolvedValue(mockBooking);
+
+      // Act
+      const result = await controller.create(
+        createDto,
+        mockUser,
+        'idempotency-key-123',
+      );
+
+      // Assert
+      expect(result).toEqual(mockBooking);
+      expect(bookingService.createBooking).toHaveBeenCalledWith(
+        createDto,
+        mockUser.id,
+        'idempotency-key-123',
+      );
+    });
+  });
+
+  describe('GET /bookings/:id', () => {
+    it('should return a booking by id', async () => {
+      // Arrange
+      const mockBooking = { id: 'booking-123', status: 'confirmed' };
+      bookingService.getBookingById.mockResolvedValue(mockBooking);
+
+      // Act
+      const result = await controller.findOne('booking-123');
+
+      // Assert
+      expect(result).toEqual(mockBooking);
+    });
+  });
+
+  describe('GET /bookings/my', () => {
+    it('should return user bookings with pagination', async () => {
+      // Arrange
+      const mockUser = { id: 'user-123' };
+      const mockResult = {
+        bookings: [{ id: 'b1' }, { id: 'b2' }],
+        total: 2,
+        page: 1,
+        limit: 10,
+      };
+      bookingService.getUserBookings.mockResolvedValue(mockResult);
+
+      // Act
+      const result = await controller.getMyBookings(mockUser, {
+        page: 1,
+        limit: 10,
+      });
+
+      // Assert
+      expect(result).toEqual(mockResult);
+      expect(bookingService.getUserBookings).toHaveBeenCalledWith(mockUser.id, {
+        page: 1,
+        limit: 10,
+      });
+    });
+  });
+
+  describe('DELETE /bookings/:id', () => {
+    it('should cancel a booking', async () => {
+      // Arrange
+      const mockUser = { id: 'user-123' };
+      const cancelledBooking = { id: 'booking-123', status: 'cancelled' };
+      bookingService.cancelBooking.mockResolvedValue(cancelledBooking);
+
+      // Act
+      const result = await controller.cancel('booking-123', mockUser);
+
+      // Assert
+      expect(result.status).toBe('cancelled');
+      expect(bookingService.cancelBooking).toHaveBeenCalledWith(
+        'booking-123',
+        mockUser.id,
+      );
+    });
+  });
+});
+```
+
+---
+
+### Integration Tests
+
+Integration tests use a real test database to verify module interactions.
+
+#### test/integration/booking.integration.spec.ts
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { BookingModule } from '../../src/modules/booking/booking.module';
+import { PropertyModule } from '../../src/modules/property/property.module';
+import { BookingService } from '../../src/modules/booking/booking.service';
+import { PropertyService } from '../../src/modules/property/property.service';
+import { RedisModule } from '../../src/modules/redis/redis.module';
+import { DataSource } from 'typeorm';
+
+describe('Booking Integration Tests', () => {
+  let app: INestApplication;
+  let bookingService: BookingService;
+  let propertyService: PropertyService;
+  let dataSource: DataSource;
+
+  // Test database configuration
+  const testDbConfig = {
+    type: 'postgres' as const,
+    host: process.env.TEST_DB_HOST || 'localhost',
+    port: parseInt(process.env.TEST_DB_PORT || '5433'),
+    username: process.env.TEST_DB_USER || 'test',
+    password: process.env.TEST_DB_PASSWORD || 'test',
+    database: process.env.TEST_DB_NAME || 'booking_test',
+    autoLoadEntities: true,
+    synchronize: true, // Only for test database
+  };
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [
+        TypeOrmModule.forRoot(testDbConfig),
+        RedisModule.forRoot({
+          host: process.env.TEST_REDIS_HOST || 'localhost',
+          port: parseInt(process.env.TEST_REDIS_PORT || '6380'),
+        }),
+        BookingModule,
+        PropertyModule,
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    bookingService = moduleRef.get<BookingService>(BookingService);
+    propertyService = moduleRef.get<PropertyService>(PropertyService);
+    dataSource = moduleRef.get<DataSource>(DataSource);
+  });
+
+  afterAll(async () => {
+    await dataSource.destroy();
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    // Clean database before each test
+    await dataSource.query('TRUNCATE TABLE bookings CASCADE');
+    await dataSource.query('TRUNCATE TABLE properties CASCADE');
+    await dataSource.query('TRUNCATE TABLE users CASCADE');
+  });
+
+  describe('Booking Creation with Real Database', () => {
+    let testProperty: any;
+    let testUser: any;
+
+    beforeEach(async () => {
+      // Create test data
+      testUser = await dataSource.query(
+        `INSERT INTO users (id, email, password, name, role) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        ['user-123', 'test@example.com', 'hashed', 'Test User', 'guest'],
+      );
+
+      testProperty = await dataSource.query(
+        `INSERT INTO properties (id, title, host_id, price_per_night, status) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        ['prop-123', 'Beach House', 'host-123', 100, 'active'],
+      );
+    });
+
+    it('should create booking and update availability', async () => {
+      // Act
+      const booking = await bookingService.createBooking(
+        {
+          propertyId: 'prop-123',
+          checkIn: new Date('2024-06-01'),
+          checkOut: new Date('2024-06-05'),
+          guests: 2,
+        },
+        'user-123',
+        'idem-key-1',
+      );
+
+      // Assert
+      expect(booking).toBeDefined();
+      expect(booking.id).toBeDefined();
+      expect(booking.status).toBe('pending');
+
+      // Verify booking exists in database
+      const dbBooking = await dataSource.query(
+        'SELECT * FROM bookings WHERE id = $1',
+        [booking.id],
+      );
+      expect(dbBooking).toHaveLength(1);
+
+      // Verify availability is blocked
+      const availability = await bookingService.checkAvailability(
+        'prop-123',
+        new Date('2024-06-01'),
+        new Date('2024-06-05'),
+      );
+      expect(availability).toBe(false);
+    });
+
+    it('should prevent double booking with concurrent requests', async () => {
+      // Act - Simulate concurrent booking attempts
+      const results = await Promise.allSettled([
+        bookingService.createBooking(
+          {
+            propertyId: 'prop-123',
+            checkIn: new Date('2024-06-01'),
+            checkOut: new Date('2024-06-05'),
+            guests: 2,
+          },
+          'user-123',
+          'idem-key-1',
+        ),
+        bookingService.createBooking(
+          {
+            propertyId: 'prop-123',
+            checkIn: new Date('2024-06-01'),
+            checkOut: new Date('2024-06-05'),
+            guests: 2,
+          },
+          'user-456',
+          'idem-key-2',
+        ),
+      ]);
+
+      // Assert - Only one should succeed
+      const successes = results.filter((r) => r.status === 'fulfilled');
+      const failures = results.filter((r) => r.status === 'rejected');
+
+      expect(successes).toHaveLength(1);
+      expect(failures).toHaveLength(1);
+
+      // Verify only one booking in database
+      const bookings = await dataSource.query(
+        `SELECT * FROM bookings WHERE property_id = $1 
+         AND check_in = $2 AND check_out = $3`,
+        ['prop-123', '2024-06-01', '2024-06-05'],
+      );
+      expect(bookings).toHaveLength(1);
+    });
+
+    it('should handle idempotency correctly', async () => {
+      const idempotencyKey = 'unique-key-123';
+
+      // First request
+      const booking1 = await bookingService.createBooking(
+        {
+          propertyId: 'prop-123',
+          checkIn: new Date('2024-06-01'),
+          checkOut: new Date('2024-06-05'),
+          guests: 2,
+        },
+        'user-123',
+        idempotencyKey,
+      );
+
+      // Second request with same key should return same booking
+      const booking2 = await bookingService.createBooking(
+        {
+          propertyId: 'prop-123',
+          checkIn: new Date('2024-06-01'),
+          checkOut: new Date('2024-06-05'),
+          guests: 2,
+        },
+        'user-123',
+        idempotencyKey,
+      );
+
+      expect(booking1.id).toBe(booking2.id);
+
+      // Verify only one booking exists
+      const bookings = await dataSource.query(
+        'SELECT * FROM bookings WHERE user_id = $1',
+        ['user-123'],
+      );
+      expect(bookings).toHaveLength(1);
+    });
+  });
+});
+```
+
+---
+
+### E2E Tests
+
+E2E tests verify the complete API flow using HTTP requests.
+
+#### test/e2e/booking.e2e-spec.ts
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../../src/app.module';
+import { DataSource } from 'typeorm';
+
+describe('Booking API (e2e)', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+  let accessToken: string;
+  let testPropertyId: string;
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
+    await app.init();
+
+    dataSource = moduleRef.get<DataSource>(DataSource);
+
+    // Create test user and get token
+    const authResponse = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        email: 'e2e-test@example.com',
+        password: 'Test123!@#',
+        name: 'E2E Test User',
+      });
+
+    accessToken = authResponse.body.accessToken;
+
+    // Create test property
+    const propertyResponse = await request(app.getHttpServer())
+      .post('/properties')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'E2E Test Property',
+        description: 'A beautiful test property',
+        pricePerNight: 150,
+        location: { lat: 25.7617, lng: -80.1918 },
+        address: '123 Test St, Miami, FL',
+        maxGuests: 4,
+        bedrooms: 2,
+        bathrooms: 1,
+      });
+
+    testPropertyId = propertyResponse.body.id;
+  });
+
+  afterAll(async () => {
+    // Cleanup test data
+    await dataSource.query('DELETE FROM bookings WHERE id LIKE $1', ['%e2e%']);
+    await dataSource.query('DELETE FROM properties WHERE title = $1', [
+      'E2E Test Property',
+    ]);
+    await dataSource.query('DELETE FROM users WHERE email = $1', [
+      'e2e-test@example.com',
+    ]);
+    await app.close();
+  });
+
+  describe('POST /bookings', () => {
+    it('should create a new booking', () => {
+      return request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('X-Idempotency-Key', 'e2e-test-key-1')
+        .send({
+          propertyId: testPropertyId,
+          checkIn: '2024-07-01',
+          checkOut: '2024-07-05',
+          guests: 2,
+        })
+        .expect(201)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('id');
+          expect(res.body.status).toBe('pending');
+          expect(res.body.propertyId).toBe(testPropertyId);
+          expect(res.body.totalPrice).toBe(600); // 4 nights * 150
+        });
+    });
+
+    it('should return 401 without auth token', () => {
+      return request(app.getHttpServer())
+        .post('/bookings')
+        .send({
+          propertyId: testPropertyId,
+          checkIn: '2024-08-01',
+          checkOut: '2024-08-05',
+          guests: 2,
+        })
+        .expect(401);
+    });
+
+    it('should return 400 for invalid dates', () => {
+      return request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('X-Idempotency-Key', 'e2e-test-key-2')
+        .send({
+          propertyId: testPropertyId,
+          checkIn: '2024-08-05', // checkIn after checkOut
+          checkOut: '2024-08-01',
+          guests: 2,
+        })
+        .expect(400);
+    });
+
+    it('should return 409 for overlapping dates', async () => {
+      // First booking
+      await request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('X-Idempotency-Key', 'e2e-test-key-3')
+        .send({
+          propertyId: testPropertyId,
+          checkIn: '2024-09-01',
+          checkOut: '2024-09-05',
+          guests: 2,
+        })
+        .expect(201);
+
+      // Overlapping booking
+      return request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('X-Idempotency-Key', 'e2e-test-key-4')
+        .send({
+          propertyId: testPropertyId,
+          checkIn: '2024-09-03', // Overlaps with first booking
+          checkOut: '2024-09-07',
+          guests: 2,
+        })
+        .expect(409);
+    });
+  });
+
+  describe('GET /bookings/:id', () => {
+    let bookingId: string;
+
+    beforeAll(async () => {
+      const response = await request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('X-Idempotency-Key', 'e2e-test-key-5')
+        .send({
+          propertyId: testPropertyId,
+          checkIn: '2024-10-01',
+          checkOut: '2024-10-05',
+          guests: 2,
+        });
+      bookingId = response.body.id;
+    });
+
+    it('should return booking details', () => {
+      return request(app.getHttpServer())
+        .get(`/bookings/${bookingId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.id).toBe(bookingId);
+          expect(res.body).toHaveProperty('property');
+          expect(res.body).toHaveProperty('guest');
+        });
+    });
+
+    it('should return 404 for non-existent booking', () => {
+      return request(app.getHttpServer())
+        .get('/bookings/non-existent-id')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(404);
+    });
+  });
+
+  describe('GET /bookings/my', () => {
+    it('should return paginated user bookings', () => {
+      return request(app.getHttpServer())
+        .get('/bookings/my')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .query({ page: 1, limit: 10 })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('bookings');
+          expect(res.body).toHaveProperty('pagination');
+          expect(res.body.pagination).toHaveProperty('total');
+          expect(res.body.pagination).toHaveProperty('page');
+          expect(res.body.pagination).toHaveProperty('limit');
+          expect(Array.isArray(res.body.bookings)).toBe(true);
+        });
+    });
+  });
+
+  describe('DELETE /bookings/:id', () => {
+    let bookingId: string;
+
+    beforeEach(async () => {
+      const response = await request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('X-Idempotency-Key', `e2e-cancel-key-${Date.now()}`)
+        .send({
+          propertyId: testPropertyId,
+          checkIn: '2024-11-01',
+          checkOut: '2024-11-05',
+          guests: 2,
+        });
+      bookingId = response.body.id;
+    });
+
+    it('should cancel a booking', () => {
+      return request(app.getHttpServer())
+        .delete(`/bookings/${bookingId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.status).toBe('cancelled');
+        });
+    });
+
+    it('should return 404 when cancelling non-existent booking', () => {
+      return request(app.getHttpServer())
+        .delete('/bookings/non-existent-id')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(404);
+    });
+  });
+});
+```
+
+---
+
+### Test Fixtures and Mocks
+
+#### test/fixtures/bookings.fixture.ts
+
+```typescript
+import {
+  Booking,
+  BookingStatus,
+} from '../../src/modules/booking/entities/booking.entity';
+
+export const createMockBooking = (overrides?: Partial<Booking>): Booking =>
+  ({
+    id: 'booking-123',
+    propertyId: 'property-123',
+    userId: 'user-123',
+    checkIn: new Date('2024-06-01'),
+    checkOut: new Date('2024-06-05'),
+    guests: 2,
+    totalPrice: 500,
+    status: BookingStatus.PENDING,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  } as Booking);
+
+export const bookingFixtures = {
+  pending: createMockBooking({ status: BookingStatus.PENDING }),
+  confirmed: createMockBooking({
+    id: 'booking-confirmed',
+    status: BookingStatus.CONFIRMED,
+  }),
+  cancelled: createMockBooking({
+    id: 'booking-cancelled',
+    status: BookingStatus.CANCELLED,
+  }),
+};
+```
+
+#### test/fixtures/properties.fixture.ts
+
+```typescript
+import { Property } from '../../src/modules/property/entities/property.entity';
+
+export const createMockProperty = (overrides?: Partial<Property>): Property =>
+  ({
+    id: 'property-123',
+    title: 'Beach House',
+    description: 'Beautiful beach house',
+    hostId: 'host-123',
+    pricePerNight: 100,
+    location: { type: 'Point', coordinates: [-80.1918, 25.7617] },
+    address: '123 Beach St, Miami, FL',
+    maxGuests: 4,
+    bedrooms: 2,
+    bathrooms: 1,
+    status: 'active',
+    averageRating: 4.5,
+    reviewCount: 10,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  } as Property);
+```
+
+#### test/mocks/redis.mock.ts
+
+```typescript
+export class MockRedisService {
+  private store = new Map<string, string>();
+  private locks = new Set<string>();
+
+  async get(key: string): Promise<string | null> {
+    return this.store.get(key) || null;
+  }
+
+  async set(key: string, value: string, ttl?: number): Promise<void> {
+    this.store.set(key, value);
+    if (ttl) {
+      setTimeout(() => this.store.delete(key), ttl * 1000);
+    }
+  }
+
+  async del(key: string): Promise<void> {
+    this.store.delete(key);
+  }
+
+  async acquireLock(key: string, ttl: number): Promise<boolean> {
+    if (this.locks.has(key)) {
+      return false;
+    }
+    this.locks.add(key);
+    setTimeout(() => this.locks.delete(key), ttl * 1000);
+    return true;
+  }
+
+  async releaseLock(key: string): Promise<void> {
+    this.locks.delete(key);
+  }
+
+  // Helper for tests
+  clear(): void {
+    this.store.clear();
+    this.locks.clear();
+  }
+}
+```
+
+---
 
 ### Critical Test Scenarios
 
 #### 1. Concurrency Test (Most Important)
+
 ```typescript
 describe('Booking Concurrency', () => {
   it('should prevent double booking when two users book simultaneously', async () => {
@@ -2883,14 +5914,22 @@ describe('Booking Concurrency', () => {
 
     // Simulate two concurrent booking attempts
     const [booking1, booking2] = await Promise.allSettled([
-      bookingService.createBooking({ propertyId, checkIn, checkOut }, 'key1'),
-      bookingService.createBooking({ propertyId, checkIn, checkOut }, 'key2'),
+      bookingService.createBooking(
+        { propertyId, checkIn, checkOut },
+        'user1',
+        'key1',
+      ),
+      bookingService.createBooking(
+        { propertyId, checkIn, checkOut },
+        'user2',
+        'key2',
+      ),
     ]);
 
     // One should succeed, one should fail
     const results = [booking1, booking2];
-    const successes = results.filter(r => r.status === 'fulfilled');
-    const failures = results.filter(r => r.status === 'rejected');
+    const successes = results.filter((r) => r.status === 'fulfilled');
+    const failures = results.filter((r) => r.status === 'rejected');
 
     expect(successes).toHaveLength(1);
     expect(failures).toHaveLength(1);
@@ -2900,20 +5939,94 @@ describe('Booking Concurrency', () => {
 ```
 
 #### 2. Availability Test
+
 ```typescript
 it('should update availability immediately after booking', async () => {
+  const propertyId = 'test-property-id';
+  const checkIn = new Date('2024-06-01');
+  const checkOut = new Date('2024-06-05');
+
   // Create booking
-  await bookingService.createBooking({ ... }, 'key1');
-  
+  await bookingService.createBooking(
+    { propertyId, checkIn, checkOut, guests: 2 },
+    'user1',
+    'key1',
+  );
+
   // Check availability - should be false
   const availability = await availabilityService.checkAvailability(
     propertyId,
     checkIn,
-    checkOut
+    checkOut,
   );
-  
+
   expect(availability).toBe(false);
 });
+```
+
+---
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run only unit tests
+npm run test:unit
+
+# Run only integration tests (requires test database)
+npm run test:integration
+
+# Run only e2e tests (requires full application)
+npm run test:e2e
+
+# Run tests with coverage report
+npm run test:cov
+
+# Run tests in watch mode during development
+npm run test:watch
+
+# Run specific test file
+npm test -- booking.service.spec.ts
+
+# Run tests matching pattern
+npm test -- --testNamePattern="should create a booking"
+```
+
+### Test Database Setup (Docker Compose)
+
+```yaml
+# docker-compose.test.yml
+version: '3.8'
+
+services:
+  test-db:
+    image: postgis/postgis:15-3.3
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: booking_test
+    ports:
+      - '5433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data # Use tmpfs for faster tests
+
+  test-redis:
+    image: redis:7-alpine
+    ports:
+      - '6380:6379'
+```
+
+```bash
+# Start test containers
+docker-compose -f docker-compose.test.yml up -d
+
+# Run integration tests
+npm run test:integration
+
+# Stop test containers
+docker-compose -f docker-compose.test.yml down
 ```
 
 ---
@@ -2929,6 +6042,7 @@ it('should update availability immediately after booking', async () => {
 5. **Storage**: Azure Blob Storage for images
 
 ### Environment Variables
+
 ```
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
@@ -2941,6 +6055,7 @@ EMAIL_SERVICE_API_KEY=...
 ## Success Criteria
 
 ### Must Have (MVP)
+
 - ✅ Zero double bookings (tested with concurrent requests)
 - ✅ Real-time availability updates
 - ✅ Basic location-based search
@@ -2948,10 +6063,12 @@ EMAIL_SERVICE_API_KEY=...
 - ✅ Booking confirmation emails
 
 ### Standout Features (Competitive Advantage)
+
 - ⭐ **Waitlist & Auto-Rebooking** - Fill cancelled slots automatically
 - ⭐ **Smart Price Drop Alerts** - Never miss a deal, auto-booking option
 
 ### Nice to Have (Future)
+
 - Advanced search filters
 - Review system
 - Host dashboard
@@ -2963,15 +6080,15 @@ EMAIL_SERVICE_API_KEY=...
 
 ### MVP (Minimum Viable Product) - 6-8 weeks
 
-| Phase | Duration | Tasks |
-|-------|----------|-------|
-| **Setup** | 1 week | Project setup, database schema, auth |
-| **Property Management** | 1 week | CRUD for properties, image upload |
-| **Search** | 1 week | Basic location-based search |
-| **Booking System** | 2-3 weeks | Booking flow, concurrency control, availability |
-| **Payment** | 1 week | Payment gateway integration |
-| **Testing** | 1 week | Concurrency tests, integration tests |
-| **Deployment** | 1 week | Docker, deployment, monitoring |
+| Phase                   | Duration  | Tasks                                           |
+| ----------------------- | --------- | ----------------------------------------------- |
+| **Setup**               | 1 week    | Project setup, database schema, auth            |
+| **Property Management** | 1 week    | CRUD for properties, image upload               |
+| **Search**              | 1 week    | Basic location-based search                     |
+| **Booking System**      | 2-3 weeks | Booking flow, concurrency control, availability |
+| **Payment**             | 1 week    | Payment gateway integration                     |
+| **Testing**             | 1 week    | Concurrency tests, integration tests            |
+| **Deployment**          | 1 week    | Docker, deployment, monitoring                  |
 
 **Total: 6-8 weeks** (with 1-2 developers)
 
@@ -2998,6 +6115,7 @@ This simplified guide focuses on solving the core problems: preventing double bo
 ### Authentication & User Management
 
 #### Authentication
+
 ```
 POST   /auth/register
   Body: { email, password, name, role? }
@@ -3033,6 +6151,7 @@ POST   /auth/resend-verification
 ```
 
 #### User Profile
+
 ```
 GET    /users/me
   Returns: Current user profile
@@ -3063,6 +6182,7 @@ PATCH  /users/me/preferences
 ### Properties
 
 #### Property Discovery & Search
+
 ```
 GET    /properties/search
   Query: {
@@ -3120,6 +6240,7 @@ GET    /properties/nearby/:id
 ```
 
 #### Property Management (Host)
+
 ```
 POST   /properties
   Body: {
@@ -3161,6 +6282,7 @@ PATCH  /properties/my-properties/:id/photos/reorder
 ```
 
 #### Property Availability Management (Host)
+
 ```
 GET    /properties/my-properties/:id/availability
   Query: { start_date?, end_date? }
@@ -3199,6 +6321,7 @@ GET    /properties/my-properties/:id/calendar
 ### Bookings
 
 #### Booking Management (Guest)
+
 ```
 POST   /bookings
   Headers: { X-Idempotency-Key: string (required) }
@@ -3242,6 +6365,7 @@ GET    /bookings/past
 ```
 
 #### Booking Management (Host)
+
 ```
 GET    /bookings/my-properties
   Query: {
@@ -3663,6 +6787,7 @@ Events:
 ## API Response Standards
 
 ### Success Response Format
+
 ```typescript
 {
   success: true,
@@ -3675,6 +6800,7 @@ Events:
 ```
 
 ### Error Response Format
+
 ```typescript
 {
   success: false,
@@ -3688,6 +6814,7 @@ Events:
 ```
 
 ### HTTP Status Codes
+
 - `200` - Success
 - `201` - Created
 - `204` - No Content
@@ -3702,18 +6829,22 @@ Events:
 - `503` - Service Unavailable
 
 ### Pagination
+
 All list endpoints support pagination:
+
 - `page`: Page number (default: 1)
 - `limit`: Items per page (default: 20, max: 100)
 - Response includes `pagination` object with metadata
 
 ### Rate Limiting
+
 - Public endpoints: 100 requests/minute
 - Authenticated endpoints: 1000 requests/minute
 - Payment endpoints: 10 requests/minute
 - Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
 
 ### CORS
+
 - Allowed origins configured per environment
 - Credentials: true for authenticated requests
 - Preflight: 24 hours cache
@@ -3723,6 +6854,7 @@ All list endpoints support pagination:
 ## Frontend Integration Notes
 
 ### Authentication Flow
+
 1. User registers/logs in → Receive `accessToken` and `refreshToken`
 2. Store tokens securely (httpOnly cookies recommended)
 3. Include `Authorization: Bearer <accessToken>` in all authenticated requests
@@ -3730,34 +6862,40 @@ All list endpoints support pagination:
 5. On refresh failure, redirect to login
 
 ### Idempotency Keys
+
 - Generate UUID v4 for all POST requests that create resources
 - Include in `X-Idempotency-Key` header
 - Retry failed requests with same key (prevents duplicates)
 
 ### Real-time Updates
+
 - Use WebSocket connection for live updates
 - Subscribe to relevant events based on user role
 - Fallback to polling if WebSocket unavailable
 
 ### Image Uploads
+
 - Use multipart/form-data for file uploads
 - Maximum file size: 10MB per image
 - Supported formats: JPEG, PNG, WebP
 - Compress images client-side before upload
 
 ### Search Optimization
+
 - Debounce search input (300ms)
 - Cache search results client-side
 - Use pagination for large result sets
 - Implement infinite scroll or "Load More"
 
 ### Booking Flow
+
 1. Search properties → Select property → Check availability
 2. Create booking (with idempotency key) → Receive payment intent
 3. Process payment → Confirm booking
 4. Show confirmation with booking details
 
 ### Error Handling
+
 - Display user-friendly error messages
 - Log errors for debugging
 - Retry transient failures (network errors)
@@ -3766,3 +6904,11 @@ All list endpoints support pagination:
 ---
 
 This comprehensive API reference covers all frontend requirements for building a complete booking platform interface.
+
+## Project Names
+
+```
+stayly.io, stayly.co, getstayly.com
+roost.app, roostbnb.com
+holdspot.com, holdspot.io
+```
