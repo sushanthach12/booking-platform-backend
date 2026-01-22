@@ -1,4 +1,3 @@
-
 ```
 backend/
 ├── src/
@@ -127,7 +126,8 @@ backend/
 │   ├── auth/                            # Authentication module (Single Responsibility)
 │   │   ├── auth.module.ts
 │   │   ├── auth.controller.ts
-│   │   ├── auth.service.ts
+|   |   ├── services/
+│   │   │   ├── auth.service.ts
 │   │   ├── strategies/
 │   │   │   ├── jwt.strategy.ts
 │   │   │   └── local.strategy.ts
