@@ -4,9 +4,11 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Request,
   UseGuards,
 } from '@nestjs/common';
+import { RequestUser } from '../../jwt/types/jwt.types';
+import { CurrentUser } from '../decorators/current-user.decorator';
+import { AuthGuard } from '../guards/auth.guard';
 import { AuthService } from '../services/auth.service';
 
 @Controller('auth')
@@ -50,9 +52,9 @@ export class AuthController {
    */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @UseGuards() // TODO: Add JWT Auth Guard
-  async logout(@Request() req: { user: { id: string } }) {
-    return this.authService.logout(req.user.id);
+  @UseGuards(AuthGuard)
+  async logout(@CurrentUser() user: RequestUser) {
+    return this.authService.logout(user.id);
   }
 
   /**
