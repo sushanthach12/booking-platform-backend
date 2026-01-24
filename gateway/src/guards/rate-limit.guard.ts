@@ -1,4 +1,4 @@
-import { RedisService } from '@nestjs-modules/ioredis';
+import { RedisService } from '../redis/redis.service';
 import {
   CanActivate,
   ExecutionContext,

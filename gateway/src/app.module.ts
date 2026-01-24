@@ -1,4 +1,3 @@
-import { RedisModule } from '@nestjs-modules/ioredis';
 import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -12,6 +11,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
+import { RedisClientModule } from './redis/redis.module';
 import { CircuitBreakerService } from './services/circuit-breaker.service';
 import { ProxyService } from './services/proxy.service';
 import { RoutingService } from './services/routing.service';
@@ -40,19 +40,7 @@ import { RoutingService } from './services/routing.service';
           },
         }) as JwtModuleOptions,
     }),
-    RedisModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const redisUrl = configService.get<string>('redis.url');
-        const host = configService.get<string>('redis.host') ?? 'localhost';
-        const port = configService.get<number>('redis.port') ?? 6379;
-
-        return {
-          type: 'single',
-          url: redisUrl ?? `redis://${host}:${port}`,
-        };
-      },
-    }),
+    RedisClientModule,
   ],
   controllers: [HealthController, GatewayController],
   providers: [

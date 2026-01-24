@@ -15,6 +15,11 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const { method, url, ip } = request;
+    const path = request.path ?? url;
+
+    if (path === '/favicon.ico') {
+      return next.handle();
+    }
     const now = Date.now();
 
     return next.handle().pipe(

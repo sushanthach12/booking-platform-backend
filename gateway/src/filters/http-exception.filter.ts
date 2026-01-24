@@ -16,6 +16,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    const path = request.path ?? request.url;
 
     const status =
       exception instanceof HttpException
@@ -27,9 +28,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? exception.getResponse()
         : 'Internal server error';
 
-    this.logger.error(
-      `${request.method} ${request.url} - ${status} - ${JSON.stringify(message)}`,
-    );
+    if (path !== '/favicon.ico') {
+      this.logger.error(
+        `${request.method} ${request.url} - ${status} - ${JSON.stringify(message)}`,
+      );
+    }
 
     response.status(status).json({
       statusCode: status,

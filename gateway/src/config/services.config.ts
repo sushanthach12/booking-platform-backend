@@ -1,7 +1,7 @@
 export const servicesConfig = () => ({
   services: {
     user: {
-      baseUrl: process.env.USER_SERVICE_URL || 'http://localhost:3001',
+      baseUrl: 'http://localhost:8001',
       timeout: 5000,
       retries: 3,
       rateLimit: {
@@ -10,7 +10,7 @@ export const servicesConfig = () => ({
       },
     },
     property: {
-      baseUrl: process.env.PROPERTY_SERVICE_URL || 'http://localhost:3002',
+      baseUrl: 'http://localhost:8002',
       timeout: 5000,
       retries: 3,
       rateLimit: {
@@ -19,7 +19,7 @@ export const servicesConfig = () => ({
       },
     },
     booking: {
-      baseUrl: process.env.BOOKING_SERVICE_URL || 'http://localhost:3003',
+      baseUrl: 'http://localhost:8003',
       timeout: 5000,
       retries: 3,
       rateLimit: {
@@ -28,7 +28,7 @@ export const servicesConfig = () => ({
       },
     },
     payment: {
-      baseUrl: process.env.PAYMENT_SERVICE_URL || 'http://localhost:3004',
+      baseUrl: 'http://localhost:8004',
       timeout: 10000,
       retries: 2,
       rateLimit: {
@@ -37,7 +37,7 @@ export const servicesConfig = () => ({
       },
     },
     search: {
-      baseUrl: process.env.SEARCH_SERVICE_URL || 'http://localhost:3005',
+      baseUrl: 'http://localhost:8005',
       timeout: 5000,
       retries: 3,
       rateLimit: {
@@ -46,8 +46,8 @@ export const servicesConfig = () => ({
       },
     },
     notification: {
-      baseUrl: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006',
-      timeout: 3000,
+      baseUrl: 'http://localhost:8006',
+      timeout: 8000,
       retries: 2,
       rateLimit: {
         ttl: 60,
@@ -55,7 +55,7 @@ export const servicesConfig = () => ({
       },
     },
     content: {
-      baseUrl: process.env.CONTENT_SERVICE_URL || 'http://localhost:3007',
+      baseUrl: 'http://localhost:8007',
       timeout: 5000,
       retries: 3,
       rateLimit: {
@@ -64,7 +64,7 @@ export const servicesConfig = () => ({
       },
     },
     pricing: {
-      baseUrl: process.env.PRICING_SERVICE_URL || 'http://localhost:3008',
+      baseUrl: 'http://localhost:8008',
       timeout: 5000,
       retries: 3,
       rateLimit: {
@@ -73,7 +73,7 @@ export const servicesConfig = () => ({
       },
     },
     admin: {
-      baseUrl: process.env.ADMIN_SERVICE_URL || 'http://localhost:3009',
+      baseUrl: 'http://localhost:8009',
       timeout: 5000,
       retries: 3,
       rateLimit: {

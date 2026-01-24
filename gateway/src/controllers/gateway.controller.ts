@@ -10,7 +10,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
-import { Response } from 'express';
+import type { Response } from 'express';
 import type { GatewayRequest } from '../common/interfaces/gateway-request.interface';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RateLimitGuard } from '../guards/rate-limit.guard';
