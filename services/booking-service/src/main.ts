@@ -22,7 +22,7 @@ async function bootstrap() {
   const PORT = process.env.PORT ?? 8002;
 
   await app.listen(PORT, () => {
-    logger.log(`Booking service is running on port ${PORT}`);
+    logger.debug(`Booking service is running on port ${PORT}`);
   });
 }
 
