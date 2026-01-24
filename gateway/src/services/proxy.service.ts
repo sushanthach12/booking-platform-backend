@@ -2,6 +2,7 @@ import { HttpService } from '@nestjs/axios';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { catchError, firstValueFrom, timeout } from 'rxjs';
+import { getServiceConfig, ServiceName } from '../config/services.config';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { RoutingService } from './routing.service';
 
@@ -35,8 +36,9 @@ export class ProxyService {
     }
 
     const serviceUrl = this.routingService.getServiceUrl(route.service);
-    const serviceConfig = this.configService.get<{ timeout?: number }>(
-      `services.${route.service}`,
+    const serviceConfig = getServiceConfig(
+      this.configService,
+      route.service as ServiceName,
     );
     const targetUrl = `${serviceUrl}${path}`;
 
@@ -59,12 +61,12 @@ export class ProxyService {
           headers: cleanHeaders,
           params: query,
           data: body,
-          timeout: serviceConfig?.timeout ?? 5000,
+          timeout: serviceConfig.timeout,
         };
 
         const response = await firstValueFrom(
           this.httpService.request(requestConfig).pipe(
-            timeout(serviceConfig?.timeout ?? 5000),
+            timeout(serviceConfig.timeout),
             catchError((error) => {
               throw new HttpException(
                 error.response?.data || error.message,

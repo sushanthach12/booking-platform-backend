@@ -2,6 +2,8 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { gatewayDefaults, gatewayEnv } from './config/gateway.config';
+import { parseBoolean, parseCsv, parseNumber } from './config/config.utils';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 
@@ -14,11 +16,18 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  const allowedOrigins = configService.get<string[]>(
-    'gateway.cors.allowedOrigins',
-  ) ?? ['*'];
-  const corsCredentials =
-    configService.get<boolean>('gateway.cors.credentials') ?? true;
+  const allowedOriginsRaw = configService.get<string>(
+    gatewayEnv.allowedOrigins,
+  );
+  const parsedOrigins = parseCsv(allowedOriginsRaw);
+  const allowedOrigins =
+    parsedOrigins.length > 0
+      ? parsedOrigins
+      : gatewayDefaults.cors.allowedOrigins;
+  const corsCredentials = parseBoolean(
+    configService.get<string>(gatewayEnv.corsCredentials),
+    gatewayDefaults.cors.credentials,
+  );
 
   app.enableCors({
     origin: allowedOrigins.includes('*') ? true : allowedOrigins,
@@ -43,7 +52,10 @@ async function bootstrap() {
   // Enable shutdown hooks
   app.enableShutdownHooks();
 
-  const PORT = configService.get<number>('gateway.port') ?? 8000;
+  const PORT = parseNumber(
+    configService.get<string>(gatewayEnv.port),
+    gatewayDefaults.port,
+  );
 
   await app.listen(PORT, () => {
     logger.debug(`Gateway is running on port ${PORT}`);

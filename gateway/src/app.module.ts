@@ -2,8 +2,8 @@ import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
-import { gatewayConfig } from './config/gateway.config';
-import { servicesConfig } from './config/services.config';
+import { gatewayDefaults, gatewayEnv } from './config/gateway.config';
+import { parseNumber } from './config/config.utils';
 import { GatewayController } from './controllers/gateway.controller';
 import { HealthController } from './controllers/health.controller';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
@@ -19,24 +19,33 @@ import { RoutingService } from './services/routing.service';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      load: [gatewayConfig, servicesConfig],
       isGlobal: true,
     }),
     HttpModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        timeout: configService.get<number>('gateway.httpTimeout') ?? 5000,
-        maxRedirects: 5,
-      }),
+      useFactory: (configService: ConfigService) => {
+        const timeout = parseNumber(
+          configService.get<string>(gatewayEnv.httpTimeout),
+          gatewayDefaults.httpTimeout,
+        );
+        return {
+          timeout,
+          maxRedirects: 5,
+        };
+      },
     }),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) =>
         ({
-          secret: configService.get<string>('jwt.secret') ?? 'change-me',
+          secret:
+            configService.get<string>(gatewayEnv.jwtSecret) ??
+            gatewayDefaults.jwt.secret,
           global: true,
           signOptions: {
-            expiresIn: configService.get<string>('jwt.expiresIn') ?? '1h',
+            expiresIn:
+              configService.get<string>(gatewayEnv.jwtExpiresIn) ??
+              gatewayDefaults.jwt.expiresIn,
           },
         }) as JwtModuleOptions,
     }),

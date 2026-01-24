@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { GatewayRequest } from '../common/interfaces/gateway-request.interface';
+import { gatewayDefaults, gatewayEnv } from '../config/gateway.config';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -25,7 +26,9 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get<string>('jwt.secret') ?? 'change-me',
+        secret:
+          this.configService.get<string>(gatewayEnv.jwtSecret) ??
+          gatewayDefaults.jwt.secret,
       });
       request.user = payload;
       return true;

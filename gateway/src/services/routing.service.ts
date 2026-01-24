@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getServiceConfig, ServiceName } from '../config/services.config';
 
 export interface RouteConfig {
   path: string;
@@ -61,16 +62,17 @@ export class RoutingService {
     requiresAuth: boolean = true,
   ): void {
     const routeKey = `${method}:${path}`;
-    const serviceConfig = this.configService.get<{
-      rateLimit?: { ttl: number; limit: number };
-    }>(`services.${service}`);
+    const serviceConfig = getServiceConfig(
+      this.configService,
+      service as ServiceName,
+    );
 
     this.routes.set(routeKey, {
       path,
       service,
       method,
       requiresAuth,
-      rateLimit: serviceConfig?.rateLimit,
+      rateLimit: serviceConfig.rateLimit,
     });
   }
 
@@ -100,9 +102,10 @@ export class RoutingService {
   }
 
   getServiceUrl(serviceName: string): string {
-    const serviceConfig = this.configService.get<{ baseUrl?: string }>(
-      `services.${serviceName}`,
+    const serviceConfig = getServiceConfig(
+      this.configService,
+      serviceName as ServiceName,
     );
-    return serviceConfig?.baseUrl ?? '';
+    return serviceConfig.baseUrl;
   }
 }
