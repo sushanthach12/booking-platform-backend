@@ -1,6 +1,9 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './filters/http-exception.filter';
+import { LoggingInterceptor } from './interceptors/logging.interceptor';
 
 const logger = new Logger('Bootstrap');
 
@@ -9,17 +12,38 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
+  const configService = app.get(ConfigService);
+
+  const allowedOrigins = configService.get<string[]>(
+    'gateway.cors.allowedOrigins',
+  ) ?? ['*'];
+  const corsCredentials =
+    configService.get<boolean>('gateway.cors.credentials') ?? true;
+
+  app.enableCors({
+    origin: allowedOrigins.includes('*') ? true : allowedOrigins,
+    credentials: corsCredentials,
+  });
+
   // Enable global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip properties that don't have decorators
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
     }),
   );
+
+  // Global exception filter
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Global request logging
+  app.useGlobalInterceptors(new LoggingInterceptor());
 
   // Enable shutdown hooks
   app.enableShutdownHooks();
 
-  const PORT = process.env.PORT ?? 8000;
+  const PORT = configService.get<number>('gateway.port') ?? 8000;
 
   await app.listen(PORT, () => {
     logger.debug(`Gateway is running on port ${PORT}`);
