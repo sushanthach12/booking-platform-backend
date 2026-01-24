@@ -19,7 +19,11 @@ async function bootstrap() {
   // Enable shutdown hooks
   app.enableShutdownHooks();
 
-  await app.listen(process.env.PORT ?? 8000);
+  const PORT = process.env.PORT ?? 8002;
+
+  await app.listen(PORT, () => {
+    logger.log(`Booking service is running on port ${PORT}`);
+  });
 }
 
 // Handle unhandled promise rejections
