@@ -13,7 +13,7 @@ export class LoggingInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
-    const { method, protocol, headers, query, body } = request;
+    const { method, headers, query, body } = request;
     const path = request.path ?? request.url?.split('?')[0] ?? '/';
 
     if (path === '/favicon.ico') {
@@ -21,8 +21,6 @@ export class LoggingInterceptor implements NestInterceptor {
     }
 
     // Build full URL with protocol, host, path, and query parameters
-    const protocolStr =
-      protocol === 'https' || request.secure ? 'https' : 'http';
     const queryString = Object.entries(query || {})
       .map(([key, value]) => {
         if (Array.isArray(value)) {
@@ -36,7 +34,7 @@ export class LoggingInterceptor implements NestInterceptor {
         return `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`;
       })
       .join('&');
-    const fullUrl = `${protocolStr}://{{ApiGateway}}${path}${queryString ? `?${queryString}` : ''}`;
+    const fullUrl = `{{ApiGateway}}${path}${queryString ? `?${queryString}` : ''}`;
 
     // Build headers, excluding ones that curl handles automatically
     const excludedHeaders = [
