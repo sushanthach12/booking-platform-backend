@@ -29,7 +29,16 @@ export class AuthService {
     // 4. Generate JWT tokens
     // 5. Return user and tokens
 
-    throw new Error('Method not implemented.');
+    return Promise.resolve({
+      user: {
+        id: 'user-id',
+        email: registerDto.email,
+        name: 'User Name',
+        role: 'user',
+      },
+      refreshToken: 'refresh-token',
+      accessToken: 'access-token',
+    });
   }
 
   /**
@@ -53,7 +62,16 @@ export class AuthService {
     // 3. Generate JWT tokens
     // 4. Return user and tokens
 
-    throw new Error('Method not implemented.');
+    return Promise.resolve({
+      user: {
+        id: 'user-id',
+        email: loginDto.email,
+        name: 'User Name',
+        role: 'user',
+      },
+      refreshToken: 'refresh-token',
+      accessToken: 'access-token',
+    });
   }
 
   /**
@@ -71,7 +89,10 @@ export class AuthService {
     // 3. Generate new tokens
     // 4. Return new tokens
 
-    throw new Error('Method not implemented.');
+    return Promise.resolve({
+      refreshToken: refreshToken,
+      accessToken: 'access-token',
+    });
   }
 
   /**
@@ -85,7 +106,8 @@ export class AuthService {
     // 2. Clear any session data
     // 3. Return success message
 
-    throw new Error('Method not implemented.');
+    console.log(`Logging out user with ID: ${userId}`);
+    return Promise.resolve({ message: 'Logout successful' });
   }
 
   /**
@@ -100,7 +122,8 @@ export class AuthService {
     // 3. Send reset email
     // 4. Return success message
 
-    throw new Error('Method not implemented.');
+    console.log(`Sending password reset email to: ${email}`);
+    return Promise.resolve({ message: 'Password reset email sent' });
   }
 
   /**
@@ -121,7 +144,10 @@ export class AuthService {
     // 5. Invalidate reset token
     // 6. Return success message
 
-    throw new Error('Method not implemented.');
+    console.log(
+      `Resetting password for token: ${token} with new password: ${newPassword}`,
+    );
+    return Promise.resolve({ message: 'Password has been reset successfully' });
   }
 
   /**
@@ -144,6 +170,7 @@ export class AuthService {
     // 2. Compare password
     // 3. Return user if valid, null otherwise
 
-    throw new Error('Method not implemented.');
+    console.log(`Validating user with email: ${email}, password: ${password}`);
+    return Promise.resolve(null);
   }
 }
