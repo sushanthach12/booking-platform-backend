@@ -9,6 +9,9 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
+  // prefix
+  app.setGlobalPrefix('api/users');
+
   // Enable global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({

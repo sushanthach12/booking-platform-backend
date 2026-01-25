@@ -6,7 +6,7 @@ export interface RouteConfig {
   path: string;
   service: string;
   method: string;
-  requiresAuth?: boolean;
+  excludeFromAuth?: string[];
   rateLimit?: {
     ttl: number;
     limit: number;
@@ -22,44 +22,32 @@ export class RoutingService {
   }
 
   private initializeRoutes(): void {
-    // Auth routes (no auth required)
-    this.addRoute('/api/v1/auth/*', 'user', 'ALL', false);
+    // User routes - exclude auth routes like login, register, etc.
+    this.addRoute('/api/users/*', 'user', 'ALL', [
+      '/api/users/auth/login',
+      '/api/users/auth/register',
+      '/api/users/auth/refresh',
+      '/api/users/auth/verify',
+    ]);
 
-    // User routes
-    this.addRoute('/api/v1/users/*', 'user', 'ALL', true);
+    // Property routes - exclude public listing endpoints
+    this.addRoute('/api/properties/*', 'property', 'ALL', [
+      '/api/properties',
+      '/api/properties/search',
+    ]);
 
-    // Property routes
-    this.addRoute('/api/v1/properties', 'property', 'GET', false);
-    this.addRoute('/api/v1/properties/*', 'property', 'ALL', true);
+    // Search routes - public by default
+    this.addRoute('/api/search/*', 'search', 'GET');
 
-    // Search routes
-    this.addRoute('/api/v1/search/*', 'search', 'GET', false);
-
-    // Booking routes
-    this.addRoute('/api/v1/bookings/*', 'booking', 'ALL', true);
-
-    // Payment routes
-    this.addRoute('/api/v1/payments/*', 'payment', 'ALL', true);
-
-    // Notification routes
-    this.addRoute('/api/v1/notifications/*', 'notification', 'ALL', true);
-
-    // Content routes
-    this.addRoute('/api/v1/reviews/*', 'content', 'ALL', true);
-    this.addRoute('/api/v1/upload/*', 'content', 'ALL', true);
-
-    // Pricing routes
-    this.addRoute('/api/v1/price-alerts/*', 'pricing', 'ALL', true);
-
-    // Admin routes
-    this.addRoute('/api/v1/admin/*', 'admin', 'ALL', true);
+    // Booking routes - all require auth
+    this.addRoute('/api/bookings/*', 'booking', 'ALL');
   }
 
   private addRoute(
     path: string,
     service: string,
     method: string,
-    requiresAuth: boolean = true,
+    excludeFromAuth?: string[],
   ): void {
     const routeKey = `${method}:${path}`;
     const serviceConfig = getServiceConfig(
@@ -71,7 +59,7 @@ export class RoutingService {
       path,
       service,
       method,
-      requiresAuth,
+      excludeFromAuth,
       rateLimit: serviceConfig.rateLimit,
     });
   }
@@ -107,5 +95,16 @@ export class RoutingService {
       serviceName as ServiceName,
     );
     return serviceConfig.baseUrl;
+  }
+
+  isExcludedFromAuth(path: string, route: RouteConfig): boolean {
+    if (!route.excludeFromAuth || route.excludeFromAuth.length === 0) {
+      return false;
+    }
+
+    return route.excludeFromAuth.some((excludedPath) => {
+      const pattern = this.pathToRegex(excludedPath);
+      return pattern.test(path);
+    });
   }
 }

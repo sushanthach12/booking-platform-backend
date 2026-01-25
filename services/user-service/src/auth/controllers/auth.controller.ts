@@ -1,14 +1,6 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { RequestUser } from '../../jwt/types/jwt.types';
 import { CurrentUser } from '../decorators/current-user.decorator';
-import { AuthGuard } from '../guards/auth.guard';
 import { AuthService } from '../services/auth.service';
 
 @Controller('auth')
@@ -52,7 +44,6 @@ export class AuthController {
    */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(AuthGuard)
   async logout(@CurrentUser() user: RequestUser) {
     return this.authService.logout(user.id);
   }

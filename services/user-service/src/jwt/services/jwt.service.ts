@@ -281,7 +281,6 @@ export class JwtService {
       type: decoded.type as 'access' | 'refresh' | undefined,
       iat: decoded.iat,
       exp: decoded.exp,
-      jti: decoded.jti as string | undefined,
     };
   }
 

@@ -25,8 +25,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const message =
       exception instanceof HttpException
-        ? exception.getResponse()
+        ? exception.message || 'Something went wrong'
         : 'Internal server error';
+
+    const error =
+      exception instanceof HttpException ? exception.getResponse() : null;
 
     if (path !== '/favicon.ico') {
       this.logger.error(
@@ -35,10 +38,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     response.status(status).json({
-      statusCode: status,
+      status_code: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       message,
+      error,
     });
   }
 }

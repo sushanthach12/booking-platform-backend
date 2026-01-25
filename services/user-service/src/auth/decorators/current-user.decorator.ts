@@ -12,17 +12,17 @@ import { RequestUser } from '../../jwt/types/jwt.types';
  * }
  */
 export const CurrentUser = createParamDecorator(
-  (data: keyof RequestUser | undefined, ctx: ExecutionContext): RequestUser | any => {
+  (data: keyof RequestUser | undefined, ctx: ExecutionContext): RequestUser => {
     const request = ctx.switchToHttp().getRequest<{ user: RequestUser }>();
     const user = request.user;
 
     if (!user) {
-      return null;
+      return null as any;
     }
 
     // If specific property requested, return that property
     if (data) {
-      return user[data];
+      return user[data] as any;
     }
 
     // Otherwise return entire user object

@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtService } from '../../jwt/services/jwt.service';
-import { RequestUser } from '../../jwt/types/jwt.types';
 
 /**
  * Authentication Guard
@@ -23,7 +22,7 @@ export class AuthGuard implements CanActivate {
 
   constructor(private readonly jwtService: JwtService) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
 
     try {
@@ -36,10 +35,10 @@ export class AuthGuard implements CanActivate {
       }
 
       // Verify and decode token (defaults to access token)
-      const payload = await this.jwtService.verifyToken(token, 'access');
+      const payload = this.jwtService.verifyToken(token, 'access');
 
       // Attach user to request object
-      request.user = {
+      (request as any).user = {
         id: payload.sub,
         email: payload.email,
         role: payload.role,

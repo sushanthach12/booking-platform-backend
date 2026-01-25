@@ -45,7 +45,8 @@ export class GatewayController {
     req.gatewayRoute = route;
     const context = new ExecutionContextHost([req, res]);
 
-    if (route.requiresAuth) {
+    // Check if route is excluded from auth, otherwise require auth
+    if (!this.routingService.isExcludedFromAuth(req.path, route)) {
       await this.jwtAuthGuard.canActivate(context);
     }
 
