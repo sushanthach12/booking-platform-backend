@@ -6,7 +6,6 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -14,32 +13,65 @@ export class LoggingInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
-    const { method, url, ip } = request;
-    const path = request.path ?? url;
+    const { method, protocol, headers, query, body } = request;
+    const path = request.path ?? request.url?.split('?')[0] ?? '/';
 
     if (path === '/favicon.ico') {
       return next.handle();
     }
-    const now = Date.now();
 
-    return next.handle().pipe(
-      tap({
-        next: () => {
-          const response = context.switchToHttp().getResponse();
-          const { statusCode } = response;
-          const delay = Date.now() - now;
+    // Build full URL with protocol, host, path, and query parameters
+    const host = headers.host;
+    const protocolStr =
+      protocol === 'https' || request.secure ? 'https' : 'http';
+    const queryString = Object.entries(query || {})
+      .map(([key, value]) => {
+        if (Array.isArray(value)) {
+          return value
+            .map(
+              (v) =>
+                `${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`,
+            )
+            .join('&');
+        }
+        return `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`;
+      })
+      .join('&');
+    const fullUrl = `${protocolStr}://${host}${path}${queryString ? `?${queryString}` : ''}`;
 
-          this.logger.log(
-            `${method} ${url} ${statusCode} - ${delay}ms - ${ip}`,
-          );
-        },
-        error: (error) => {
-          const delay = Date.now() - now;
-          this.logger.error(
-            `${method} ${url} ${error.status || 500} - ${delay}ms - ${ip} - ${error.message}`,
-          );
-        },
-      }),
-    );
+    // Build headers, excluding ones that curl handles automatically
+    const excludedHeaders = [
+      'host',
+      'content-length',
+      'connection',
+      'transfer-encoding',
+    ];
+    const headerEntries = Object.entries(headers || {})
+      .filter(([key]) => !excludedHeaders.includes(key.toLowerCase()))
+      .map(([key, value]) => {
+        const headerValue = Array.isArray(value)
+          ? value.join(', ')
+          : String(value);
+        // Escape single quotes in header values
+        const escapedValue = headerValue.replace(/'/g, "'\\''");
+        return `-H '${key}: ${escapedValue}'`;
+      })
+      .join(' ');
+
+    // Build body part
+    let bodyPart = '';
+    if (body && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
+      const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
+      // Escape single quotes in body
+      const escapedBody = bodyStr.replace(/'/g, "'\\''");
+      bodyPart = ` --data-raw '${escapedBody}'`;
+    }
+
+    const curlCommand =
+      `curl -X ${method} '${fullUrl}' ${headerEntries}${bodyPart}`.trim();
+
+    this.logger.debug(`curl command: ${curlCommand}`);
+
+    return next.handle();
   }
 }
