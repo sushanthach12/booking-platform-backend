@@ -21,7 +21,6 @@ export class LoggingInterceptor implements NestInterceptor {
     }
 
     // Build full URL with protocol, host, path, and query parameters
-    const host = headers.host;
     const protocolStr =
       protocol === 'https' || request.secure ? 'https' : 'http';
     const queryString = Object.entries(query || {})
@@ -37,7 +36,7 @@ export class LoggingInterceptor implements NestInterceptor {
         return `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`;
       })
       .join('&');
-    const fullUrl = `${protocolStr}://${host}${path}${queryString ? `?${queryString}` : ''}`;
+    const fullUrl = `${protocolStr}://{{ApiGateway}}${path}${queryString ? `?${queryString}` : ''}`;
 
     // Build headers, excluding ones that curl handles automatically
     const excludedHeaders = [
