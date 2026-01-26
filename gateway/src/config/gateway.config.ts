@@ -5,7 +5,7 @@ export const gatewayEnv = {
   allowedOrigins: 'ALLOWED_ORIGINS',
   corsCredentials: 'CORS_CREDENTIALS',
   jwtSecret: 'JWT_SECRET',
-  jwtExpiresIn: 'JWT_EXPIRES_IN',
+  jwtExpiresIn: 'JWT_EXPIRY',
   redisUrl: 'REDIS_URL',
   redisHost: 'REDIS_HOST',
   redisPort: 'REDIS_PORT',

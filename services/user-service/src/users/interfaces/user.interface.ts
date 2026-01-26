@@ -14,3 +14,10 @@ export interface ICreateUserParams {
   name: string;
   role: UserRole;
 }
+
+export interface IGetProfileResponse {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+}

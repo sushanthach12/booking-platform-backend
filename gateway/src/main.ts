@@ -2,14 +2,17 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { gatewayDefaults, gatewayEnv } from './config/gateway.config';
+import { loadEnvConfig } from './config';
 import { parseBoolean, parseCsv, parseNumber } from './config/config.utils';
+import { gatewayDefaults, gatewayEnv } from './config/gateway.config';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 
 const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
+  loadEnvConfig(logger);
+
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });

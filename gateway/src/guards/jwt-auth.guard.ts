@@ -25,10 +25,12 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
+      const secret =
+        this.configService.get<string>(gatewayEnv.jwtSecret) ??
+        gatewayDefaults.jwt.secret;
+
       const payload = await this.jwtService.verifyAsync(token, {
-        secret:
-          this.configService.get<string>(gatewayEnv.jwtSecret) ??
-          gatewayDefaults.jwt.secret,
+        secret,
       });
 
       const userId = payload.sub;
@@ -48,6 +50,6 @@ export class JwtAuthGuard implements CanActivate {
   private extractTokenFromHeader(request: GatewayRequest): string | undefined {
     const authorization = request.headers?.authorization;
     const [type, token] = authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+    return type === 'JWT' ? token : undefined;
   }
 }

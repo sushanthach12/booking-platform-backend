@@ -27,8 +27,7 @@ export class UserRepositoryImpl implements IUserRepository {
   }
 
   findById(id: string): Promise<IUser | null> {
-    console.log(`Finding user by ID: ${id}`);
-    throw new Error('Method not implemented.');
+    return this.userRepository.findOne({ where: { id } });
   }
 
   findByEmail(email: string): Promise<IUser | null> {
