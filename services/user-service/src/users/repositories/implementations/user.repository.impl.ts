@@ -1,12 +1,28 @@
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { UserEntity } from '../../entities/user.entity';
 import { IUser } from '../../interfaces/user.interface';
 import { IUserRepository } from '../interfaces/user.repository.interface';
 
 export class UserRepositoryImpl implements IUserRepository {
-  constructor() {}
+  constructor(
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
+  ) {}
 
   findAll(): Promise<IUser[]> {
-    throw new Error('Method not implemented.');
+    return this.dataSource.manager.transaction(
+      async (transactionalEntityManager) => {
+        const users = await transactionalEntityManager.find(UserEntity, {
+          select: ['id', 'email', 'name', 'role'],
+        });
+        return users;
+      },
+    );
   }
+
   findById(id: string): Promise<IUser | null> {
     console.log(`Finding user by ID: ${id}`);
     throw new Error('Method not implemented.');
