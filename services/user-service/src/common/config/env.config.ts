@@ -28,7 +28,7 @@ export const loadEnvConfig = (): void => {
   }
 
   // 3️⃣ Add defaults or computed environment variables
-  if (!process.env.PORT) process.env.PORT = '8000';
+  if (!process.env.PORT) process.env.PORT = '8001';
   if (!process.env.CORS_ORIGIN) process.env.CORS_ORIGIN = '*';
   if (!process.env.API_PREFIX) process.env.API_PREFIX = 'api/platform';
   if (!process.env.API_VERSION) process.env.API_VERSION = 'v1';
