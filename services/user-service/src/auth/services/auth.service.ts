@@ -18,18 +18,33 @@ export class AuthService {
 
   constructor(private readonly userService: UserService) {}
 
-  async validateUser(email: string, password: string): Promise<IUser> {
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<{
+    userFound: boolean;
+    user: IUser | null;
+  }> {
     const user = await this.userService.findByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      return {
+        userFound: false,
+        user: null,
+      };
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      return {
+        userFound: true,
+        user: null,
+      };
     }
 
-    return user;
+    return {
+      userFound: true,
+      user: user,
+    };
   }
 
   /**
@@ -84,18 +99,31 @@ export class AuthService {
     accessToken: string;
     refreshToken: string;
   }> {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
+    const validatedUser = await this.validateUser(
+      loginDto.email,
+      loginDto.password,
+    );
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (!validatedUser.userFound) {
+      throw new UnauthorizedException(
+        'Email does not exist. Please register first.',
+      );
+    }
+
+    if (validatedUser.userFound && !validatedUser.user) {
+      throw new UnauthorizedException('Invalid Credentials');
+    }
+
+    if (!validatedUser.user) {
+      throw new UnauthorizedException('Invalid Credentials');
     }
 
     return {
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
+        id: validatedUser.user.id,
+        email: validatedUser.user.email,
+        name: validatedUser.user.name,
+        role: validatedUser.user.role,
       },
       refreshToken: 'refresh-token',
       accessToken: 'access-token',
