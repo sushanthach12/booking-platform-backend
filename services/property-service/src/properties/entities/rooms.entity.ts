@@ -1,0 +1,122 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { PropertyImageEntity } from './property-image.entity';
+import { PropertyEntity } from './property.entity';
+
+export enum RoomType {
+  BEDROOM = 'bedroom',
+  LIVING_ROOM = 'living_room',
+  PRIVATE_ROOM = 'private_room',
+  SHARED_ROOM = 'shared_room',
+  KITCHEN = 'kitchen',
+  BATHROOM = 'bathroom',
+  OTHER = 'other',
+}
+
+export enum BedType {
+  KING = 'king',
+  QUEEN = 'queen',
+  DOUBLE = 'double',
+  SINGLE = 'single',
+  SOFA_BED = 'sofa_bed',
+  BUNK_BED = 'bunk_bed',
+  FLOOR_MATTRESS = 'floor_mattress',
+}
+
+export enum RoomStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+}
+
+@Entity('rooms')
+export class RoomEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'uuid', name: 'property_id' })
+  propertyId: string;
+
+  @Column({ type: 'varchar', length: 255 })
+  name: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+    name: 'room_type',
+  })
+  roomType: RoomType;
+
+  @Column({ type: 'integer', default: 1 })
+  beds: number;
+
+  @Column({ type: 'varchar', length: 50, name: 'bed_type', nullable: true })
+  bedType: BedType | null;
+
+  @Column({ type: 'integer', name: 'max_guests', default: 2 })
+  maxGuests: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    name: 'base_price',
+    nullable: true,
+  })
+  basePrice: number | null;
+
+  @Column({ type: 'boolean', name: 'is_private', default: true })
+  isPrivate: boolean;
+
+  @Column({ type: 'boolean', name: 'has_bathroom', default: false })
+  hasBathroom: boolean;
+
+  @Column({ type: 'boolean', name: 'has_balcony', default: false })
+  hasBalcony: boolean;
+
+  @Column({ type: 'integer', name: 'floor_number', nullable: true })
+  floorNumber: number | null;
+
+  @Column({
+    type: 'decimal',
+    precision: 8,
+    scale: 2,
+    name: 'square_meters',
+    nullable: true,
+  })
+  squareMeters: number | null;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: RoomStatus.ACTIVE,
+  })
+  status: RoomStatus;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+
+  @ManyToOne(() => PropertyEntity, (property) => property.rooms, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'property_id' })
+  property: PropertyEntity;
+
+  @OneToMany(() => PropertyImageEntity, (image) => image.room, {
+    cascade: true,
+  })
+  images: PropertyImageEntity[];
+}

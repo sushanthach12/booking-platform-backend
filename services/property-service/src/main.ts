@@ -1,12 +1,29 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { loadEnvConfig } from './common/config/env.config';
 
 const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
+  loadEnvConfig(logger);
+
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
+
+  // Enable global validation pipe
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // Strip properties that don't have decorators
+    }),
+  );
+  // prefix
+  app.setGlobalPrefix('api/properties');
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+    prefix: 'v',
   });
 
   // Enable global validation pipe
@@ -22,7 +39,7 @@ async function bootstrap() {
   const PORT = process.env.PORT ?? 8002;
 
   await app.listen(PORT, () => {
-    logger.log(`Property service is running on port ${PORT}`);
+    logger.debug(`Property service is running on port ${PORT}`);
   });
 }
 

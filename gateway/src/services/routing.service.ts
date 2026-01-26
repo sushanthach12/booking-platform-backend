@@ -32,8 +32,8 @@ export class RoutingService {
 
     // Property routes - exclude public listing endpoints
     this.addRoute('/api/properties/*', 'property', 'ALL', [
-      '/api/properties',
-      '/api/properties/search',
+      '/api/properties/v1',
+      '/api/properties/v1/search',
     ]);
 
     // Search routes - public by default
