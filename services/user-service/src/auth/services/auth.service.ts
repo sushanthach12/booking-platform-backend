@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from '../../users/enums/user.enum';
 import { IUser } from '../../users/interfaces/user.interface';
@@ -16,7 +17,10 @@ import {
 export class AuthService {
   private readonly BCRYPT_ROUNDS = 10;
 
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly userService: UserService,
+  ) {}
 
   async validateUser(
     email: string,
@@ -75,7 +79,7 @@ export class AuthService {
     });
 
     // 3. Generate JWT tokens
-    const tokens = this.generateTokens(newUser.id);
+    const tokens = await this.generateTokens(newUser);
 
     return {
       user: newUser,
@@ -118,6 +122,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Credentials');
     }
 
+    const tokens = await this.generateTokens(validatedUser.user);
+
     return {
       user: {
         id: validatedUser.user.id,
@@ -125,22 +131,40 @@ export class AuthService {
         name: validatedUser.user.name,
         role: validatedUser.user.role,
       },
-      refreshToken: 'refresh-token',
-      accessToken: 'access-token',
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
     };
   }
 
-  generateTokens(userId: string): {
+  private async generateTokens(user: IUser): Promise<{
     accessToken: string;
     refreshToken: string;
-  } {
-    console.log(`Generating tokens for user with ID: ${userId}`);
+    expiresIn: number;
+  }> {
+    const payload: {
+      sub: string;
+      email: string;
+    } = {
+      sub: user.id,
+      email: user.email,
+    };
+
+    // Parallel token generation for better performance
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        expiresIn: '15m', // Short-lived access token
+      }),
+      this.jwtService.signAsync(payload, {
+        expiresIn: '7d', // Longer-lived refresh token
+      }),
+    ]);
+
     return {
-      refreshToken: 'refresh-token',
-      accessToken: 'access-token',
+      accessToken,
+      refreshToken,
+      expiresIn: 15 * 60, // 15 minutes in seconds
     };
   }
-
   /**
    * Logout user and invalidate tokens
    * @param userId - User ID

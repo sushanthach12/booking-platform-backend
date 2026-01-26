@@ -30,7 +30,15 @@ export class JwtAuthGuard implements CanActivate {
           this.configService.get<string>(gatewayEnv.jwtSecret) ??
           gatewayDefaults.jwt.secret,
       });
-      request.user = payload;
+
+      const userId = payload.sub;
+      if (!userId) {
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      // TODO: validate the user
+
+      request.headers['x-user-id'] = userId;
       return true;
     } catch {
       throw new UnauthorizedException('Invalid token');
