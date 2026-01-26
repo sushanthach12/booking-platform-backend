@@ -6,7 +6,7 @@ import { loadEnvConfig } from './common/config/env.config';
 const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
-  loadEnvConfig();
+  loadEnvConfig(logger);
 
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],

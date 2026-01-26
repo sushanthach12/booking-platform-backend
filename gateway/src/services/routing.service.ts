@@ -24,10 +24,10 @@ export class RoutingService {
   private initializeRoutes(): void {
     // User routes - exclude auth routes like login, register, etc.
     this.addRoute('/api/users/*', 'user', 'ALL', [
-      '/api/users/auth/login',
-      '/api/users/auth/register',
-      '/api/users/auth/refresh',
-      '/api/users/auth/verify',
+      '/api/users/v1/auth/login',
+      '/api/users/v1/auth/register',
+      '/api/users/v1/auth/refresh',
+      '/api/users/v1/auth/verify',
     ]);
 
     // Property routes - exclude public listing endpoints

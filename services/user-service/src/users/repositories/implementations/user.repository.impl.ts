@@ -2,7 +2,10 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { UserEntity } from '../../entities/user.entity';
 import { IUser } from '../../interfaces/user.interface';
-import { IUserRepository } from '../interfaces/user.repository.interface';
+import {
+  ICreateUserImplParams,
+  IUserRepository,
+} from '../interfaces/user.repository.interface';
 
 export class UserRepositoryImpl implements IUserRepository {
   constructor(
@@ -27,13 +30,18 @@ export class UserRepositoryImpl implements IUserRepository {
     console.log(`Finding user by ID: ${id}`);
     throw new Error('Method not implemented.');
   }
+
   findByEmail(email: string): Promise<IUser | null> {
-    console.log(`Finding user by email: ${email}`);
-    throw new Error('Method not implemented.');
+    return this.userRepository.findOne({ where: { email } });
   }
-  create(user: IUser): Promise<IUser> {
-    console.log(`Creating user:`, user);
-    throw new Error('Method not implemented.');
+
+  async create(data: ICreateUserImplParams): Promise<IUser> {
+    const user = this.userRepository.create({
+      ...data,
+      role: data.role,
+    });
+
+    return this.userRepository.save(user);
   }
   update(user: IUser): Promise<IUser> {
     console.log(`Updating user:`, user);

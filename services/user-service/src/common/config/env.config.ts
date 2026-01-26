@@ -1,10 +1,10 @@
+import { Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { NodeEnv } from '../enums/config.enum';
 
-export const loadEnvConfig = (): void => {
+export const loadEnvConfig = (logger: Logger): void => {
   const nodeEnv = process.env.NODE_ENV || NodeEnv.DEVELOPMENT;
-  console.log('nodeEnv', nodeEnv);
 
   // 1️⃣ For LOCAL or DEVELOPMENT – fall back to .env
   if (nodeEnv === NodeEnv.DEVELOPMENT) {
@@ -20,9 +20,9 @@ export const loadEnvConfig = (): void => {
           }
         }
       });
-      console.log(`Loaded local environment file: ${envPath}`);
+      logger.log(`Loaded local environment file: ${envPath}`);
     } else {
-      console.warn(`No local env file found for ${nodeEnv}`);
+      logger.warn(`No local env file found for ${nodeEnv}`);
     }
     return;
   }

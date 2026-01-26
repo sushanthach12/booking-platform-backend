@@ -1,44 +1,72 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import { UserRole } from '../../users/enums/user.enum';
+import { IUser } from '../../users/interfaces/user.interface';
+import { UserService } from '../../users/services/user.service';
+import {
+  IRegisterRequest,
+  IRegisterResponse,
+} from '../interfaces/auth.interface';
 
 @Injectable()
 export class AuthService {
+  private readonly BCRYPT_ROUNDS = 10;
+
+  constructor(private readonly userService: UserService) {}
+
+  async validateUser(email: string, password: string): Promise<IUser> {
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return user;
+  }
+
   /**
    * Register a new user
    * @param registerDto - User registration data
    * @returns User data with access and refresh tokens
    */
-  async register(registerDto: {
-    email: string;
-    password: string;
-    name: string;
-    role?: string;
-  }): Promise<{
-    user: {
-      id: string;
-      email: string;
-      name: string;
-      role: string;
-    };
-    accessToken: string;
-    refreshToken: string;
-  }> {
-    // TODO: Implement user registration logic
+  async register(data: IRegisterRequest): Promise<IRegisterResponse> {
     // 1. Check if user already exists
-    // 2. Hash password
-    // 3. Create user in database
-    // 4. Generate JWT tokens
-    // 5. Return user and tokens
+    const user = await this.userService.findByEmail(data.payload.email);
 
-    return Promise.resolve({
-      user: {
-        id: 'user-id',
-        email: registerDto.email,
-        name: 'User Name',
-        role: 'user',
-      },
-      refreshToken: 'refresh-token',
-      accessToken: 'access-token',
+    if (user) {
+      throw new BadRequestException('Email already in use');
+    }
+
+    // Use optimized bcrypt rounds for better performance
+    const hashedPassword = await bcrypt.hash(
+      data.payload.password,
+      this.BCRYPT_ROUNDS,
+    );
+
+    // 2. Create user in database
+    const newUser = await this.userService.create({
+      email: data.payload.email,
+      password: hashedPassword,
+      name: data.payload.name,
+      role: UserRole.GUEST,
     });
+
+    // 3. Generate JWT tokens
+    const tokens = this.generateTokens(newUser.id);
+
+    return {
+      user: newUser,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   /**
@@ -56,43 +84,33 @@ export class AuthService {
     accessToken: string;
     refreshToken: string;
   }> {
-    // TODO: Implement login logic
-    // 1. Find user by email
-    // 2. Verify password
-    // 3. Generate JWT tokens
-    // 4. Return user and tokens
+    const user = await this.validateUser(loginDto.email, loginDto.password);
 
-    return Promise.resolve({
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return {
       user: {
-        id: 'user-id',
-        email: loginDto.email,
-        name: 'User Name',
-        role: 'user',
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
       },
       refreshToken: 'refresh-token',
       accessToken: 'access-token',
-    });
+    };
   }
 
-  /**
-   * Refresh access token using refresh token
-   * @param refreshToken - Refresh token string
-   * @returns New access and refresh tokens
-   */
-  async refreshToken(refreshToken: string): Promise<{
+  generateTokens(userId: string): {
     accessToken: string;
     refreshToken: string;
-  }> {
-    // TODO: Implement token refresh logic
-    // 1. Verify refresh token
-    // 2. Get user from token
-    // 3. Generate new tokens
-    // 4. Return new tokens
-
-    return Promise.resolve({
-      refreshToken: refreshToken,
+  } {
+    console.log(`Generating tokens for user with ID: ${userId}`);
+    return {
+      refreshToken: 'refresh-token',
       accessToken: 'access-token',
-    });
+    };
   }
 
   /**
@@ -148,29 +166,5 @@ export class AuthService {
       `Resetting password for token: ${token} with new password: ${newPassword}`,
     );
     return Promise.resolve({ message: 'Password has been reset successfully' });
-  }
-
-  /**
-   * Validate user credentials
-   * @param email - User email
-   * @param password - User password
-   * @returns User data if valid, null otherwise
-   */
-  async validateUser(
-    email: string,
-    password: string,
-  ): Promise<{
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-  } | null> {
-    // TODO: Implement user validation logic
-    // 1. Find user by email
-    // 2. Compare password
-    // 3. Return user if valid, null otherwise
-
-    console.log(`Validating user with email: ${email}, password: ${password}`);
-    return Promise.resolve(null);
   }
 }
