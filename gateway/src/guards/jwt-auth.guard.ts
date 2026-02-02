@@ -34,13 +34,15 @@ export class JwtAuthGuard implements CanActivate {
       });
 
       const userId = payload.sub;
-      if (!userId) {
+      const role = payload.role;
+      if (!userId || !role) {
         throw new UnauthorizedException('Invalid token');
       }
 
-      // TODO: validate the user
-
-      request.headers['x-user-id'] = userId;
+      request.user = {
+        id: userId,
+        role: role,
+      };
       return true;
     } catch {
       throw new UnauthorizedException('Invalid token');

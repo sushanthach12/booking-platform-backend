@@ -2,6 +2,9 @@ import { Request } from 'express';
 import type { RouteConfig } from '../../services/routing.service';
 
 export interface GatewayRequest extends Request {
-  user?: Record<string, unknown>;
+  user?: {
+    id: string;
+    role: string;
+  };
   gatewayRoute?: RouteConfig;
 }

@@ -147,11 +147,9 @@ export class AuthService {
   }> {
     const payload: {
       sub: string;
-      email: string;
       role: string;
     } = {
       sub: user.id,
-      email: user.email,
       role: user.role ?? EUserRole.GUEST,
     };
 
