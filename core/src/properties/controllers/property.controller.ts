@@ -8,6 +8,8 @@ import {
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { CurrentUser } from '../../common/decorators/request-user.decorator';
+import { RequestUser } from '../../common/types/users.types';
 import { CreatePropertyDto } from '../dto/create-property.dto';
 import { PropertyService } from '../services/property.service';
 
@@ -19,11 +21,16 @@ export class PropertyController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
-  async register(@Res() res: Response, @Body() body: CreatePropertyDto) {
-    this.logger.log(`Register request received for email`);
+  async createProperty(
+    @Res() res: Response,
+    @CurrentUser() user: RequestUser,
+    @Body() body: CreatePropertyDto,
+  ) {
+    this.logger.log(`Create property request received`);
 
     const response = await this.propertyService.createProperty({
       payload: body,
+      user,
     });
 
     return res.status(HttpStatus.OK).json({ data: response });

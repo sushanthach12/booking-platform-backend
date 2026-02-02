@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { EUserRole } from '../enums/user.enum';
+import { EUserRole, EUserStatus } from '../enums/user.enum';
 
 @Entity('users')
 export class UserEntity {
@@ -22,20 +22,52 @@ export class UserEntity {
   name: string;
 
   @Column({
-    type: 'enum',
+    type: 'varchar',
+    length: 20,
     default: EUserRole.GUEST,
-    enumName: 'user_role',
-    enum: EUserRole,
   })
-  role: EUserRole;
+  role: string;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: EUserStatus.ACTIVE,
+  })
+  status: string;
+
+  @Column({
+    type: 'varchar',
+    length: 15,
+    nullable: true,
+  })
+  phone: string;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  email_verified: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  phone_verified: boolean;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
+  created_at: Date;
 
   @UpdateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',
   })
-  updatedAt: Date;
+  updated_at: Date;
+
+  @UpdateDateColumn({
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+    onUpdate: 'CURRENT_TIMESTAMP',
+  })
+  last_login_at: Date;
 }

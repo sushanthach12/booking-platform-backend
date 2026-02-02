@@ -1,5 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
+import { RequestUser } from '../types/users.types';
 
 // Extend the Request interface to include the 'user' property
 declare module 'express' {
@@ -11,7 +12,7 @@ declare module 'express' {
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest<Request>();
-    return request.user;
+    return request.user as RequestUser;
   },
 );
 
