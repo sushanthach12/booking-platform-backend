@@ -1,8 +1,9 @@
 import { HttpService } from '@nestjs/axios';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AxiosRequestConfig } from 'axios';
 import { catchError, firstValueFrom, timeout } from 'rxjs';
-import { getServiceConfig, ServiceName } from '../config/services.config';
+import { ServiceName, getServiceConfig } from '../config/services.config';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { RoutingService } from './routing.service';
 
@@ -16,6 +17,10 @@ export class ProxyService {
   ) {}
 
   async proxyRequest(
+    user: {
+      id: string;
+      role: string;
+    },
     method: string,
     path: string,
     body: unknown,
@@ -42,13 +47,16 @@ export class ProxyService {
     );
     const targetUrl = `${serviceUrl}${path}`;
 
-    const cleanHeaders = { ...headers };
+    const cleanHeaders: Record<string, string> = {
+      ...headers,
+      user: JSON.stringify(user),
+    };
     delete cleanHeaders.host;
     delete cleanHeaders['content-length'];
 
     try {
       return await this.circuitBreaker.execute(route.service, async () => {
-        const requestConfig = {
+        const requestConfig: AxiosRequestConfig = {
           method: method.toLowerCase() as
             | 'get'
             | 'post'

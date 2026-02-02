@@ -3,7 +3,17 @@ export enum EPropertyType {
   HOUSE = 'house',
   VILLA = 'villa',
   CABIN = 'cabin',
+  CONDO = 'condo',
+  TOWNHOUSE = 'townhouse',
+  STUDIO = 'studio',
+  LOFT = 'loft',
   OTHER = 'other',
+}
+
+export enum EPropertyStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  DELETED = 'deleted',
 }
 
 export enum EPropertyChargeTypes {

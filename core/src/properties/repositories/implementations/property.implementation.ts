@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
+  DeepPartial,
   EntityNotFoundError,
   QueryFailedError,
   Repository,
@@ -12,22 +13,26 @@ import { PropertyAmenityEntity } from '../../entities/property-amenity.entity';
 import { PropertyDetailsEntity } from '../../entities/property-details.entity';
 import { PropertyImageEntity } from '../../entities/property-image.entity';
 import { PropertyLocationEntity } from '../../entities/property-location.entity';
-import {
-  CancellationPolicy,
-  PropertyPolicyEntity,
-} from '../../entities/property-policy.entity';
+import { PropertyPolicyEntity } from '../../entities/property-policy.entity';
 import { PropertyPricingEntity } from '../../entities/property-pricing.entity';
 import { PropertyRatingEntity } from '../../entities/property-rating.entity';
-import { PropertyEntity, PropertyStatus } from '../../entities/property.entity';
+import { PropertyEntity } from '../../entities/property.entity';
 import { RoomEntity } from '../../entities/rooms.entity';
+import {
+  EPropertyCancellationPolicy,
+  EPropertyStatus,
+  EPropertyType,
+} from '../../enums/property.enum';
 import { ERoomStatus } from '../../enums/rooms.enum';
 import {
+  ICheckPropertyExistsImplParams,
   ICreateAmenityImplParams,
   ICreateHouseRuleImplParams,
   ICreatePropertyAmenityImplParams,
   ICreatePropertyDetailsImplParams,
   ICreatePropertyImageImplParams,
   ICreatePropertyImplParams,
+  ICreatePropertyImplResponse,
   ICreatePropertyLocationImplParams,
   ICreatePropertyPolicyImplParams,
   ICreatePropertyPricingImplParams,
@@ -155,19 +160,97 @@ export class PropertyRepository implements IPropertyRepository {
 
   // ==================== Property CRUD ====================
 
+  async checkPropertyExists(
+    params: ICheckPropertyExistsImplParams,
+  ): Promise<boolean> {
+    try {
+      const property = await this.propertyRepository.findOne({
+        where: { hostId: params.hostId, title: params.title },
+        select: { id: true },
+      });
+      return property !== null;
+    } catch (error) {
+      this.handleDbError(error, 'checkPropertyExists', 'Property');
+    }
+  }
+
   async createProperty(
     params: ICreatePropertyImplParams,
-  ): Promise<PropertyEntity> {
+  ): Promise<ICreatePropertyImplResponse> {
     try {
-      const property = this.propertyRepository.create({
-        hostId: params.hostId,
-        title: params.title,
-        description: params.description ?? null,
-        propertyType: params.propertyType,
-        status: params.status ?? PropertyStatus.DRAFT,
+      const { hostId, payload } = params;
+
+      const result = await this.dataSource.transaction(async (manager) => {
+        /* ----------------------------------
+         * 1. Create Property (root entity)
+         * ---------------------------------- */
+        const property: PropertyEntity = manager.create(PropertyEntity, {
+          hostId: hostId,
+          title: payload.details.title,
+          description: payload.details.description ?? null,
+          propertyType: payload.details.propertyType,
+          status: EPropertyStatus.ACTIVE,
+          details: {
+            maxGuests: payload.policies.maxGuests,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1.0,
+          },
+          pricing: {
+            basePrice: payload.pricing.basePrice,
+            cleaningFee: 0,
+          },
+          ratings: {
+            rating: 0,
+            reviewCount: 0,
+          },
+          policies: {
+            minNights: payload.policies.minNights,
+            maxNights: payload.policies.maxNights,
+            maxGuests: payload.policies.maxGuests,
+            checkInTime: payload.policies.checkInTime,
+            checkOutTime: payload.policies.checkOutTime,
+            cancellationPolicy: payload.policies.cancellationPolicy,
+            instantBook: payload.policies.enableWaitlist,
+          },
+          rooms: [],
+          amenities: [],
+          images: [],
+          houseRules: [],
+          location: {
+            addressLine1: payload.address.addressLine1,
+            addressLine2: payload.address.addressLine2 ?? null,
+            city: payload.address.city,
+            state: payload.address.state ?? null,
+            country: payload.address.country,
+            postalCode: payload.address.postalCode ?? null,
+            latitude: payload.address.latitude ?? null,
+            longitude: payload.address.longitude ?? null,
+          },
+        } as DeepPartial<PropertyEntity>);
+
+        const savedProperty = await manager.save(property);
+
+        return {
+          id: savedProperty.id,
+          title: savedProperty.title,
+          description: savedProperty.description,
+          propertyType: savedProperty.propertyType,
+          status: savedProperty.status,
+          createdAt: savedProperty.createdAt,
+          updatedAt: savedProperty.updatedAt,
+        };
       });
 
-      return await this.propertyRepository.save(property);
+      return {
+        id: result.id,
+        title: result.title,
+        description: result.description,
+        propertyType: result.propertyType as EPropertyType,
+        status: result.status as EPropertyStatus,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+      };
     } catch (error) {
       this.handleDbError(error, 'createProperty', 'Property');
     }
@@ -1063,7 +1146,7 @@ export class PropertyRepository implements IPropertyRepository {
         checkInTime: params.checkInTime ?? '15:00',
         checkOutTime: params.checkOutTime ?? '11:00',
         cancellationPolicy:
-          params.cancellationPolicy ?? CancellationPolicy.MODERATE,
+          params.cancellationPolicy ?? EPropertyCancellationPolicy.FLEXIBLE,
         instantBook: params.instantBook ?? false,
       });
 

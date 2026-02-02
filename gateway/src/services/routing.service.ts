@@ -23,24 +23,38 @@ export class RoutingService {
 
   private initializeRoutes(): void {
     // User routes - exclude auth routes like login, register, etc.
-    this.addRoute('/api/users/*', 'user', 'ALL', [
-      '/api/users/v1/auth/login',
-      '/api/users/v1/auth/register',
-      '/api/users/v1/auth/refresh',
-      '/api/users/v1/auth/verify',
+    // this.addRoute('/api/users/*', 'user', 'ALL', [
+    //   '/api/users/v1/auth/login',
+    //   '/api/users/v1/auth/register',
+    //   '/api/users/v1/auth/refresh',
+    //   '/api/users/v1/auth/verify',
+    // ]);
+
+    // Property routes - exclude public listing endpoints
+    // this.addRoute('/api/properties/*', 'property', 'ALL', [
+    //   '/api/properties/v1',
+    //   '/api/properties/v1/search',
+    // ]);
+
+    // Search routes - public by default
+    // this.addRoute('/api/search/*', 'search', 'GET');
+
+    // Booking routes - all require auth
+    // this.addRoute('/api/bookings/*', 'booking', 'ALL');
+
+    // User routes - exclude auth routes like login, register, etc.
+    this.addRoute('/api/core/*', 'core', 'ALL', [
+      '/api/core/v1/auth/login',
+      '/api/core/v1/auth/register',
+      '/api/core/v1/auth/refresh',
+      '/api/core/v1/auth/verify',
     ]);
 
     // Property routes - exclude public listing endpoints
-    this.addRoute('/api/properties/*', 'property', 'ALL', [
-      '/api/properties/v1',
-      '/api/properties/v1/search',
+    this.addRoute('/api/core/v1/properties/*', 'core', 'ALL', [
+      '/api/core/v1/properties',
+      '/api/core/v1/properties/search',
     ]);
-
-    // Search routes - public by default
-    this.addRoute('/api/search/*', 'search', 'GET');
-
-    // Booking routes - all require auth
-    this.addRoute('/api/bookings/*', 'booking', 'ALL');
   }
 
   private addRoute(

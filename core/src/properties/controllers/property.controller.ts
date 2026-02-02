@@ -26,13 +26,22 @@ export class PropertyController {
     @CurrentUser() user: RequestUser,
     @Body() body: CreatePropertyDto,
   ) {
-    this.logger.log(`Create property request received`);
+    try {
+      this.logger.log(`Create property request received`);
 
-    const response = await this.propertyService.createProperty({
-      payload: body,
-      user,
-    });
+      const response = await this.propertyService.createProperty({
+        payload: body,
+        user,
+      });
 
-    return res.status(HttpStatus.OK).json({ data: response });
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Something went wrong';
+      const statusCode =
+        error.response?.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+
+      return res.status(statusCode).json({ message: errorMessage });
+    }
   }
 }

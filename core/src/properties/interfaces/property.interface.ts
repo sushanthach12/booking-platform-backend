@@ -23,6 +23,8 @@ export interface ICreatePropertyRequestParams {
       state: string;
       country: string;
       postalCode: string;
+      latitude: number;
+      longitude: number;
     };
     pricing: {
       basePrice: number;

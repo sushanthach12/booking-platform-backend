@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { EPropertyStatus } from '../enums/property.enum';
 import { HouseRuleEntity } from './house-rules.entity';
 import { PropertyAmenityEntity } from './property-amenity.entity';
 import { PropertyDetailsEntity } from './property-details.entity';
@@ -16,25 +17,6 @@ import { PropertyPolicyEntity } from './property-policy.entity';
 import { PropertyPricingEntity } from './property-pricing.entity';
 import { PropertyRatingEntity } from './property-rating.entity';
 import { RoomEntity } from './rooms.entity';
-
-export enum PropertyType {
-  APARTMENT = 'apartment',
-  HOUSE = 'house',
-  VILLA = 'villa',
-  CABIN = 'cabin',
-  CONDO = 'condo',
-  TOWNHOUSE = 'townhouse',
-  STUDIO = 'studio',
-  LOFT = 'loft',
-  OTHER = 'other',
-}
-
-export enum PropertyStatus {
-  DRAFT = 'draft',
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-  DELETED = 'deleted',
-}
 
 @Entity('properties')
 export class PropertyEntity {
@@ -54,17 +36,15 @@ export class PropertyEntity {
     type: 'varchar',
     length: 50,
     name: 'property_type',
-    enum: PropertyType,
   })
-  propertyType: PropertyType;
+  propertyType: string;
 
   @Column({
     type: 'varchar',
     length: 20,
-    default: PropertyStatus.DRAFT,
-    enum: PropertyStatus,
+    default: EPropertyStatus.ACTIVE,
   })
-  status: PropertyStatus;
+  status: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

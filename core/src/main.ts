@@ -13,7 +13,7 @@ async function bootstrap() {
   });
 
   // prefix
-  app.setGlobalPrefix('api/users');
+  app.setGlobalPrefix('api/core');
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',

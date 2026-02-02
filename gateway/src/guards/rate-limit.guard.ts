@@ -1,4 +1,3 @@
-import { RedisService } from '../redis/redis.service';
 import {
   CanActivate,
   ExecutionContext,
@@ -8,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { GatewayRequest } from '../common/interfaces/gateway-request.interface';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class RateLimitGuard implements CanActivate {
@@ -53,7 +53,7 @@ export class RateLimitGuard implements CanActivate {
   }
 
   private getRateLimitKey(request: GatewayRequest, service: string): string {
-    const userId = (request.user?.sub as string | undefined) ?? 'anonymous';
+    const userId = request.user?.id ?? 'anonymous';
     const forwardedFor = request.headers['x-forwarded-for'];
     const forwardedIp = Array.isArray(forwardedFor)
       ? forwardedFor[0]

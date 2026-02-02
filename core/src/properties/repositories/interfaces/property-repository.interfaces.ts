@@ -4,35 +4,46 @@ import { PropertyAmenityEntity } from '../../entities/property-amenity.entity';
 import { PropertyDetailsEntity } from '../../entities/property-details.entity';
 import { PropertyImageEntity } from '../../entities/property-image.entity';
 import { PropertyLocationEntity } from '../../entities/property-location.entity';
-import {
-  CancellationPolicy,
-  PropertyPolicyEntity,
-} from '../../entities/property-policy.entity';
+import { PropertyPolicyEntity } from '../../entities/property-policy.entity';
 import { PropertyPricingEntity } from '../../entities/property-pricing.entity';
 import { PropertyRatingEntity } from '../../entities/property-rating.entity';
-import {
-  PropertyEntity,
-  PropertyStatus,
-  PropertyType,
-} from '../../entities/property.entity';
+import { PropertyEntity } from '../../entities/property.entity';
 import { RoomEntity } from '../../entities/rooms.entity';
+import {
+  EPropertyCancellationPolicy,
+  EPropertyStatus,
+  EPropertyType,
+} from '../../enums/property.enum';
 import { EBedType, ERoomStatus, ERoomType } from '../../enums/rooms.enum';
+import { ICreatePropertyRequestParams } from '../../interfaces/property.interface';
 
 // Property Entity Interfaces
-export interface ICreatePropertyImplParams {
+export interface ICheckPropertyExistsImplParams {
   hostId: string;
   title: string;
-  description?: string | null;
-  propertyType: PropertyType;
-  status?: PropertyStatus;
+}
+
+export interface ICreatePropertyImplParams {
+  hostId: string;
+  payload: ICreatePropertyRequestParams['payload'];
+}
+
+export interface ICreatePropertyImplResponse {
+  id: string;
+  title: string;
+  description: string | null;
+  propertyType: EPropertyType;
+  status: EPropertyStatus;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface IUpdatePropertyImplParams {
   id: string;
   title?: string;
   description?: string | null;
-  propertyType?: PropertyType;
-  status?: PropertyStatus;
+  propertyType?: EPropertyType;
+  status?: EPropertyStatus;
 }
 
 export interface IFindPropertyByIdImplParams {
@@ -41,8 +52,8 @@ export interface IFindPropertyByIdImplParams {
 
 export interface IFindPropertiesImplParams {
   hostId?: string;
-  status?: PropertyStatus;
-  propertyType?: PropertyType;
+  status?: EPropertyStatus;
+  propertyType?: EPropertyType;
   limit?: number;
   offset?: number;
 }
@@ -299,7 +310,7 @@ export interface ICreatePropertyPolicyImplParams {
   maxNights?: number;
   checkInTime?: string;
   checkOutTime?: string;
-  cancellationPolicy?: CancellationPolicy;
+  cancellationPolicy?: EPropertyCancellationPolicy;
   instantBook?: boolean;
 }
 
@@ -309,7 +320,7 @@ export interface IUpdatePropertyPolicyImplParams {
   maxNights?: number;
   checkInTime?: string;
   checkOutTime?: string;
-  cancellationPolicy?: CancellationPolicy;
+  cancellationPolicy?: EPropertyCancellationPolicy;
   instantBook?: boolean;
 }
 
@@ -348,8 +359,11 @@ export interface IFindPropertyPricingByPropertyIdImplParams {
 
 // Repository Interface Definitions
 export interface IPropertyRepository {
+  checkPropertyExists(params: ICheckPropertyExistsImplParams): Promise<boolean>;
   // Property CRUD
-  createProperty(params: ICreatePropertyImplParams): Promise<PropertyEntity>;
+  createProperty(
+    params: ICreatePropertyImplParams,
+  ): Promise<ICreatePropertyImplResponse>;
   findPropertyById(
     params: IFindPropertyByIdImplParams,
   ): Promise<PropertyEntity | null>;

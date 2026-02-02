@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { EUserRole } from '../../users/enums/user.enum';
 
 export class LoginDto {
@@ -32,7 +38,7 @@ export class LoginDto {
   })
   @IsString()
   @IsEnum(EUserRole)
-  @IsNotEmpty()
+  @IsOptional()
   userType: EUserRole;
 }
 

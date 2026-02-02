@@ -1,16 +1,15 @@
 import { ConfigService } from '@nestjs/config';
 import { parseNumber } from './config.utils';
 
-export type ServiceName =
-  | 'user'
-  | 'property'
-  | 'booking'
-  | 'payment'
-  | 'search'
-  | 'notification'
-  | 'content'
-  | 'pricing'
-  | 'admin';
+export type ServiceName = 'core';
+// | 'property'
+// | 'booking'
+// | 'payment'
+// | 'search'
+// | 'notification'
+// | 'content'
+// | 'pricing'
+// | 'admin';
 
 export type ServiceConfig = {
   baseUrl: string;
@@ -23,7 +22,7 @@ export type ServiceConfig = {
 };
 
 export const servicesEnv = {
-  user: {
+  core: {
     timeout: 'USER_SERVICE_TIMEOUT',
     retries: 'USER_SERVICE_RETRIES',
     rateLimitTtl: 'USER_SERVICE_RATE_LIMIT_TTL',
@@ -80,7 +79,7 @@ export const servicesEnv = {
 } as const;
 
 export const servicesDefaults: Record<ServiceName, ServiceConfig> = {
-  user: {
+  core: {
     baseUrl: 'http://localhost:8001',
     timeout: 5000,
     retries: 3,
@@ -89,78 +88,78 @@ export const servicesDefaults: Record<ServiceName, ServiceConfig> = {
       limit: 100,
     },
   },
-  property: {
-    baseUrl: 'http://localhost:8002',
-    timeout: 5000,
-    retries: 3,
-    rateLimit: {
-      ttl: 60,
-      limit: 200,
-    },
-  },
-  booking: {
-    baseUrl: 'http://localhost:8003',
-    timeout: 5000,
-    retries: 3,
-    rateLimit: {
-      ttl: 60,
-      limit: 10,
-    },
-  },
-  payment: {
-    baseUrl: 'http://localhost:8004',
-    timeout: 10000,
-    retries: 2,
-    rateLimit: {
-      ttl: 60,
-      limit: 50,
-    },
-  },
-  search: {
-    baseUrl: 'http://localhost:8005',
-    timeout: 5000,
-    retries: 3,
-    rateLimit: {
-      ttl: 60,
-      limit: 200,
-    },
-  },
-  notification: {
-    baseUrl: 'http://localhost:8006',
-    timeout: 8000,
-    retries: 2,
-    rateLimit: {
-      ttl: 60,
-      limit: 100,
-    },
-  },
-  content: {
-    baseUrl: 'http://localhost:8007',
-    timeout: 5000,
-    retries: 3,
-    rateLimit: {
-      ttl: 60,
-      limit: 100,
-    },
-  },
-  pricing: {
-    baseUrl: 'http://localhost:8008',
-    timeout: 5000,
-    retries: 3,
-    rateLimit: {
-      ttl: 60,
-      limit: 100,
-    },
-  },
-  admin: {
-    baseUrl: 'http://localhost:8009',
-    timeout: 5000,
-    retries: 3,
-    rateLimit: {
-      ttl: 60,
-      limit: 50,
-    },
-  },
+  // property: {
+  //   baseUrl: 'http://localhost:8002',
+  //   timeout: 5000,
+  //   retries: 3,
+  //   rateLimit: {
+  //     ttl: 60,
+  //     limit: 200,
+  //   },
+  // },
+  // booking: {
+  //   baseUrl: 'http://localhost:8003',
+  //   timeout: 5000,
+  //   retries: 3,
+  //   rateLimit: {
+  //     ttl: 60,
+  //     limit: 10,
+  //   },
+  // },
+  // payment: {
+  //   baseUrl: 'http://localhost:8004',
+  //   timeout: 10000,
+  //   retries: 2,
+  //   rateLimit: {
+  //     ttl: 60,
+  //     limit: 50,
+  //   },
+  // },
+  // search: {
+  //   baseUrl: 'http://localhost:8005',
+  //   timeout: 5000,
+  //   retries: 3,
+  //   rateLimit: {
+  //     ttl: 60,
+  //     limit: 200,
+  //   },
+  // },
+  // notification: {
+  //   baseUrl: 'http://localhost:8006',
+  //   timeout: 8000,
+  //   retries: 2,
+  //   rateLimit: {
+  //     ttl: 60,
+  //     limit: 100,
+  //   },
+  // },
+  // content: {
+  //   baseUrl: 'http://localhost:8007',
+  //   timeout: 5000,
+  //   retries: 3,
+  //   rateLimit: {
+  //     ttl: 60,
+  //     limit: 100,
+  //   },
+  // },
+  // pricing: {
+  //   baseUrl: 'http://localhost:8008',
+  //   timeout: 5000,
+  //   retries: 3,
+  //   rateLimit: {
+  //     ttl: 60,
+  //     limit: 100,
+  //   },
+  // },
+  // admin: {
+  //   baseUrl: 'http://localhost:8009',
+  //   timeout: 5000,
+  //   retries: 3,
+  //   rateLimit: {
+  //     ttl: 60,
+  //     limit: 50,
+  //   },
+  // },
 };
 
 export const getServiceConfig = (

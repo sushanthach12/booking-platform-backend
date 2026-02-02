@@ -90,7 +90,7 @@ export class CircuitBreakerService {
     circuit.lastFailureTime = Date.now();
 
     if (circuit.failures >= this.failureThreshold) {
-      circuit.state = 'OPEN';
+      // circuit.state = 'OPEN';
       this.logger.warn(
         `Circuit breaker for ${serviceName} moved to OPEN after ${circuit.failures} failures`,
       );

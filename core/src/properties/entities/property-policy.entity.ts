@@ -8,13 +8,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { EPropertyCancellationPolicy } from '../enums/property.enum';
 import { PropertyEntity } from './property.entity';
-
-export enum CancellationPolicy {
-  FLEXIBLE = 'flexible',
-  MODERATE = 'moderate',
-  STRICT = 'strict',
-}
 
 @Entity('property_policies')
 @Index(['propertyId'], { unique: true })
@@ -41,10 +36,9 @@ export class PropertyPolicyEntity {
     type: 'varchar',
     length: 20,
     name: 'cancellation_policy',
-    default: CancellationPolicy.MODERATE,
-    enum: CancellationPolicy,
+    default: EPropertyCancellationPolicy.FLEXIBLE,
   })
-  cancellationPolicy: CancellationPolicy;
+  cancellationPolicy: string;
 
   @Column({ type: 'boolean', name: 'instant_book', default: false })
   instantBook: boolean;

@@ -53,6 +53,7 @@ export class GatewayController {
     await this.rateLimitGuard.canActivate(context);
 
     const response = await this.proxyService.proxyRequest(
+      req.user as { id: string; role: string },
       req.method,
       req.path,
       body,

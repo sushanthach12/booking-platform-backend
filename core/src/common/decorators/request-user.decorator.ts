@@ -1,4 +1,8 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import {
+  createParamDecorator,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { RequestUser } from '../types/users.types';
 
@@ -12,13 +16,19 @@ declare module 'express' {
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest<Request>();
-    return request.user as RequestUser;
+    const user = JSON.parse(request.headers.user as string) as RequestUser;
+
+    if (!user) {
+      throw new UnauthorizedException('No user found');
+    }
+    return user;
   },
 );
 
 export const RequestUserId = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest<Request>();
-    return request.user?.id;
+    const user = JSON.parse(request.headers.user as string) as RequestUser;
+    return user.id;
   },
 );
