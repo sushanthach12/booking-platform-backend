@@ -9,7 +9,15 @@ import { timeToMinutes } from '../../common/helpers/time.helper';
 import { parseWithZod } from '../../common/zod';
 import { PROPERTY_REPOSITORY } from '../../database';
 import { EUserRole } from '../../users/enums/user.enum';
-import { ICreatePropertyRequestParams } from '../interfaces/property.interface';
+import { EPropertyStatus, EPropertyType } from '../enums/property.enum';
+import {
+  ICreatePropertyAvailabilityRequestParams,
+  ICreatePropertyAvailabilityResponse,
+  ICreatePropertyRequestParams,
+  ICreatePropertyResponse,
+  IGetPropertiesRequestParams,
+  IGetPropertiesResponse,
+} from '../interfaces/property.interface';
 import { IPropertyRepository } from '../repositories';
 import { CreatePropertyRequestSchema } from '../validations/schema/create.property.schema';
 
@@ -19,6 +27,46 @@ export class PropertyService {
     @Inject(PROPERTY_REPOSITORY)
     private readonly propertyRepository: IPropertyRepository,
   ) {}
+
+  async getProperties(
+    data: IGetPropertiesRequestParams,
+  ): Promise<IGetPropertiesResponse> {
+    const { payload } = data;
+
+    const page = payload.page ?? 1;
+    const limit = Math.min(100, payload.limit ?? 10);
+    const offset = (page - 1) * limit;
+
+    const [properties, totalItems] = await Promise.all([
+      this.propertyRepository.findProperties({
+        page,
+        limit,
+        offset,
+      }),
+      this.propertyRepository.countProperties({
+        propertyType: EPropertyType.APARTMENT,
+      }),
+    ]);
+
+    return {
+      results: properties.map((property) => ({
+        id: property.id,
+        title: property.title,
+        description: property.description,
+        propertyType: property.propertyType as EPropertyType,
+        status: property.status as EPropertyStatus,
+        createdAt: property.createdAt,
+        updatedAt: property.updatedAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        length: properties.length,
+        totalPages: Math.ceil(totalItems / limit),
+      },
+    };
+  }
 
   private validateCreatePropertyPayload(
     payload: ICreatePropertyRequestParams['payload'],
@@ -77,7 +125,9 @@ export class PropertyService {
   }
 
   // list properties
-  async createProperty(params: ICreatePropertyRequestParams): Promise<any> {
+  async createProperty(
+    params: ICreatePropertyRequestParams,
+  ): Promise<ICreatePropertyResponse> {
     // if zod schema validations are needed, use parseWithZod
     const validatedParams = parseWithZod(CreatePropertyRequestSchema, params);
     this.validateCreatePropertyPayload(params.payload);
@@ -105,6 +155,36 @@ export class PropertyService {
       payload: payload as ICreatePropertyRequestParams['payload'],
     });
 
-    return propertyMeta;
+    return {
+      id: propertyMeta.id,
+      title: propertyMeta.title,
+      description: propertyMeta.description,
+      propertyType: propertyMeta.propertyType,
+      status: propertyMeta.status,
+      createdAt: propertyMeta.createdAt,
+      updatedAt: propertyMeta.updatedAt,
+    };
+  }
+
+  async createPropertyAvailability(
+    params: ICreatePropertyAvailabilityRequestParams,
+  ): Promise<ICreatePropertyAvailabilityResponse> {
+    const { payload } = params;
+
+    // get the property if exists or not
+
+    // if there is roomId then check if exists
+
+    // check if the property belongs to the user
+
+    // check if the room belongs to the property
+
+    // check if the startDate and endDate are valid
+
+    return Promise.resolve({
+      id: '1',
+      propertyId: '',
+      roomId: payload.roomId,
+    });
   }
 }

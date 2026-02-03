@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { EPropertyStatus } from '../enums/property.enum';
+import { AvailabilityCalenderEntity } from './availablity-calender.entity';
 import { HouseRuleEntity } from './house-rules.entity';
 import { PropertyAmenityEntity } from './property-amenity.entity';
 import { PropertyDetailsEntity } from './property-details.entity';
@@ -93,4 +94,11 @@ export class PropertyEntity {
 
   @OneToMany(() => HouseRuleEntity, (rule) => rule.property, { cascade: true })
   houseRules: HouseRuleEntity[];
+
+  @OneToMany(
+    () => AvailabilityCalenderEntity,
+    (availability) => availability.property,
+    { cascade: true },
+  )
+  availability: AvailabilityCalenderEntity[];
 }

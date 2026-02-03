@@ -26,6 +26,7 @@ import {
 import { ERoomStatus } from '../../enums/rooms.enum';
 import {
   ICheckPropertyExistsImplParams,
+  ICountPropertiesImplParams,
   ICreateAmenityImplParams,
   ICreateHouseRuleImplParams,
   ICreatePropertyAmenityImplParams,
@@ -304,6 +305,41 @@ export class PropertyRepository implements IPropertyRepository {
       return await queryBuilder.getMany();
     } catch (error) {
       this.handleDbError(error, 'findProperties', 'Property');
+    }
+  }
+
+  async countProperties(params: ICountPropertiesImplParams): Promise<number> {
+    try {
+      const queryBuilder =
+        this.propertyRepository.createQueryBuilder('property');
+
+      if (params?.propertyType) {
+        queryBuilder.andWhere('property.propertyType = :propertyType', {
+          propertyType: params.propertyType,
+        });
+      }
+
+      if (params?.status) {
+        queryBuilder.andWhere('property.status = :status', {
+          status: params.status,
+        });
+      }
+
+      if (params?.hostId) {
+        queryBuilder.andWhere('property.hostId = :hostId', {
+          hostId: params.hostId,
+        });
+      }
+
+      if (params?.title) {
+        queryBuilder.andWhere('property.title = :title', {
+          title: params.title,
+        });
+      }
+
+      return await queryBuilder.getCount();
+    } catch (error) {
+      this.handleDbError(error, 'countProperties', 'Property');
     }
   }
 

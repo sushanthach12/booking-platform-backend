@@ -51,8 +51,8 @@ export class RoutingService {
     ]);
 
     // Property routes - exclude public listing endpoints
-    this.addRoute('/api/core/v1/properties/*', 'core', 'ALL', [
-      '/api/core/v1/properties',
+    this.addRoute('/api/core/*', 'core', 'ALL', [
+      '/api/core/v1/properties/listing',
       '/api/core/v1/properties/search',
     ]);
   }

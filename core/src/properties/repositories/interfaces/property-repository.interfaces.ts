@@ -51,11 +51,20 @@ export interface IFindPropertyByIdImplParams {
 }
 
 export interface IFindPropertiesImplParams {
-  hostId?: string;
-  status?: EPropertyStatus;
+  page: number;
+  limit: number;
+  offset: number;
   propertyType?: EPropertyType;
-  limit?: number;
-  offset?: number;
+  status?: EPropertyStatus;
+  hostId?: string;
+  title?: string;
+}
+
+export interface ICountPropertiesImplParams {
+  propertyType?: EPropertyType;
+  status?: EPropertyStatus;
+  hostId?: string;
+  title?: string;
 }
 
 // Amenity Entity Interfaces
@@ -367,7 +376,8 @@ export interface IPropertyRepository {
   findPropertyById(
     params: IFindPropertyByIdImplParams,
   ): Promise<PropertyEntity | null>;
-  findProperties(params?: IFindPropertiesImplParams): Promise<PropertyEntity[]>;
+  findProperties(params: IFindPropertiesImplParams): Promise<PropertyEntity[]>;
+  countProperties(params: ICountPropertiesImplParams): Promise<number>;
   updateProperty(params: IUpdatePropertyImplParams): Promise<PropertyEntity>;
   deleteProperty(params: IFindPropertyByIdImplParams): Promise<boolean>;
 
