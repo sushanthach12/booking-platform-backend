@@ -19,6 +19,14 @@ export class PropertyController {
 
   constructor(private readonly propertyService: PropertyService) {}
 
+  private handleError(res: Response, error: any) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Something went wrong';
+    const statusCode =
+      error.response?.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+    return res.status(statusCode).json({ message: errorMessage });
+  }
+
   @Post()
   @HttpCode(HttpStatus.OK)
   async createProperty(
@@ -36,12 +44,8 @@ export class PropertyController {
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Something went wrong';
-      const statusCode =
-        error.response?.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
-
-      return res.status(statusCode).json({ message: errorMessage });
+      this.logger.error(`Error creating property:`, error.message);
+      return this.handleError(res, error);
     }
   }
 }
