@@ -2,8 +2,8 @@ import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
-import { gatewayDefaults, gatewayEnv } from './config/gateway.config';
 import { parseNumber } from './config/config.utils';
+import { gatewayDefaults, gatewayEnv } from './config/gateway.config';
 import { GatewayController } from './controllers/gateway.controller';
 import { HealthController } from './controllers/health.controller';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
@@ -12,7 +12,6 @@ import { RateLimitGuard } from './guards/rate-limit.guard';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
 import { RedisClientModule } from './redis/redis.module';
-import { CircuitBreakerService } from './services/circuit-breaker.service';
 import { ProxyService } from './services/proxy.service';
 import { RoutingService } from './services/routing.service';
 
@@ -55,7 +54,6 @@ import { RoutingService } from './services/routing.service';
   providers: [
     ProxyService,
     RoutingService,
-    CircuitBreakerService,
     JwtAuthGuard,
     RateLimitGuard,
     LoggingInterceptor,

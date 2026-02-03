@@ -4,16 +4,14 @@ import { ConfigService } from '@nestjs/config';
 import { AxiosRequestConfig } from 'axios';
 import { catchError, firstValueFrom, timeout } from 'rxjs';
 import { ServiceName, getServiceConfig } from '../config/services.config';
-import { CircuitBreakerService } from './circuit-breaker.service';
 import { RoutingService } from './routing.service';
 
 @Injectable()
 export class ProxyService {
   constructor(
-    private httpService: HttpService,
-    private routingService: RoutingService,
-    private circuitBreaker: CircuitBreakerService,
-    private configService: ConfigService,
+    private readonly httpService: HttpService,
+    private readonly routingService: RoutingService,
+    private readonly configService: ConfigService,
   ) {}
 
   async proxyRequest(
@@ -55,41 +53,41 @@ export class ProxyService {
     delete cleanHeaders['content-length'];
 
     try {
-      return await this.circuitBreaker.execute(route.service, async () => {
-        const requestConfig: AxiosRequestConfig = {
-          method: method.toLowerCase() as
-            | 'get'
-            | 'post'
-            | 'put'
-            | 'patch'
-            | 'delete'
-            | 'head'
-            | 'options',
-          url: targetUrl,
-          headers: cleanHeaders,
-          params: query,
-          data: body,
-          timeout: serviceConfig.timeout,
-        };
+      // return await this.circuitBreaker.execute(route.service, async () => {
+      const requestConfig: AxiosRequestConfig = {
+        method: method.toLowerCase() as
+          | 'get'
+          | 'post'
+          | 'put'
+          | 'patch'
+          | 'delete'
+          | 'head'
+          | 'options',
+        url: targetUrl,
+        headers: cleanHeaders,
+        params: query,
+        data: body,
+        timeout: serviceConfig.timeout,
+      };
 
-        const response = await firstValueFrom(
-          this.httpService.request(requestConfig).pipe(
-            timeout(serviceConfig.timeout),
-            catchError((error) => {
-              throw new HttpException(
-                error.response?.data || error.message,
-                error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
-              );
-            }),
-          ),
-        );
+      const response = await firstValueFrom(
+        this.httpService.request(requestConfig).pipe(
+          timeout(serviceConfig.timeout),
+          catchError((error) => {
+            throw new HttpException(
+              error.response?.data || error.message,
+              error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+          }),
+        ),
+      );
 
-        return {
-          data: response.data,
-          status: response.status,
-          headers: response.headers as Record<string, string>,
-        };
-      });
+      return {
+        data: response.data,
+        status: response.status,
+        headers: response.headers as Record<string, string>,
+      };
+      // });
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
