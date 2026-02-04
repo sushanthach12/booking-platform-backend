@@ -99,7 +99,17 @@ export class RoutingService {
   }
 
   private pathToRegex(path: string): RegExp {
-    const pattern = path.replace(/\*/g, '.*').replace(/\//g, '\\/');
+    // Handle wildcard at the end of path
+    if (path.endsWith('/*')) {
+      const basePath = path.slice(0, -2); // Remove '/*'
+      const pattern = basePath.replace(/\//g, '\\/');
+      return new RegExp(`^${pattern}(/.*)?$`);
+    }
+
+    const pattern = path
+      .replace(/\*/g, '.*')
+      .replace(/\//g, '\\/')
+      .replace(/\\\.\*/g, '.*');
     return new RegExp(`^${pattern}$`);
   }
 
