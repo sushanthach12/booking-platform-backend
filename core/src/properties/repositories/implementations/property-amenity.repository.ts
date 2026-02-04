@@ -86,7 +86,9 @@ export class PropertyAmenityRepository implements IPropertyAmenityRepository {
     params: IUpdatePropertyAmenityImplParams,
   ): Promise<PropertyAmenityEntity> {
     try {
-      const propertyAmenity = await this.findPropertyAmenityById({ id: params.id });
+      const propertyAmenity = await this.findPropertyAmenityById({
+        id: params.id,
+      });
       if (!propertyAmenity) {
         throw new Error('Property amenity not found');
       }

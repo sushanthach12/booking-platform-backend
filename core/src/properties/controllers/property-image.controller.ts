@@ -46,7 +46,9 @@ export class PropertyImageController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Create property image request received for property: ${params.propertyId}`);
+      this.logger.log(
+        `Create property image request received for property: ${params.propertyId}`,
+      );
 
       const response = await this.propertyImageService.createPropertyImage({
         user,
@@ -69,7 +71,9 @@ export class PropertyImageController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Get property images request received for property: ${propertyId}`);
+      this.logger.log(
+        `Get property images request received for property: ${propertyId}`,
+      );
 
       const response = await this.propertyImageService.getPropertyImages({
         user,
@@ -92,7 +96,9 @@ export class PropertyImageController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Update property image request received for image: ${params.imageId}`);
+      this.logger.log(
+        `Update property image request received for image: ${params.imageId}`,
+      );
 
       const response = await this.propertyImageService.updatePropertyImage({
         user,
@@ -115,14 +121,18 @@ export class PropertyImageController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Delete property image request received for image: ${params.imageId}`);
+      this.logger.log(
+        `Delete property image request received for image: ${params.imageId}`,
+      );
 
       await this.propertyImageService.deletePropertyImage({
         user,
         params: { propertyId: params.propertyId, imageId: params.imageId },
       });
 
-      return res.status(HttpStatus.OK).json({ message: 'Property image deleted successfully' });
+      return res
+        .status(HttpStatus.OK)
+        .json({ message: 'Property image deleted successfully' });
     } catch (error) {
       this.logger.error(`Error deleting property image:`, error.message);
       return this.handleError(res, error);
@@ -138,7 +148,9 @@ export class PropertyImageController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Reorder property images request received for property: ${propertyId}`);
+      this.logger.log(
+        `Reorder property images request received for property: ${propertyId}`,
+      );
 
       await this.propertyImageService.reorderPropertyImages({
         user,
@@ -146,7 +158,9 @@ export class PropertyImageController {
         payload: body,
       });
 
-      return res.status(HttpStatus.OK).json({ message: 'Property images reordered successfully' });
+      return res
+        .status(HttpStatus.OK)
+        .json({ message: 'Property images reordered successfully' });
     } catch (error) {
       this.logger.error(`Error reordering property images:`, error.message);
       return this.handleError(res, error);

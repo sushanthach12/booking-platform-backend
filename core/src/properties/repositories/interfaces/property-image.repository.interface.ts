@@ -3,11 +3,21 @@ import { PropertyImageEntity } from '../../entities/property-image.entity';
 // Property Image Repository Interface
 export interface IPropertyImageRepository {
   // CRUD Operations
-  createPropertyImage(params: ICreatePropertyImageImplParams): Promise<PropertyImageEntity>;
-  findPropertyImageById(params: IFindPropertyImageByIdImplParams): Promise<PropertyImageEntity | null>;
-  findPropertyImages(params?: IFindPropertyImagesImplParams): Promise<PropertyImageEntity[]>;
-  updatePropertyImage(params: IUpdatePropertyImageImplParams): Promise<PropertyImageEntity>;
-  deletePropertyImage(params: IFindPropertyImageByIdImplParams): Promise<boolean>;
+  createPropertyImage(
+    params: ICreatePropertyImageImplParams,
+  ): Promise<PropertyImageEntity>;
+  findPropertyImageById(
+    params: IFindPropertyImageByIdImplParams,
+  ): Promise<PropertyImageEntity | null>;
+  findPropertyImages(
+    params?: IFindPropertyImagesImplParams,
+  ): Promise<PropertyImageEntity[]>;
+  updatePropertyImage(
+    params: IUpdatePropertyImageImplParams,
+  ): Promise<PropertyImageEntity>;
+  deletePropertyImage(
+    params: IFindPropertyImageByIdImplParams,
+  ): Promise<boolean>;
 
   // Custom Operations
   findPrimaryImage(propertyId: string): Promise<PropertyImageEntity | null>;

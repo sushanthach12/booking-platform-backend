@@ -23,7 +23,9 @@ import { PropertyAmenityService } from '../services/property-amenity.service';
 export class PropertyAmenityController {
   private readonly logger = new Logger(PropertyAmenityController.name);
 
-  constructor(private readonly propertyAmenityService: PropertyAmenityService) {}
+  constructor(
+    private readonly propertyAmenityService: PropertyAmenityService,
+  ) {}
 
   private handleError(res: Response, error: any) {
     const errorMessage =
@@ -41,7 +43,9 @@ export class PropertyAmenityController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Get property amenities request received for property: ${propertyId}`);
+      this.logger.log(
+        `Get property amenities request received for property: ${propertyId}`,
+      );
 
       const response = await this.propertyAmenityService.getPropertyAmenities({
         user,
@@ -57,9 +61,7 @@ export class PropertyAmenityController {
 
   @Get('all')
   @HttpCode(HttpStatus.OK)
-  async getAllAmenities(
-    @Res() res: Response,
-  ) {
+  async getAllAmenities(@Res() res: Response) {
     try {
       this.logger.log(`Get all amenities request received`);
 
@@ -81,7 +83,9 @@ export class PropertyAmenityController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Add property amenities request received for property: ${propertyId}`);
+      this.logger.log(
+        `Add property amenities request received for property: ${propertyId}`,
+      );
 
       const response = await this.propertyAmenityService.addPropertyAmenities({
         user,
@@ -104,14 +108,18 @@ export class PropertyAmenityController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Remove property amenity request received for property: ${params.propertyId}`);
+      this.logger.log(
+        `Remove property amenity request received for property: ${params.propertyId}`,
+      );
 
       await this.propertyAmenityService.removePropertyAmenity({
         user,
         params: { propertyId: params.propertyId, amenityId: params.amenityId },
       });
 
-      return res.status(HttpStatus.OK).json({ message: 'Property amenity removed successfully' });
+      return res
+        .status(HttpStatus.OK)
+        .json({ message: 'Property amenity removed successfully' });
     } catch (error) {
       this.logger.error(`Error removing property amenity:`, error.message);
       return this.handleError(res, error);

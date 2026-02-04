@@ -1,4 +1,15 @@
-import { IsString, IsOptional, IsEnum, IsUUID, IsBoolean, IsNumber, IsArray, IsDateString, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsUUID,
+  IsBoolean,
+  IsNumber,
+  IsArray,
+  IsDateString,
+  Min,
+  Max,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { EPropertyStatus, EPropertyType } from '../enums/property.enum';
 
@@ -38,7 +49,8 @@ export class UpdatePropertyDto {
   @ApiProperty({
     type: String,
     description: 'Property description',
-    example: 'A modern apartment in the heart of downtown with amazing city views',
+    example:
+      'A modern apartment in the heart of downtown with amazing city views',
     required: false,
   })
   @IsOptional()
@@ -304,7 +316,7 @@ export class ReorderPropertyImagesDto {
     description: 'Array of image IDs with their new display orders',
     example: [
       { imageId: '456e7890-e89b-12d3-a456-426614174001', displayOrder: 1 },
-      { imageId: '789e0123-e89b-12d3-a456-426614174002', displayOrder: 2 }
+      { imageId: '789e0123-e89b-12d3-a456-426614174002', displayOrder: 2 },
     ],
     required: true,
   })
@@ -318,7 +330,10 @@ export class AddPropertyAmenitiesDto {
   @ApiProperty({
     type: [String],
     description: 'Array of amenity IDs to add to property',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '456e7890-e89b-12d3-a456-426614174001'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '456e7890-e89b-12d3-a456-426614174001',
+    ],
     required: true,
   })
   @IsArray()
@@ -846,7 +861,7 @@ export class BulkUpdateAvailabilityDto {
     description: 'Array of availability updates',
     example: [
       { date: '2024-01-01', available: true, price: 150 },
-      { date: '2024-01-02', available: false, blockReason: 'Maintenance' }
+      { date: '2024-01-02', available: false, blockReason: 'Maintenance' },
     ],
     required: true,
   })
@@ -1037,7 +1052,7 @@ export class SearchPropertiesDto {
   @ApiProperty({
     type: Number,
     description: 'Longitude for geospatial search',
-    example: -74.0060,
+    example: -74.006,
     required: false,
   })
   @IsOptional()
@@ -1193,7 +1208,7 @@ export class NearbyPropertiesDto {
   @ApiProperty({
     type: Number,
     description: 'Longitude for location-based search',
-    example: -74.0060,
+    example: -74.006,
     required: true,
   })
   @IsNumber()

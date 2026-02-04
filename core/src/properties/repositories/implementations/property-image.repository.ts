@@ -105,10 +105,14 @@ export class PropertyImageRepository implements IPropertyImageRepository {
 
       Object.assign(image, {
         ...(params.url !== undefined && { url: params.url }),
-        ...(params.thumbnailUrl !== undefined && { thumbnailUrl: params.thumbnailUrl }),
+        ...(params.thumbnailUrl !== undefined && {
+          thumbnailUrl: params.thumbnailUrl,
+        }),
         ...(params.caption !== undefined && { caption: params.caption }),
         ...(params.altText !== undefined && { altText: params.altText }),
-        ...(params.displayOrder !== undefined && { displayOrder: params.displayOrder }),
+        ...(params.displayOrder !== undefined && {
+          displayOrder: params.displayOrder,
+        }),
         ...(params.isPrimary !== undefined && { isPrimary: params.isPrimary }),
         ...(params.width !== undefined && { width: params.width }),
         ...(params.height !== undefined && { height: params.height }),
@@ -133,7 +137,9 @@ export class PropertyImageRepository implements IPropertyImageRepository {
     }
   }
 
-  async findPrimaryImage(propertyId: string): Promise<PropertyImageEntity | null> {
+  async findPrimaryImage(
+    propertyId: string,
+  ): Promise<PropertyImageEntity | null> {
     try {
       return await this.propertyImageRepository.findOne({
         where: { propertyId, isPrimary: true },
@@ -147,7 +153,7 @@ export class PropertyImageRepository implements IPropertyImageRepository {
     try {
       await this.propertyImageRepository.update(
         { propertyId, isPrimary: true },
-        { isPrimary: false }
+        { isPrimary: false },
       );
     } catch (error) {
       this.handleDbError(error, 'unsetPrimaryImages', 'PropertyImage');
