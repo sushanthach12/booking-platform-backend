@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { timeToMinutes } from '../../common/helpers/time.helper';
 import { parseWithZod } from '../../common/zod';
@@ -17,8 +18,20 @@ import {
   ICreatePropertyResponse,
   IGetPropertiesRequestParams,
   IGetPropertiesResponse,
+  IGetPropertyRequestParams,
+  IGetPropertyResponse,
+  IUpdatePropertyRequestParams,
+  IUpdatePropertyResponse,
+  IDeletePropertyRequestParams,
+  IUpdatePropertyStatusRequestParams,
+  IUpdatePropertyStatusResponse,
+  ISearchPropertiesRequestParams,
+  INearbyPropertiesRequestParams,
+  IGetHostPropertiesRequestParams,
+  IGetPropertyAnalyticsRequestParams,
+  IGetPropertyAnalyticsResponse,
 } from '../interfaces/property.interface';
-import { IPropertyRepository } from '../repositories';
+import { IPropertyRepository } from '../repositories/interfaces/property-repository.interfaces';
 import { CreatePropertyRequestSchema } from '../validations/schema/create.property.schema';
 
 @Injectable()
@@ -186,5 +199,259 @@ export class PropertyService {
       propertyId: '',
       roomId: payload.roomId,
     });
+  }
+
+  // New CRUD Methods
+  async getProperty(
+    params: IGetPropertyRequestParams,
+  ): Promise<IGetPropertyResponse> {
+    const { user, params: { propertyId, includeRelations } } = params;
+
+    const property = await this.propertyRepository.findPropertyById({ id: propertyId });
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    // For now, allow all authenticated users to view properties
+    // In production, you might want to add visibility restrictions based on status
+
+    const response: IGetPropertyResponse = {
+      id: property.id,
+      hostId: property.hostId,
+      title: property.title,
+      description: property.description,
+      propertyType: property.propertyType as EPropertyType,
+      status: property.status as EPropertyStatus,
+      createdAt: property.createdAt,
+      updatedAt: property.updatedAt,
+    };
+
+    // Include relations if requested
+    if (includeRelations) {
+      // TODO: Add related data fetching
+      // response.location = await this.getPropertyLocation(propertyId);
+      // response.pricing = await this.getPropertyPricing(propertyId);
+      // etc.
+    }
+
+    return response;
+  }
+
+  async updateProperty(
+    params: IUpdatePropertyRequestParams,
+  ): Promise<IUpdatePropertyResponse> {
+    const { user, params: { propertyId }, payload } = params;
+
+    // Check if property exists and user owns it
+    const existingProperty = await this.propertyRepository.findPropertyById({ id: propertyId });
+    if (!existingProperty) {
+      throw new NotFoundException('Property not found');
+    }
+
+    if (existingProperty.hostId !== user.id) {
+      throw new ForbiddenException('Only property owner can update property');
+    }
+
+    const updatedProperty = await this.propertyRepository.updateProperty({
+      id: propertyId,
+      ...payload,
+    });
+
+    return {
+      id: updatedProperty.id,
+      title: updatedProperty.title,
+      description: updatedProperty.description,
+      propertyType: updatedProperty.propertyType as EPropertyType,
+      status: updatedProperty.status as EPropertyStatus,
+      updatedAt: updatedProperty.updatedAt,
+    };
+  }
+
+  async deleteProperty(
+    params: IDeletePropertyRequestParams,
+  ): Promise<void> {
+    const { user, params: { propertyId } } = params;
+
+    // Check if property exists and user owns it
+    const existingProperty = await this.propertyRepository.findPropertyById({ id: propertyId });
+    if (!existingProperty) {
+      throw new NotFoundException('Property not found');
+    }
+
+    if (existingProperty.hostId !== user.id) {
+      throw new ForbiddenException('Only property owner can delete property');
+    }
+
+    // Soft delete by updating status
+    await this.propertyRepository.updateProperty({
+      id: propertyId,
+      status: EPropertyStatus.DELETED,
+    });
+  }
+
+  async updatePropertyStatus(
+    params: IUpdatePropertyStatusRequestParams,
+  ): Promise<IUpdatePropertyStatusResponse> {
+    const { user, params: { propertyId }, payload } = params;
+
+    // Check if property exists and user owns it
+    const existingProperty = await this.propertyRepository.findPropertyById({ id: propertyId });
+    if (!existingProperty) {
+      throw new NotFoundException('Property not found');
+    }
+
+    if (existingProperty.hostId !== user.id) {
+      throw new ForbiddenException('Only property owner can update property status');
+    }
+
+    const updatedProperty = await this.propertyRepository.updateProperty({
+      id: propertyId,
+      status: payload.status,
+    });
+
+    return {
+      id: updatedProperty.id,
+      status: updatedProperty.status as EPropertyStatus,
+      updatedAt: updatedProperty.updatedAt,
+    };
+  }
+
+  async searchProperties(
+    params: ISearchPropertiesRequestParams,
+  ): Promise<IGetPropertiesResponse> {
+    const { payload } = params;
+
+    const page = payload.page ?? 1;
+    const limit = Math.min(100, payload.limit ?? 10);
+    const offset = (page - 1) * limit;
+
+    // TODO: Implement advanced search with filters
+    const [properties, totalItems] = await Promise.all([
+      this.propertyRepository.findProperties({
+        page,
+        limit,
+        offset,
+        propertyType: payload.propertyType?.[0] as EPropertyType, // Simplified for now
+        status: EPropertyStatus.ACTIVE,
+      }),
+      this.propertyRepository.countProperties({
+        propertyType: payload.propertyType?.[0] as EPropertyType,
+        status: EPropertyStatus.ACTIVE,
+      }),
+    ]);
+
+    return {
+      results: properties.map((property) => ({
+        id: property.id,
+        title: property.title,
+        description: property.description,
+        propertyType: property.propertyType as EPropertyType,
+        status: property.status as EPropertyStatus,
+        createdAt: property.createdAt,
+        updatedAt: property.updatedAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        length: properties.length,
+        totalPages: Math.ceil(totalItems / limit),
+      },
+    };
+  }
+
+  async getNearbyProperties(
+    params: INearbyPropertiesRequestParams,
+  ): Promise<IGetPropertiesResponse> {
+    const { params: { latitude, longitude, radius = 10, limit = 10 } } = params;
+
+    // TODO: Implement geospatial search using PostGIS
+    // For now, return empty results
+    return {
+      results: [],
+      pagination: {
+        page: 1,
+        limit,
+        totalItems: 0,
+        length: 0,
+        totalPages: 0,
+      },
+    };
+  }
+
+  async getHostProperties(
+    params: IGetHostPropertiesRequestParams,
+  ): Promise<IGetPropertiesResponse> {
+    const { user, payload } = params;
+
+    if (user.role !== EUserRole.HOST) {
+      throw new ForbiddenException('Only hosts can view their properties');
+    }
+
+    const page = payload.page ?? 1;
+    const limit = Math.min(100, payload.limit ?? 10);
+    const offset = (page - 1) * limit;
+
+    const [properties, totalItems] = await Promise.all([
+      this.propertyRepository.findProperties({
+        page,
+        limit,
+        offset,
+        hostId: user.id,
+        propertyType: payload.propertyType,
+        status: payload.status,
+      }),
+      this.propertyRepository.countProperties({
+        hostId: user.id,
+        propertyType: payload.propertyType,
+        status: payload.status,
+      }),
+    ]);
+
+    return {
+      results: properties.map((property) => ({
+        id: property.id,
+        title: property.title,
+        description: property.description,
+        propertyType: property.propertyType as EPropertyType,
+        status: property.status as EPropertyStatus,
+        createdAt: property.createdAt,
+        updatedAt: property.updatedAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        length: properties.length,
+        totalPages: Math.ceil(totalItems / limit),
+      },
+    };
+  }
+
+  async getPropertyAnalytics(
+    params: IGetPropertyAnalyticsRequestParams,
+  ): Promise<IGetPropertyAnalyticsResponse> {
+    const { user, params: { propertyId, startDate, endDate } } = params;
+
+    // Check if property exists and user owns it
+    const existingProperty = await this.propertyRepository.findPropertyById({ id: propertyId });
+    if (!existingProperty) {
+      throw new NotFoundException('Property not found');
+    }
+
+    if (existingProperty.hostId !== user.id) {
+      throw new ForbiddenException('Only property owner can view analytics');
+    }
+
+    // TODO: Implement analytics logic
+    // For now, return mock data
+    return {
+      totalViews: 0,
+      totalBookings: 0,
+      totalRevenue: 0,
+      averageRating: 0,
+      occupancyRate: 0,
+      bookingTrends: [],
+    };
   }
 }

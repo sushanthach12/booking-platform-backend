@@ -1,9 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Logger,
+  Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -17,6 +21,16 @@ import {
 } from '../dto/availability.dto';
 import { CreatePropertyDto } from '../dto/create-property.dto';
 import { PropertyListingDto } from '../dto/listing.dto';
+import {
+  GetPropertyParamsDto,
+  UpdatePropertyDto,
+  UpdatePropertyStatusDto,
+  DeletePropertyParamsDto,
+  SearchPropertiesDto,
+  NearbyPropertiesDto,
+  GetHostPropertiesDto,
+  GetPropertyAnalyticsParamsDto,
+} from '../dto/property-crud.dto';
 import { PropertyService } from '../services/property.service';
 
 @Controller('properties')
@@ -72,26 +86,179 @@ export class PropertyController {
     }
   }
 
-  @Post('availability')
+  @Get(':id')
   @HttpCode(HttpStatus.OK)
-  async createPropertyAvailability(
-    @Res() res: Response,
+  async getProperty(
+    @Param() params: GetPropertyParamsDto,
     @CurrentUser() user: RequestUser,
-    @Body() body: CreatePropertyAvailabilityDto,
-    @Query() query: CreatePropertyAvailabilityQueryDto,
+    @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Create property request received`);
+      this.logger.log(`Get property request received for property: ${params.propertyId}`);
 
-      const response = await this.propertyService.createPropertyAvailability({
+      const response = await this.propertyService.getProperty({
         user,
-        query,
+        params: { propertyId: params.propertyId, includeRelations: params.includeRelations },
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(`Error getting property:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  async updateProperty(
+    @Param('id') propertyId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() body: UpdatePropertyDto,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Update property request received for property: ${propertyId}`);
+
+      const response = await this.propertyService.updateProperty({
+        user,
+        params: { propertyId },
         payload: body,
       });
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
-      this.logger.error(`Error creating property:`, error.message);
+      this.logger.error(`Error updating property:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async deleteProperty(
+    @Param('id') propertyId: string,
+    @CurrentUser() user: RequestUser,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Delete property request received for property: ${propertyId}`);
+
+      await this.propertyService.deleteProperty({
+        user,
+        params: { propertyId },
+      });
+
+      return res.status(HttpStatus.OK).json({ message: 'Property deleted successfully' });
+    } catch (error) {
+      this.logger.error(`Error deleting property:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Patch(':id/status')
+  @HttpCode(HttpStatus.OK)
+  async updatePropertyStatus(
+    @Param('id') propertyId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() body: UpdatePropertyStatusDto,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Update property status request received for property: ${propertyId}`);
+
+      const response = await this.propertyService.updatePropertyStatus({
+        user,
+        params: { propertyId },
+        payload: body,
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(`Error updating property status:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Post('search')
+  @HttpCode(HttpStatus.OK)
+  async searchProperties(
+    @Body() body: SearchPropertiesDto,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Search properties request received`);
+
+      const response = await this.propertyService.searchProperties({
+        payload: body,
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(`Error searching properties:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Get('nearby')
+  @HttpCode(HttpStatus.OK)
+  async getNearbyProperties(
+    @Query() query: NearbyPropertiesDto,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Get nearby properties request received`);
+
+      const response = await this.propertyService.getNearbyProperties({
+        params: query,
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(`Error getting nearby properties:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Get('host/me')
+  @HttpCode(HttpStatus.OK)
+  async getHostProperties(
+    @CurrentUser() user: RequestUser,
+    @Query() query: GetHostPropertiesDto,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Get host properties request received`);
+
+      const response = await this.propertyService.getHostProperties({
+        user,
+        payload: query,
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(`Error getting host properties:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Get(':id/analytics')
+  @HttpCode(HttpStatus.OK)
+  async getPropertyAnalytics(
+    @Param() params: GetPropertyAnalyticsParamsDto,
+    @CurrentUser() user: RequestUser,
+    @Query() query: { startDate?: string; endDate?: string },
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Get property analytics request received for property: ${params.propertyId}`);
+
+      const response = await this.propertyService.getPropertyAnalytics({
+        user,
+        params: { propertyId: params.propertyId, startDate: query.startDate, endDate: query.endDate },
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(`Error getting property analytics:`, error.message);
       return this.handleError(res, error);
     }
   }
