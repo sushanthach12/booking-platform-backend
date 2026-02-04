@@ -233,10 +233,148 @@ export class PropertyService {
 
     // Include relations if requested
     if (includeRelations) {
-      // TODO: Add related data fetching
-      // response.location = await this.getPropertyLocation(propertyId);
-      // response.pricing = await this.getPropertyPricing(propertyId);
-      // etc.
+      // Fetch all related data for property details page
+      const [location, pricing, details, policy, ratings] = await Promise.all([
+        this.propertyRepository.findPropertyLocationByPropertyId({
+          propertyId,
+        }),
+        this.propertyRepository.findPropertyPricingByPropertyId({ propertyId }),
+        this.propertyRepository.findPropertyDetailsByPropertyId({ propertyId }),
+        this.propertyRepository.findPropertyPolicyByPropertyId({ propertyId }),
+        this.propertyRepository.findPropertyRatingByPropertyId({ propertyId }),
+      ]);
+
+      // Map location data
+      if (location) {
+        response.location = {
+          id: location.id,
+          addressLine1: location.addressLine1,
+          addressLine2: location.addressLine2 || undefined,
+          city: location.city,
+          state: location.state || undefined,
+          country: location.country,
+          postalCode: location.postalCode || undefined,
+          latitude: location.latitude || undefined,
+          longitude: location.longitude || undefined,
+        };
+      }
+
+      // Map pricing data
+      if (pricing) {
+        response.pricing = {
+          id: pricing.id,
+          basePrice: pricing.basePrice,
+          currency: pricing.currency,
+          cleaningFee: pricing.cleaningFee,
+          serviceFeePercentage: pricing.serviceFeePercentage,
+        };
+      }
+
+      // Map property details (bedrooms, beds, etc.)
+      if (details) {
+        response.details = {
+          id: details.id,
+          maxGuests: details.maxGuests,
+          bedrooms: details.bedrooms,
+          beds: details.beds,
+          bathrooms: details.bathrooms,
+        };
+      }
+
+      // Map policy data
+      if (policy) {
+        response.policies = {
+          id: policy.id,
+          minNights: policy.minNights,
+          maxNights: policy.maxNights,
+          maxGuests: details?.maxGuests || 0, // Get from details since policy doesn't have maxGuests
+          checkInTime: policy.checkInTime,
+          checkOutTime: policy.checkOutTime,
+          enableWaitlist: policy.instantBook, // Use instantBook as enableWaitlist for now
+          cancellationPolicy: policy.cancellationPolicy,
+        };
+      }
+
+      // Map ratings
+      if (ratings) {
+        response.ratings = {
+          id: ratings.id,
+          averageRating: ratings.averageRating || 0,
+          totalReviews: ratings.totalReviews || 0,
+          // Detailed rating fields not available in entity yet, commenting out for now
+          // cleanlinessRating: ratings.cleanlinessRating || undefined,
+          // communicationRating: ratings.communicationRating || undefined,
+          // checkInRating: ratings.checkInRating || undefined,
+          // accuracyRating: ratings.accuracyRating || undefined,
+          // locationRating: ratings.locationRating || undefined,
+          // valueRating: ratings.valueRating || undefined,
+        };
+      }
+
+      // TODO: Implement these methods in repository when ready
+      // Images, amenities, and rooms methods are commented out in the repository
+      /*
+      const [
+        images,
+        amenities,
+        rooms,
+      ] = await Promise.all([
+        this.propertyRepository.findPropertyImagesByPropertyId({ propertyId }),
+        this.propertyRepository.findPropertyAmenitiesByPropertyId({ propertyId }),
+        this.propertyRepository.findRoomsByPropertyId({ propertyId }),
+      ]);
+
+      // Map images
+      if (images && images.length > 0) {
+        response.images = images.map(image => ({
+          id: image.id,
+          url: image.url,
+          thumbnailUrl: image.thumbnailUrl || undefined,
+          caption: image.caption || undefined,
+          altText: image.altText || undefined,
+          displayOrder: image.displayOrder,
+          isPrimary: image.isPrimary,
+          width: image.width || undefined,
+          height: image.height || undefined,
+          fileSize: image.fileSize || undefined,
+          mimeType: image.mimeType || undefined,
+          createdAt: image.createdAt,
+        }));
+      }
+
+      // Map amenities
+      if (amenities && amenities.length > 0) {
+        response.amenities = amenities.map(amenity => ({
+          id: amenity.amenity.id,
+          name: amenity.amenity.name,
+          description: amenity.amenity.description || undefined,
+          icon: amenity.amenity.icon || undefined,
+          category: amenity.amenity.category,
+        }));
+      }
+
+      // Map rooms
+      if (rooms && rooms.length > 0) {
+        response.rooms = rooms.map(room => ({
+          id: room.id,
+          name: room.name,
+          description: room.description || undefined,
+          roomType: room.roomType,
+          beds: room.beds,
+          bedType: room.bedType || undefined,
+          maxGuests: room.maxGuests,
+          basePrice: room.basePrice || undefined,
+          isPrivate: room.isPrivate,
+          hasBathroom: room.hasBathroom,
+          hasBalcony: room.hasBalcony,
+          floorNumber: room.floorNumber || undefined,
+          squareMeters: room.squareMeters || undefined,
+          status: room.status,
+          createdAt: room.createdAt,
+          updatedAt: room.updatedAt,
+        }));
+      }
+      */
     }
 
     return response;

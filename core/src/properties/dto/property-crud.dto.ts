@@ -33,7 +33,7 @@ export class GetPropertyDetailsQueryDto {
     example: false,
     required: false,
   })
-  @Transform(({ value }) => value === 'true' || false)
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsOptional()
   @IsBoolean()
   includeRelations?: boolean = false;
