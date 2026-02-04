@@ -43,15 +43,15 @@ export class RoutingService {
     // this.addRoute('/api/bookings/*', 'booking', 'ALL');
 
     // User routes - exclude auth routes like login, register, etc.
-    this.addRoute('/api/core/*', 'core', 'ALL', [
+    this.addRoute('/api/core/v1/auth/*', 'core', 'ALL', [
       '/api/core/v1/auth/login',
       '/api/core/v1/auth/register',
       '/api/core/v1/auth/refresh',
       '/api/core/v1/auth/verify',
     ]);
 
-    // Property routes - exclude public listing endpoints
-    this.addRoute('/api/core/*', 'core', 'ALL', [
+    this.addRoute('/api/core/v1/properties/*', 'core', 'ALL', [
+      // properties
       '/api/core/v1/properties/listing',
       '/api/core/v1/properties/search',
     ]);
