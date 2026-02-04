@@ -16,20 +16,20 @@ import {
   ICreatePropertyAvailabilityResponse,
   ICreatePropertyRequestParams,
   ICreatePropertyResponse,
+  IDeletePropertyRequestParams,
+  IGetHostPropertiesRequestParams,
   IGetPropertiesRequestParams,
   IGetPropertiesResponse,
-  IGetPropertyRequestParams,
-  IGetPropertyResponse,
-  IUpdatePropertyRequestParams,
-  IUpdatePropertyResponse,
-  IDeletePropertyRequestParams,
-  IUpdatePropertyStatusRequestParams,
-  IUpdatePropertyStatusResponse,
-  ISearchPropertiesRequestParams,
-  INearbyPropertiesRequestParams,
-  IGetHostPropertiesRequestParams,
   IGetPropertyAnalyticsRequestParams,
   IGetPropertyAnalyticsResponse,
+  IGetPropertyRequestParams,
+  IGetPropertyResponse,
+  INearbyPropertiesRequestParams,
+  ISearchPropertiesRequestParams,
+  IUpdatePropertyRequestParams,
+  IUpdatePropertyResponse,
+  IUpdatePropertyStatusRequestParams,
+  IUpdatePropertyStatusResponse,
 } from '../interfaces/property.interface';
 import { IPropertyRepository } from '../repositories/interfaces/property-repository.interfaces';
 import { CreatePropertyRequestSchema } from '../validations/schema/create.property.schema';
@@ -205,9 +205,14 @@ export class PropertyService {
   async getProperty(
     params: IGetPropertyRequestParams,
   ): Promise<IGetPropertyResponse> {
-    const { user, params: { propertyId, includeRelations } } = params;
+    const {
+      // user,
+      params: { propertyId, includeRelations },
+    } = params;
 
-    const property = await this.propertyRepository.findPropertyById({ id: propertyId });
+    const property = await this.propertyRepository.findPropertyById({
+      id: propertyId,
+    });
     if (!property) {
       throw new NotFoundException('Property not found');
     }
@@ -240,10 +245,16 @@ export class PropertyService {
   async updateProperty(
     params: IUpdatePropertyRequestParams,
   ): Promise<IUpdatePropertyResponse> {
-    const { user, params: { propertyId }, payload } = params;
+    const {
+      user,
+      params: { propertyId },
+      payload,
+    } = params;
 
     // Check if property exists and user owns it
-    const existingProperty = await this.propertyRepository.findPropertyById({ id: propertyId });
+    const existingProperty = await this.propertyRepository.findPropertyById({
+      id: propertyId,
+    });
     if (!existingProperty) {
       throw new NotFoundException('Property not found');
     }
@@ -267,13 +278,16 @@ export class PropertyService {
     };
   }
 
-  async deleteProperty(
-    params: IDeletePropertyRequestParams,
-  ): Promise<void> {
-    const { user, params: { propertyId } } = params;
+  async deleteProperty(params: IDeletePropertyRequestParams): Promise<void> {
+    const {
+      user,
+      params: { propertyId },
+    } = params;
 
     // Check if property exists and user owns it
-    const existingProperty = await this.propertyRepository.findPropertyById({ id: propertyId });
+    const existingProperty = await this.propertyRepository.findPropertyById({
+      id: propertyId,
+    });
     if (!existingProperty) {
       throw new NotFoundException('Property not found');
     }
@@ -292,16 +306,24 @@ export class PropertyService {
   async updatePropertyStatus(
     params: IUpdatePropertyStatusRequestParams,
   ): Promise<IUpdatePropertyStatusResponse> {
-    const { user, params: { propertyId }, payload } = params;
+    const {
+      user,
+      params: { propertyId },
+      payload,
+    } = params;
 
     // Check if property exists and user owns it
-    const existingProperty = await this.propertyRepository.findPropertyById({ id: propertyId });
+    const existingProperty = await this.propertyRepository.findPropertyById({
+      id: propertyId,
+    });
     if (!existingProperty) {
       throw new NotFoundException('Property not found');
     }
 
     if (existingProperty.hostId !== user.id) {
-      throw new ForbiddenException('Only property owner can update property status');
+      throw new ForbiddenException(
+        'Only property owner can update property status',
+      );
     }
 
     const updatedProperty = await this.propertyRepository.updateProperty({
@@ -360,14 +382,16 @@ export class PropertyService {
     };
   }
 
-  async getNearbyProperties(
+  getNearbyProperties(
     params: INearbyPropertiesRequestParams,
   ): Promise<IGetPropertiesResponse> {
-    const { params: { latitude, longitude, radius = 10, limit = 10 } } = params;
+    const {
+      params: { limit = 10 },
+    } = params;
 
     // TODO: Implement geospatial search using PostGIS
     // For now, return empty results
-    return {
+    return Promise.resolve({
       results: [],
       pagination: {
         page: 1,
@@ -376,7 +400,7 @@ export class PropertyService {
         length: 0,
         totalPages: 0,
       },
-    };
+    });
   }
 
   async getHostProperties(
@@ -431,10 +455,15 @@ export class PropertyService {
   async getPropertyAnalytics(
     params: IGetPropertyAnalyticsRequestParams,
   ): Promise<IGetPropertyAnalyticsResponse> {
-    const { user, params: { propertyId, startDate, endDate } } = params;
+    const {
+      user,
+      params: { propertyId },
+    } = params;
 
     // Check if property exists and user owns it
-    const existingProperty = await this.propertyRepository.findPropertyById({ id: propertyId });
+    const existingProperty = await this.propertyRepository.findPropertyById({
+      id: propertyId,
+    });
     if (!existingProperty) {
       throw new NotFoundException('Property not found');
     }

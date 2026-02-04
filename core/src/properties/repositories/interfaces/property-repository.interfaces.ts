@@ -1,8 +1,6 @@
 import { Amenity, AmenityCategory } from '../../entities/amenity.entity';
 import { HouseRuleEntity, RuleType } from '../../entities/house-rules.entity';
-import { PropertyAmenityEntity } from '../../entities/property-amenity.entity';
 import { PropertyDetailsEntity } from '../../entities/property-details.entity';
-import { PropertyImageEntity } from '../../entities/property-image.entity';
 import { PropertyLocationEntity } from '../../entities/property-location.entity';
 import { PropertyPolicyEntity } from '../../entities/property-policy.entity';
 import { PropertyPricingEntity } from '../../entities/property-pricing.entity';
@@ -129,27 +127,27 @@ export interface IFindPropertyLocationByPropertyIdImplParams {
 }
 
 // Property Amenity Entity Interfaces
-export interface ICreatePropertyAmenityImplParams {
-  propertyId: string;
-  amenityId: string;
-  notes?: string | null;
-}
+// export interface ICreatePropertyAmenityImplParams {
+//   propertyId: string;
+//   amenityId: string;
+//   notes?: string | null;
+// }
 
-export interface IUpdatePropertyAmenityImplParams {
-  id: string;
-  notes?: string | null;
-}
+// export interface IUpdatePropertyAmenityImplParams {
+//   id: string;
+//   notes?: string | null;
+// }
 
-export interface IFindPropertyAmenityByIdImplParams {
-  id: string;
-}
+// export interface IFindPropertyAmenityByIdImplParams {
+//   id: string;
+// }
 
-export interface IFindPropertyAmenitiesImplParams {
-  propertyId?: string;
-  amenityId?: string;
-  limit?: number;
-  offset?: number;
-}
+// export interface IFindPropertyAmenitiesImplParams {
+//   propertyId?: string;
+//   amenityId?: string;
+//   limit?: number;
+//   offset?: number;
+// }
 
 // Property Rating Entity Interfaces
 export interface ICreatePropertyRatingImplParams {
@@ -173,46 +171,46 @@ export interface IFindPropertyRatingByPropertyIdImplParams {
 }
 
 // Property Image Entity Interfaces
-export interface ICreatePropertyImageImplParams {
-  propertyId: string;
-  roomId?: string | null;
-  url: string;
-  thumbnailUrl?: string | null;
-  caption?: string | null;
-  altText?: string | null;
-  displayOrder?: number;
-  isPrimary?: boolean;
-  width?: number | null;
-  height?: number | null;
-  fileSize?: number | null;
-  mimeType?: string | null;
-}
+// export interface ICreatePropertyImageImplParams {
+//   propertyId: string;
+//   roomId?: string | null;
+//   url: string;
+//   thumbnailUrl?: string | null;
+//   caption?: string | null;
+//   altText?: string | null;
+//   displayOrder?: number;
+//   isPrimary?: boolean;
+//   width?: number | null;
+//   height?: number | null;
+//   fileSize?: number | null;
+//   mimeType?: string | null;
+// }
 
-export interface IUpdatePropertyImageImplParams {
-  id: string;
-  url?: string;
-  thumbnailUrl?: string | null;
-  caption?: string | null;
-  altText?: string | null;
-  displayOrder?: number;
-  isPrimary?: boolean;
-  width?: number | null;
-  height?: number | null;
-  fileSize?: number | null;
-  mimeType?: string | null;
-}
+// export interface IUpdatePropertyImageImplParams {
+//   id: string;
+//   url?: string;
+//   thumbnailUrl?: string | null;
+//   caption?: string | null;
+//   altText?: string | null;
+//   displayOrder?: number;
+//   isPrimary?: boolean;
+//   width?: number | null;
+//   height?: number | null;
+//   fileSize?: number | null;
+//   mimeType?: string | null;
+// }
 
-export interface IFindPropertyImageByIdImplParams {
-  id: string;
-}
+// export interface IFindPropertyImageByIdImplParams {
+//   id: string;
+// }
 
-export interface IFindPropertyImagesImplParams {
-  propertyId?: string;
-  roomId?: string | null;
-  isPrimary?: boolean;
-  limit?: number;
-  offset?: number;
-}
+// export interface IFindPropertyImagesImplParams {
+//   propertyId?: string;
+//   roomId?: string | null;
+//   isPrimary?: boolean;
+//   limit?: number;
+//   offset?: number;
+// }
 
 // Room Entity Interfaces
 export interface ICreateRoomImplParams {
@@ -406,21 +404,21 @@ export interface IPropertyRepository {
   ): Promise<boolean>;
 
   // Property Amenity CRUD
-  createPropertyAmenity(
-    params: ICreatePropertyAmenityImplParams,
-  ): Promise<PropertyAmenityEntity>;
-  findPropertyAmenityById(
-    params: IFindPropertyAmenityByIdImplParams,
-  ): Promise<PropertyAmenityEntity | null>;
-  findPropertyAmenities(
-    params?: IFindPropertyAmenitiesImplParams,
-  ): Promise<PropertyAmenityEntity[]>;
-  updatePropertyAmenity(
-    params: IUpdatePropertyAmenityImplParams,
-  ): Promise<PropertyAmenityEntity>;
-  deletePropertyAmenity(
-    params: IFindPropertyAmenityByIdImplParams,
-  ): Promise<boolean>;
+  // createPropertyAmenity(
+  //   params: ICreatePropertyAmenityImplParams,
+  // ): Promise<PropertyAmenityEntity>;
+  // findPropertyAmenityById(
+  //   params: IFindPropertyAmenityByIdImplParams,
+  // ): Promise<PropertyAmenityEntity | null>;
+  // findPropertyAmenities(
+  //   params?: IFindPropertyAmenitiesImplParams,
+  // ): Promise<PropertyAmenityEntity[]>;
+  // updatePropertyAmenity(
+  //   params: IUpdatePropertyAmenityImplParams,
+  // ): Promise<PropertyAmenityEntity>;
+  // deletePropertyAmenity(
+  //   params: IFindPropertyAmenityByIdImplParams,
+  // ): Promise<boolean>;
 
   // Property Rating CRUD
   createPropertyRating(
@@ -440,21 +438,21 @@ export interface IPropertyRepository {
   ): Promise<boolean>;
 
   // Property Image CRUD
-  createPropertyImage(
-    params: ICreatePropertyImageImplParams,
-  ): Promise<PropertyImageEntity>;
-  findPropertyImageById(
-    params: IFindPropertyImageByIdImplParams,
-  ): Promise<PropertyImageEntity | null>;
-  findPropertyImages(
-    params?: IFindPropertyImagesImplParams,
-  ): Promise<PropertyImageEntity[]>;
-  updatePropertyImage(
-    params: IUpdatePropertyImageImplParams,
-  ): Promise<PropertyImageEntity>;
-  deletePropertyImage(
-    params: IFindPropertyImageByIdImplParams,
-  ): Promise<boolean>;
+  // createPropertyImage(
+  //   params: ICreatePropertyImageImplParams,
+  // ): Promise<PropertyImageEntity>;
+  // findPropertyImageById(
+  //   params: IFindPropertyImageByIdImplParams,
+  // ): Promise<PropertyImageEntity | null>;
+  // findPropertyImages(
+  //   params?: IFindPropertyImagesImplParams,
+  // ): Promise<PropertyImageEntity[]>;
+  // updatePropertyImage(
+  //   params: IUpdatePropertyImageImplParams,
+  // ): Promise<PropertyImageEntity>;
+  // deletePropertyImage(
+  //   params: IFindPropertyImageByIdImplParams,
+  // ): Promise<boolean>;
 
   // Room CRUD
   createRoom(params: ICreateRoomImplParams): Promise<RoomEntity>;

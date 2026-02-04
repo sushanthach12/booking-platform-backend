@@ -277,7 +277,7 @@ export interface IGetAmenitiesResponse {
   category: string;
   icon: string | null;
   description: string | null;
-}[];
+}
 
 // Room Management
 export interface ICreateRoomRequestParams {

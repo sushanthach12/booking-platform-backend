@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { PROPERTY_REPOSITORY } from '../database';
-import { PropertyController } from './controllers/property.controller';
-import { PropertyImageController } from './controllers/property-image.controller';
+import {
+  PROPERTY_AMENITY_REPOSITORY,
+  PROPERTY_IMAGE_REPOSITORY,
+  PROPERTY_REPOSITORY,
+} from '../database';
 import { PropertyAmenityController } from './controllers/property-amenity.controller';
+import { PropertyImageController } from './controllers/property-image.controller';
+import { PropertyController } from './controllers/property.controller';
 import {
   Amenity,
   HouseRuleEntity,
@@ -17,12 +21,12 @@ import {
   PropertyRatingEntity,
   RoomEntity,
 } from './entities';
-import { PropertyImageRepository } from './repositories/implementations/property-image.repository';
-import { PropertyAmenityRepository } from './repositories/implementations/property-amenity.repository';
-import { PropertyService } from './services/property.service';
-import { PropertyImageService } from './services/property-image.service';
-import { PropertyAmenityService } from './services/property-amenity.service';
 import { PropertyRepository } from './repositories';
+import { PropertyAmenityRepository } from './repositories/implementations/property-amenity.repository';
+import { PropertyImageRepository } from './repositories/implementations/property-image.repository';
+import { PropertyAmenityService } from './services/property-amenity.service';
+import { PropertyImageService } from './services/property-image.service';
+import { PropertyService } from './services/property.service';
 
 @Module({
   imports: [
@@ -40,7 +44,11 @@ import { PropertyRepository } from './repositories';
       PropertyPricingEntity,
     ]),
   ],
-  controllers: [PropertyController, PropertyImageController, PropertyAmenityController],
+  controllers: [
+    PropertyController,
+    PropertyImageController,
+    PropertyAmenityController,
+  ],
   providers: [
     PropertyService,
     PropertyImageService,
@@ -50,11 +58,11 @@ import { PropertyRepository } from './repositories';
       useClass: PropertyRepository,
     },
     {
-      provide: 'PROPERTY_IMAGE_REPOSITORY',
+      provide: PROPERTY_IMAGE_REPOSITORY,
       useClass: PropertyImageRepository,
     },
     {
-      provide: 'PROPERTY_AMENITY_REPOSITORY',
+      provide: PROPERTY_AMENITY_REPOSITORY,
       useClass: PropertyAmenityRepository,
     },
   ],

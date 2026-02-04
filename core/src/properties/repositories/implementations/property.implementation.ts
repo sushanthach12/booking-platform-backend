@@ -29,9 +29,9 @@ import {
   ICountPropertiesImplParams,
   ICreateAmenityImplParams,
   ICreateHouseRuleImplParams,
-  ICreatePropertyAmenityImplParams,
+  // ICreatePropertyAmenityImplParams,
   ICreatePropertyDetailsImplParams,
-  ICreatePropertyImageImplParams,
+  // ICreatePropertyImageImplParams,
   ICreatePropertyImplParams,
   ICreatePropertyImplResponse,
   ICreatePropertyLocationImplParams,
@@ -44,13 +44,13 @@ import {
   IFindHouseRuleByIdImplParams,
   IFindHouseRulesImplParams,
   IFindPropertiesImplParams,
-  IFindPropertyAmenitiesImplParams,
-  IFindPropertyAmenityByIdImplParams,
+  // IFindPropertyAmenitiesImplParams,
+  // IFindPropertyAmenityByIdImplParams,
   IFindPropertyByIdImplParams,
   IFindPropertyDetailsByIdImplParams,
   IFindPropertyDetailsByPropertyIdImplParams,
-  IFindPropertyImageByIdImplParams,
-  IFindPropertyImagesImplParams,
+  // IFindPropertyImageByIdImplParams,
+  // IFindPropertyImagesImplParams,
   IFindPropertyLocationByIdImplParams,
   IFindPropertyLocationByPropertyIdImplParams,
   IFindPropertyPolicyByIdImplParams,
@@ -64,9 +64,9 @@ import {
   IPropertyRepository,
   IUpdateAmenityImplParams,
   IUpdateHouseRuleImplParams,
-  IUpdatePropertyAmenityImplParams,
+  // IUpdatePropertyAmenityImplParams,
   IUpdatePropertyDetailsImplParams,
-  IUpdatePropertyImageImplParams,
+  // IUpdatePropertyImageImplParams,
   IUpdatePropertyImplParams,
   IUpdatePropertyLocationImplParams,
   IUpdatePropertyPolicyImplParams,
@@ -561,98 +561,98 @@ export class PropertyRepository implements IPropertyRepository {
 
   // ==================== Property Amenity CRUD ====================
 
-  async createPropertyAmenity(
-    params: ICreatePropertyAmenityImplParams,
-  ): Promise<PropertyAmenityEntity> {
-    try {
-      const propertyAmenity = this.propertyAmenityRepository.create({
-        propertyId: params.propertyId,
-        amenityId: params.amenityId,
-        notes: params.notes ?? null,
-      });
+  // async createPropertyAmenity(
+  //   params: ICreatePropertyAmenityImplParams,
+  // ): Promise<PropertyAmenityEntity> {
+  //   try {
+  //     const propertyAmenity = this.propertyAmenityRepository.create({
+  //       propertyId: params.propertyId,
+  //       amenityId: params.amenityId,
+  //       notes: params.notes ?? null,
+  //     });
 
-      return await this.propertyAmenityRepository.save(propertyAmenity);
-    } catch (error) {
-      this.handleDbError(error, 'createPropertyAmenity', 'PropertyAmenity');
-    }
-  }
+  //     return await this.propertyAmenityRepository.save(propertyAmenity);
+  //   } catch (error) {
+  //     this.handleDbError(error, 'createPropertyAmenity', 'PropertyAmenity');
+  //   }
+  // }
 
-  async findPropertyAmenityById(
-    params: IFindPropertyAmenityByIdImplParams,
-  ): Promise<PropertyAmenityEntity | null> {
-    try {
-      return await this.propertyAmenityRepository.findOne({
-        where: { id: params.id },
-      });
-    } catch (error) {
-      this.handleDbError(error, 'findPropertyAmenityById', 'PropertyAmenity');
-    }
-  }
+  // async findPropertyAmenityById(
+  //   params: IFindPropertyAmenityByIdImplParams,
+  // ): Promise<PropertyAmenityEntity | null> {
+  //   try {
+  //     return await this.propertyAmenityRepository.findOne({
+  //       where: { id: params.id },
+  //     });
+  //   } catch (error) {
+  //     this.handleDbError(error, 'findPropertyAmenityById', 'PropertyAmenity');
+  //   }
+  // }
 
-  async findPropertyAmenities(
-    params?: IFindPropertyAmenitiesImplParams,
-  ): Promise<PropertyAmenityEntity[]> {
-    try {
-      const queryBuilder =
-        this.propertyAmenityRepository.createQueryBuilder('propertyAmenity');
+  // async findPropertyAmenities(
+  //   params?: IFindPropertyAmenitiesImplParams,
+  // ): Promise<PropertyAmenityEntity[]> {
+  //   try {
+  //     const queryBuilder =
+  //       this.propertyAmenityRepository.createQueryBuilder('propertyAmenity');
 
-      if (params?.propertyId) {
-        queryBuilder.where('propertyAmenity.propertyId = :propertyId', {
-          propertyId: params.propertyId,
-        });
-      }
+  //     if (params?.propertyId) {
+  //       queryBuilder.where('propertyAmenity.propertyId = :propertyId', {
+  //         propertyId: params.propertyId,
+  //       });
+  //     }
 
-      if (params?.amenityId) {
-        queryBuilder.andWhere('propertyAmenity.amenityId = :amenityId', {
-          amenityId: params.amenityId,
-        });
-      }
+  //     if (params?.amenityId) {
+  //       queryBuilder.andWhere('propertyAmenity.amenityId = :amenityId', {
+  //         amenityId: params.amenityId,
+  //       });
+  //     }
 
-      if (params?.limit) {
-        queryBuilder.limit(params.limit);
-      }
+  //     if (params?.limit) {
+  //       queryBuilder.limit(params.limit);
+  //     }
 
-      if (params?.offset) {
-        queryBuilder.offset(params.offset);
-      }
+  //     if (params?.offset) {
+  //       queryBuilder.offset(params.offset);
+  //     }
 
-      return await queryBuilder.getMany();
-    } catch (error) {
-      this.handleDbError(error, 'findPropertyAmenities', 'PropertyAmenity');
-    }
-  }
+  //     return await queryBuilder.getMany();
+  //   } catch (error) {
+  //     this.handleDbError(error, 'findPropertyAmenities', 'PropertyAmenity');
+  //   }
+  // }
 
-  async updatePropertyAmenity(
-    params: IUpdatePropertyAmenityImplParams,
-  ): Promise<PropertyAmenityEntity> {
-    try {
-      const propertyAmenity = await this.findPropertyAmenityById({
-        id: params.id,
-      });
-      if (!propertyAmenity) {
-        throw new Error('Property amenity not found');
-      }
+  // async updatePropertyAmenity(
+  //   params: IUpdatePropertyAmenityImplParams,
+  // ): Promise<PropertyAmenityEntity> {
+  //   try {
+  //     const propertyAmenity = await this.findPropertyAmenityById({
+  //       id: params.id,
+  //     });
+  //     if (!propertyAmenity) {
+  //       throw new Error('Property amenity not found');
+  //     }
 
-      Object.assign(propertyAmenity, {
-        ...(params.notes !== undefined && { notes: params.notes }),
-      });
+  //     Object.assign(propertyAmenity, {
+  //       ...(params.notes !== undefined && { notes: params.notes }),
+  //     });
 
-      return await this.propertyAmenityRepository.save(propertyAmenity);
-    } catch (error) {
-      this.handleDbError(error, 'updatePropertyAmenity', 'PropertyAmenity');
-    }
-  }
+  //     return await this.propertyAmenityRepository.save(propertyAmenity);
+  //   } catch (error) {
+  //     this.handleDbError(error, 'updatePropertyAmenity', 'PropertyAmenity');
+  //   }
+  // }
 
-  async deletePropertyAmenity(
-    params: IFindPropertyAmenityByIdImplParams,
-  ): Promise<boolean> {
-    try {
-      const result = await this.propertyAmenityRepository.delete(params.id);
-      return (result.affected ?? 0) > 0;
-    } catch (error) {
-      this.handleDbError(error, 'deletePropertyAmenity', 'PropertyAmenity');
-    }
-  }
+  // async deletePropertyAmenity(
+  //   params: IFindPropertyAmenityByIdImplParams,
+  // ): Promise<boolean> {
+  //   try {
+  //     const result = await this.propertyAmenityRepository.delete(params.id);
+  //     return (result.affected ?? 0) > 0;
+  //   } catch (error) {
+  //     this.handleDbError(error, 'deletePropertyAmenity', 'PropertyAmenity');
+  //   }
+  // }
 
   // ==================== Property Rating CRUD ====================
 
@@ -737,130 +737,130 @@ export class PropertyRepository implements IPropertyRepository {
 
   // ==================== Property Image CRUD ====================
 
-  async createPropertyImage(
-    params: ICreatePropertyImageImplParams,
-  ): Promise<PropertyImageEntity> {
-    try {
-      const image = this.propertyImageRepository.create({
-        propertyId: params.propertyId,
-        roomId: params.roomId ?? null,
-        url: params.url,
-        thumbnailUrl: params.thumbnailUrl ?? null,
-        caption: params.caption ?? null,
-        altText: params.altText ?? null,
-        displayOrder: params.displayOrder ?? 0,
-        isPrimary: params.isPrimary ?? false,
-        width: params.width ?? null,
-        height: params.height ?? null,
-        fileSize: params.fileSize ?? null,
-        mimeType: params.mimeType ?? null,
-      });
+  // async createPropertyImage(
+  //   params: ICreatePropertyImageImplParams,
+  // ): Promise<PropertyImageEntity> {
+  //   try {
+  //     const image = this.propertyImageRepository.create({
+  //       propertyId: params.propertyId,
+  //       roomId: params.roomId ?? null,
+  //       url: params.url,
+  //       thumbnailUrl: params.thumbnailUrl ?? null,
+  //       caption: params.caption ?? null,
+  //       altText: params.altText ?? null,
+  //       displayOrder: params.displayOrder ?? 0,
+  //       isPrimary: params.isPrimary ?? false,
+  //       width: params.width ?? null,
+  //       height: params.height ?? null,
+  //       fileSize: params.fileSize ?? null,
+  //       mimeType: params.mimeType ?? null,
+  //     });
 
-      return await this.propertyImageRepository.save(image);
-    } catch (error) {
-      this.handleDbError(error, 'createPropertyImage', 'PropertyImage');
-    }
-  }
+  //     return await this.propertyImageRepository.save(image);
+  //   } catch (error) {
+  //     this.handleDbError(error, 'createPropertyImage', 'PropertyImage');
+  //   }
+  // }
 
-  async findPropertyImageById(
-    params: IFindPropertyImageByIdImplParams,
-  ): Promise<PropertyImageEntity | null> {
-    try {
-      return await this.propertyImageRepository.findOne({
-        where: { id: params.id },
-      });
-    } catch (error) {
-      this.handleDbError(error, 'findPropertyImageById', 'PropertyImage');
-    }
-  }
+  // async findPropertyImageById(
+  //   params: IFindPropertyImageByIdImplParams,
+  // ): Promise<PropertyImageEntity | null> {
+  //   try {
+  //     return await this.propertyImageRepository.findOne({
+  //       where: { id: params.id },
+  //     });
+  //   } catch (error) {
+  //     this.handleDbError(error, 'findPropertyImageById', 'PropertyImage');
+  //   }
+  // }
 
-  async findPropertyImages(
-    params?: IFindPropertyImagesImplParams,
-  ): Promise<PropertyImageEntity[]> {
-    try {
-      const queryBuilder =
-        this.propertyImageRepository.createQueryBuilder('propertyImage');
+  // async findPropertyImages(
+  //   params?: IFindPropertyImagesImplParams,
+  // ): Promise<PropertyImageEntity[]> {
+  //   try {
+  //     const queryBuilder =
+  //       this.propertyImageRepository.createQueryBuilder('propertyImage');
 
-      if (params?.propertyId) {
-        queryBuilder.where('propertyImage.propertyId = :propertyId', {
-          propertyId: params.propertyId,
-        });
-      }
+  //     if (params?.propertyId) {
+  //       queryBuilder.where('propertyImage.propertyId = :propertyId', {
+  //         propertyId: params.propertyId,
+  //       });
+  //     }
 
-      if (params?.roomId !== undefined) {
-        if (params.roomId === null) {
-          queryBuilder.andWhere('propertyImage.roomId IS NULL');
-        } else {
-          queryBuilder.andWhere('propertyImage.roomId = :roomId', {
-            roomId: params.roomId,
-          });
-        }
-      }
+  //     if (params?.roomId !== undefined) {
+  //       if (params.roomId === null) {
+  //         queryBuilder.andWhere('propertyImage.roomId IS NULL');
+  //       } else {
+  //         queryBuilder.andWhere('propertyImage.roomId = :roomId', {
+  //           roomId: params.roomId,
+  //         });
+  //       }
+  //     }
 
-      if (params?.isPrimary !== undefined) {
-        queryBuilder.andWhere('propertyImage.isPrimary = :isPrimary', {
-          isPrimary: params.isPrimary,
-        });
-      }
+  //     if (params?.isPrimary !== undefined) {
+  //       queryBuilder.andWhere('propertyImage.isPrimary = :isPrimary', {
+  //         isPrimary: params.isPrimary,
+  //       });
+  //     }
 
-      if (params?.limit) {
-        queryBuilder.limit(params.limit);
-      }
+  //     if (params?.limit) {
+  //       queryBuilder.limit(params.limit);
+  //     }
 
-      if (params?.offset) {
-        queryBuilder.offset(params.offset);
-      }
+  //     if (params?.offset) {
+  //       queryBuilder.offset(params.offset);
+  //     }
 
-      queryBuilder.orderBy('propertyImage.displayOrder', 'ASC');
+  //     queryBuilder.orderBy('propertyImage.displayOrder', 'ASC');
 
-      return await queryBuilder.getMany();
-    } catch (error) {
-      this.handleDbError(error, 'findPropertyImages', 'PropertyImage');
-    }
-  }
+  //     return await queryBuilder.getMany();
+  //   } catch (error) {
+  //     this.handleDbError(error, 'findPropertyImages', 'PropertyImage');
+  //   }
+  // }
 
-  async updatePropertyImage(
-    params: IUpdatePropertyImageImplParams,
-  ): Promise<PropertyImageEntity> {
-    try {
-      const image = await this.findPropertyImageById({ id: params.id });
-      if (!image) {
-        throw new Error('Property image not found');
-      }
+  // async updatePropertyImage(
+  //   params: IUpdatePropertyImageImplParams,
+  // ): Promise<PropertyImageEntity> {
+  //   try {
+  //     const image = await this.findPropertyImageById({ id: params.id });
+  //     if (!image) {
+  //       throw new Error('Property image not found');
+  //     }
 
-      Object.assign(image, {
-        ...(params.url !== undefined && { url: params.url }),
-        ...(params.thumbnailUrl !== undefined && {
-          thumbnailUrl: params.thumbnailUrl,
-        }),
-        ...(params.caption !== undefined && { caption: params.caption }),
-        ...(params.altText !== undefined && { altText: params.altText }),
-        ...(params.displayOrder !== undefined && {
-          displayOrder: params.displayOrder,
-        }),
-        ...(params.isPrimary !== undefined && { isPrimary: params.isPrimary }),
-        ...(params.width !== undefined && { width: params.width }),
-        ...(params.height !== undefined && { height: params.height }),
-        ...(params.fileSize !== undefined && { fileSize: params.fileSize }),
-        ...(params.mimeType !== undefined && { mimeType: params.mimeType }),
-      });
+  //     Object.assign(image, {
+  //       ...(params.url !== undefined && { url: params.url }),
+  //       ...(params.thumbnailUrl !== undefined && {
+  //         thumbnailUrl: params.thumbnailUrl,
+  //       }),
+  //       ...(params.caption !== undefined && { caption: params.caption }),
+  //       ...(params.altText !== undefined && { altText: params.altText }),
+  //       ...(params.displayOrder !== undefined && {
+  //         displayOrder: params.displayOrder,
+  //       }),
+  //       ...(params.isPrimary !== undefined && { isPrimary: params.isPrimary }),
+  //       ...(params.width !== undefined && { width: params.width }),
+  //       ...(params.height !== undefined && { height: params.height }),
+  //       ...(params.fileSize !== undefined && { fileSize: params.fileSize }),
+  //       ...(params.mimeType !== undefined && { mimeType: params.mimeType }),
+  //     });
 
-      return await this.propertyImageRepository.save(image);
-    } catch (error) {
-      this.handleDbError(error, 'updatePropertyImage', 'PropertyImage');
-    }
-  }
+  //     return await this.propertyImageRepository.save(image);
+  //   } catch (error) {
+  //     this.handleDbError(error, 'updatePropertyImage', 'PropertyImage');
+  //   }
+  // }
 
-  async deletePropertyImage(
-    params: IFindPropertyImageByIdImplParams,
-  ): Promise<boolean> {
-    try {
-      const result = await this.propertyImageRepository.delete(params.id);
-      return (result.affected ?? 0) > 0;
-    } catch (error) {
-      this.handleDbError(error, 'deletePropertyImage', 'PropertyImage');
-    }
-  }
+  // async deletePropertyImage(
+  //   params: IFindPropertyImageByIdImplParams,
+  // ): Promise<boolean> {
+  //   try {
+  //     const result = await this.propertyImageRepository.delete(params.id);
+  //     return (result.affected ?? 0) > 0;
+  //   } catch (error) {
+  //     this.handleDbError(error, 'deletePropertyImage', 'PropertyImage');
+  //   }
+  // }
 
   // ==================== Room CRUD ====================
 

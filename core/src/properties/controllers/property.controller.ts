@@ -15,21 +15,16 @@ import {
 import { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
-import {
-  CreatePropertyAvailabilityDto,
-  CreatePropertyAvailabilityQueryDto,
-} from '../dto/availability.dto';
 import { CreatePropertyDto } from '../dto/create-property.dto';
 import { PropertyListingDto } from '../dto/listing.dto';
 import {
-  GetPropertyParamsDto,
-  UpdatePropertyDto,
-  UpdatePropertyStatusDto,
-  DeletePropertyParamsDto,
-  SearchPropertiesDto,
-  NearbyPropertiesDto,
   GetHostPropertiesDto,
   GetPropertyAnalyticsParamsDto,
+  GetPropertyParamsDto,
+  NearbyPropertiesDto,
+  SearchPropertiesDto,
+  UpdatePropertyDto,
+  UpdatePropertyStatusDto,
 } from '../dto/property-crud.dto';
 import { PropertyService } from '../services/property.service';
 
@@ -94,11 +89,16 @@ export class PropertyController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Get property request received for property: ${params.propertyId}`);
+      this.logger.log(
+        `Get property request received for property: ${params.propertyId}`,
+      );
 
       const response = await this.propertyService.getProperty({
         user,
-        params: { propertyId: params.propertyId, includeRelations: params.includeRelations },
+        params: {
+          propertyId: params.propertyId,
+          includeRelations: params.includeRelations,
+        },
       });
 
       return res.status(HttpStatus.OK).json({ data: response });
@@ -117,7 +117,9 @@ export class PropertyController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Update property request received for property: ${propertyId}`);
+      this.logger.log(
+        `Update property request received for property: ${propertyId}`,
+      );
 
       const response = await this.propertyService.updateProperty({
         user,
@@ -140,14 +142,18 @@ export class PropertyController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Delete property request received for property: ${propertyId}`);
+      this.logger.log(
+        `Delete property request received for property: ${propertyId}`,
+      );
 
       await this.propertyService.deleteProperty({
         user,
         params: { propertyId },
       });
 
-      return res.status(HttpStatus.OK).json({ message: 'Property deleted successfully' });
+      return res
+        .status(HttpStatus.OK)
+        .json({ message: 'Property deleted successfully' });
     } catch (error) {
       this.logger.error(`Error deleting property:`, error.message);
       return this.handleError(res, error);
@@ -163,7 +169,9 @@ export class PropertyController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Update property status request received for property: ${propertyId}`);
+      this.logger.log(
+        `Update property status request received for property: ${propertyId}`,
+      );
 
       const response = await this.propertyService.updatePropertyStatus({
         user,
@@ -249,11 +257,17 @@ export class PropertyController {
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(`Get property analytics request received for property: ${params.propertyId}`);
+      this.logger.log(
+        `Get property analytics request received for property: ${params.propertyId}`,
+      );
 
       const response = await this.propertyService.getPropertyAnalytics({
         user,
-        params: { propertyId: params.propertyId, startDate: query.startDate, endDate: query.endDate },
+        params: {
+          propertyId: params.propertyId,
+          startDate: query.startDate,
+          endDate: query.endDate,
+        },
       });
 
       return res.status(HttpStatus.OK).json({ data: response });
