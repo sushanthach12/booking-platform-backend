@@ -22,8 +22,8 @@ import {
   IGetPropertiesResponse,
   IGetPropertyAnalyticsRequestParams,
   IGetPropertyAnalyticsResponse,
-  IGetPropertyRequestParams,
-  IGetPropertyResponse,
+  IGetPropertyDetailsRequestParams,
+  IGetPropertyDetailsResponse,
   INearbyPropertiesRequestParams,
   ISearchPropertiesRequestParams,
   IUpdatePropertyRequestParams,
@@ -202,9 +202,9 @@ export class PropertyService {
   }
 
   // New CRUD Methods
-  async getProperty(
-    params: IGetPropertyRequestParams,
-  ): Promise<IGetPropertyResponse> {
+  async getPropertyDetails(
+    params: IGetPropertyDetailsRequestParams,
+  ): Promise<IGetPropertyDetailsResponse> {
     const {
       // user,
       params: { propertyId, includeRelations },
@@ -220,7 +220,7 @@ export class PropertyService {
     // For now, allow all authenticated users to view properties
     // In production, you might want to add visibility restrictions based on status
 
-    const response: IGetPropertyResponse = {
+    const response: IGetPropertyDetailsResponse = {
       id: property.id,
       hostId: property.hostId,
       title: property.title,

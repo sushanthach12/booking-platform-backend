@@ -16,7 +16,9 @@ declare module 'express' {
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest<Request>();
-    const user = JSON.parse(request.headers.user as string) as RequestUser;
+    const user = request.headers.user
+      ? (JSON.parse(request.headers.user as string) as RequestUser)
+      : null;
 
     if (!user) {
       throw new UnauthorizedException('No user found');

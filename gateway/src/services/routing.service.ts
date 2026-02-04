@@ -54,6 +54,7 @@ export class RoutingService {
       // properties
       '/api/core/v1/properties/listing',
       '/api/core/v1/properties/search',
+      '/api/core/v1/properties/details',
     ]);
   }
 

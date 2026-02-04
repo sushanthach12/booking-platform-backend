@@ -1,20 +1,22 @@
-import {
-  IsString,
-  IsOptional,
-  IsEnum,
-  IsUUID,
-  IsBoolean,
-  IsNumber,
-  IsArray,
-  IsDateString,
-  Min,
-  Max,
-} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { EPropertyStatus, EPropertyType } from '../enums/property.enum';
 
 // Property CRUD DTOs
-export class GetPropertyParamsDto {
+export class GetPropertyDetailsQueryDto {
   @ApiProperty({
     type: String,
     description: 'Property ID',
@@ -22,6 +24,7 @@ export class GetPropertyParamsDto {
     required: true,
   })
   @IsUUID()
+  @IsNotEmpty()
   propertyId: string;
 
   @ApiProperty({
@@ -30,6 +33,7 @@ export class GetPropertyParamsDto {
     example: false,
     required: false,
   })
+  @Transform(({ value }) => value === 'true' || false)
   @IsOptional()
   @IsBoolean()
   includeRelations?: boolean = false;

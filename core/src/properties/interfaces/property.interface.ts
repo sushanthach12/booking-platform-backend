@@ -119,15 +119,14 @@ export interface ICreatePropertyAvailabilityResponse {
 }
 
 // Property CRUD Operations
-export interface IGetPropertyRequestParams {
-  user: RequestUser;
+export interface IGetPropertyDetailsRequestParams {
   params: {
     propertyId: string;
     includeRelations?: boolean;
   };
 }
 
-export interface IGetPropertyResponse {
+export interface IGetPropertyDetailsResponse {
   id: string;
   hostId: string;
   title: string;

@@ -20,7 +20,7 @@ import { PropertyListingDto } from '../dto/listing.dto';
 import {
   GetHostPropertiesDto,
   GetPropertyAnalyticsParamsDto,
-  GetPropertyParamsDto,
+  GetPropertyDetailsQueryDto,
   NearbyPropertiesDto,
   SearchPropertiesDto,
   UpdatePropertyDto,
@@ -81,23 +81,19 @@ export class PropertyController {
     }
   }
 
-  @Get(':id')
+  @Get('details')
   @HttpCode(HttpStatus.OK)
-  async getProperty(
-    @Param() params: GetPropertyParamsDto,
-    @CurrentUser() user: RequestUser,
+  async getPropertyDetails(
+    @Query() query: GetPropertyDetailsQueryDto,
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(
-        `Get property request received for property: ${params.propertyId}`,
-      );
+      this.logger.log(`Get property request received for property`);
 
-      const response = await this.propertyService.getProperty({
-        user,
+      const response = await this.propertyService.getPropertyDetails({
         params: {
-          propertyId: params.propertyId,
-          includeRelations: params.includeRelations,
+          propertyId: query.propertyId,
+          includeRelations: query.includeRelations,
         },
       });
 
