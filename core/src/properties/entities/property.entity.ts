@@ -30,6 +30,14 @@ export class PropertyEntity {
   @Column({ type: 'varchar', length: 255 })
   title: string;
 
+  @Column({ 
+    type: 'varchar', 
+    length: 255, 
+    unique: true,
+    name: 'slug'
+  })
+  slug: string;
+
   @Column({ type: 'text', nullable: true })
   description: string | null;
 

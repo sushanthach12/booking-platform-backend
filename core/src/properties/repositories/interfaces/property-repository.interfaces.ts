@@ -24,11 +24,13 @@ export interface ICheckPropertyExistsImplParams {
 export interface ICreatePropertyImplParams {
   hostId: string;
   payload: ICreatePropertyRequestParams['payload'];
+  slug: string;
 }
 
 export interface ICreatePropertyImplResponse {
   id: string;
   title: string;
+  slug: string;
   description: string | null;
   propertyType: EPropertyType;
   status: EPropertyStatus;
@@ -39,6 +41,7 @@ export interface ICreatePropertyImplResponse {
 export interface IUpdatePropertyImplParams {
   id: string;
   title?: string;
+  slug?: string;
   description?: string | null;
   propertyType?: EPropertyType;
   status?: EPropertyStatus;
@@ -367,6 +370,7 @@ export interface IFindPropertyPricingByPropertyIdImplParams {
 // Repository Interface Definitions
 export interface IPropertyRepository {
   checkPropertyExists(params: ICheckPropertyExistsImplParams): Promise<boolean>;
+  getAllPropertySlugs(): Promise<string[]>;
   // Property CRUD
   createProperty(
     params: ICreatePropertyImplParams,

@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { timeToMinutes } from '../../common/helpers/time.helper';
+import { SlugHelper } from '../../common/helpers/slug.helper';
 import { parseWithZod } from '../../common/zod';
 import { PROPERTY_REPOSITORY } from '../../database';
 import { EUserRole } from '../../users/enums/user.enum';
@@ -66,6 +67,7 @@ export class PropertyService {
         id: property.id,
         title: property.title,
         description: property.description,
+        slug: property.slug,
         propertyType: property.propertyType as EPropertyType,
         status: property.status as EPropertyStatus,
         createdAt: property.createdAt,
@@ -162,15 +164,26 @@ export class PropertyService {
       throw new ConflictException('Property with this name already exists');
     }
 
+    // Generate unique slug based on title and location
+    const baseSlug = SlugHelper.generatePropertySlug(
+      payload.details.title,
+      payload.address
+    );
+    
+    // Generate unique slug with random ID
+    const uniqueSlug = SlugHelper.ensureUniqueSlug(baseSlug);
+
     // create property using db transactions
     const propertyMeta = await this.propertyRepository.createProperty({
       hostId: host.id,
       payload: payload as ICreatePropertyRequestParams['payload'],
+      slug: uniqueSlug,
     });
 
     return {
       id: propertyMeta.id,
       title: propertyMeta.title,
+      slug: propertyMeta.slug,
       description: propertyMeta.description,
       propertyType: propertyMeta.propertyType,
       status: propertyMeta.status,
@@ -224,6 +237,7 @@ export class PropertyService {
       id: property.id,
       hostId: property.hostId,
       title: property.title,
+      slug: property.slug,
       description: property.description,
       propertyType: property.propertyType as EPropertyType,
       status: property.status as EPropertyStatus,
@@ -410,6 +424,7 @@ export class PropertyService {
       id: updatedProperty.id,
       title: updatedProperty.title,
       description: updatedProperty.description,
+      slug: updatedProperty.slug,
       propertyType: updatedProperty.propertyType as EPropertyType,
       status: updatedProperty.status as EPropertyStatus,
       updatedAt: updatedProperty.updatedAt,
@@ -505,6 +520,7 @@ export class PropertyService {
         id: property.id,
         title: property.title,
         description: property.description,
+        slug: property.slug,
         propertyType: property.propertyType as EPropertyType,
         status: property.status as EPropertyStatus,
         createdAt: property.createdAt,
@@ -575,6 +591,7 @@ export class PropertyService {
         id: property.id,
         title: property.title,
         description: property.description,
+        slug: property.slug,
         propertyType: property.propertyType as EPropertyType,
         status: property.status as EPropertyStatus,
         createdAt: property.createdAt,

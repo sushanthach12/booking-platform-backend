@@ -65,6 +65,7 @@ export interface ICreatePropertyRequestParams {
 export interface ICreatePropertyResponse {
   id: string;
   title: string;
+  slug: string;
   description: string | null;
   propertyType: EPropertyType;
   status: EPropertyStatus;
@@ -82,6 +83,7 @@ export interface IGetPropertiesRequestParams {
 export interface IGetPropertiesResult {
   id: string;
   title: string;
+  slug: string;
   description: string | null;
   propertyType: EPropertyType;
   status: EPropertyStatus;
@@ -130,6 +132,7 @@ export interface IGetPropertyDetailsResponse {
   id: string;
   hostId: string;
   title: string;
+  slug: string;
   description: string | null;
   propertyType: EPropertyType;
   status: EPropertyStatus;
@@ -152,6 +155,7 @@ export interface IUpdatePropertyRequestParams {
   };
   payload: Partial<{
     title: string;
+    slug: string;
     description: string;
     propertyType: EPropertyType;
     status: EPropertyStatus;
@@ -161,6 +165,7 @@ export interface IUpdatePropertyRequestParams {
 export interface IUpdatePropertyResponse {
   id: string;
   title: string;
+  slug: string;
   description: string | null;
   propertyType: EPropertyType;
   status: EPropertyStatus;
