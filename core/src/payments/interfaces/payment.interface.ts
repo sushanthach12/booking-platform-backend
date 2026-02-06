@@ -1,54 +1,128 @@
+// Main Payment Service Interface
 export interface IPaymentService {
-  createPaymentIntent(amount: number, currency: string, metadata?: Record<string, any>): Promise<PaymentIntent>;
-  confirmPayment(paymentIntentId: string): Promise<PaymentResult>;
-  cancelPayment(paymentIntentId: string): Promise<PaymentResult>;
-  refundPayment(paymentIntentId: string, amount?: number): Promise<RefundResult>;
-  getPaymentStatus(paymentIntentId: string): Promise<PaymentStatus>;
+  createPayment(
+    amount: number,
+    currency: string,
+    customerDetails: CustomerDetails,
+    options?: PaymentOptions,
+  ): Promise<PaymentResponse>;
+  
+  getPaymentId(transactionId: string): Promise<string | null>;
+  
+  getPaymentStatus(transactionId: string): Promise<PaymentStatusResponse>;
+  
+  handleWebhook(
+    gatewayType: PaymentGatewayType,
+    payload: any,
+    signature: string,
+  ): Promise<WebhookResult>;
 }
 
-export interface PaymentIntent {
-  id: string;
-  amount: number;
-  currency: string;
-  status: PaymentStatus;
-  clientSecret?: string;
+// Customer Details
+export interface CustomerDetails {
+  customerId: string;
+  email: string;
+  name: string;
+  phone?: string;
+}
+
+// Payment Options
+export interface PaymentOptions {
+  bookingId?: string;
+  guestId?: string;
+  propertyId?: string;
+  returnUrl?: string;
+  notifyUrl?: string;
+  paymentMethods?: string[];
   metadata?: Record<string, any>;
-  createdAt: Date;
 }
 
-export interface PaymentResult {
+// Payment Response
+export interface PaymentResponse {
+  transactionId: string;
+  paymentLink?: string;
+  paymentSessionId?: string;
   success: boolean;
-  paymentIntentId: string;
-  status: PaymentStatus;
   error?: string;
-  processedAt: Date;
+  expiresAt?: Date;
 }
 
-export interface RefundResult {
+// Payment Status Response
+export interface PaymentStatusResponse {
+  status: string;
+  gatewayStatus?: string;
+  paymentId?: string;
+}
+
+// Webhook Result
+export interface WebhookResult {
+  success: boolean;
+  transactionId?: string;
+  error?: string;
+}
+
+// Payment Gateway Types
+export enum PaymentGatewayType {
+  CASHFREE = 'cashfree',
+  RAZORPAY = 'razorpay',
+  STRIPE = 'stripe',
+}
+
+// Payment Status
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+  REFUNDED = 'REFUNDED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
+}
+
+// Gateway-specific interfaces (kept separate as they're implementation details)
+export interface IPaymentGateway {
+  createPayment(orderId: string, amount: number, currency: string, customerDetails: CustomerDetails, options?: PaymentOptions): Promise<GatewayPaymentResponse>;
+  getPaymentStatus(orderId: string): Promise<GatewayStatusResponse>;
+  verifyWebhook(payload: any, signature: string): Promise<WebhookVerificationResult>;
+  refundPayment(orderId: string, amount?: number): Promise<RefundResponse>;
+}
+
+export interface GatewayPaymentResponse {
+  success: boolean;
+  orderId: string;
+  paymentLinkId?: string;
+  paymentSessionId?: string;
+  error?: string;
+  expiresAt?: Date;
+}
+
+export interface GatewayStatusResponse {
+  orderId: string;
+  status: PaymentGatewayStatus;
+  amount?: number;
+  currency?: string;
+  paymentId?: string;
+  error?: string;
+}
+
+export interface WebhookVerificationResult {
+  valid: boolean;
+  webhookData?: any;
+  error?: string;
+}
+
+export interface RefundResponse {
   success: boolean;
   refundId: string;
   amount: number;
   status: 'succeeded' | 'failed' | 'pending';
   error?: string;
-  processedAt: Date;
 }
 
-export enum PaymentStatus {
-  PENDING = 'pending',
-  REQUIRES_PAYMENT_METHOD = 'requires_payment_method',
-  REQUIRES_CONFIRMATION = 'requires_confirmation',
-  REQUIRES_ACTION = 'requires_action',
-  PROCESSING = 'processing',
-  SUCCEEDED = 'succeeded',
-  CANCELED = 'canceled',
-  FAILED = 'failed',
-}
-
-export interface CreatePaymentOptions {
-  amount: number;
-  currency: string;
-  bookingId?: string; // Optional since we create payment intent before booking
-  guestId: string;
-  propertyId: string;
-  metadata?: Record<string, any>;
+export enum PaymentGatewayStatus {
+  PENDING = 'PENDING',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+  REFUNDED = 'REFUNDED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
 }

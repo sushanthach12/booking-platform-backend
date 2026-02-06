@@ -2,10 +2,19 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PaymentGatewayFactory, PaymentGatewayType } from '../factories/payment-gateway.factory';
+import {
+  IPaymentService,
+  PaymentGatewayType,
+  PaymentOptions,
+  CustomerDetails,
+  PaymentResponse,
+  PaymentStatusResponse,
+  WebhookResult,
+  PaymentGatewayStatus,
+  IPaymentGateway,
+} from '../interfaces/payment.interface';
 import { PaymentTransactionEntity } from '../entities/payment-transaction.entity';
-import { CustomerDetails, PaymentOptions } from '../interfaces/payment-gateway.interface';
-import { CreatePaymentOptions } from '../interfaces/payment.interface';
+import { PaymentGatewayFactory } from '../factories/payment-gateway.factory';
 
 @Injectable()
 export class PaymentService {
@@ -22,7 +31,7 @@ export class PaymentService {
     amount: number,
     currency: string,
     customerDetails: CustomerDetails,
-    options?: CreatePaymentOptions & PaymentOptions,
+    options?: PaymentOptions,
   ): Promise<{ transactionId: string; paymentLink?: string; paymentSessionId?: string }> {
     this.logger.log(`Creating payment for amount: ${amount} ${currency}`);
 

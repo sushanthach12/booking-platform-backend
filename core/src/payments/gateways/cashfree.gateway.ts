@@ -4,12 +4,12 @@ import {
   IPaymentGateway,
   CustomerDetails,
   PaymentOptions,
-  PaymentResponse,
-  PaymentStatusResponse,
+  GatewayPaymentResponse,
+  GatewayStatusResponse,
   WebhookVerificationResult,
   RefundResponse,
   PaymentGatewayStatus,
-} from '../interfaces/payment-gateway.interface';
+} from '../interfaces/payment.interface';
 
 @Injectable()
 export class CashfreeGateway implements IPaymentGateway {
@@ -30,7 +30,7 @@ export class CashfreeGateway implements IPaymentGateway {
     currency: string,
     customerDetails: CustomerDetails,
     options?: PaymentOptions,
-  ): Promise<PaymentResponse> {
+  ): Promise<GatewayPaymentResponse> {
     this.logger.log(`Creating Cashfree payment for order: ${orderId}`);
     
     // TODO: Implement actual Cashfree API integration
@@ -40,7 +40,7 @@ export class CashfreeGateway implements IPaymentGateway {
       // Placeholder response - replace with actual Cashfree API call
       return {
         success: true,
-        orderId,
+        orderId: orderId,
         paymentLinkId: `cf_link_${orderId}`,
         paymentSessionId: `cf_session_${orderId}`,
         expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
@@ -55,7 +55,7 @@ export class CashfreeGateway implements IPaymentGateway {
     }
   }
 
-  async getPaymentStatus(orderId: string): Promise<PaymentStatusResponse> {
+  async getPaymentStatus(orderId: string): Promise<GatewayStatusResponse> {
     this.logger.log(`Getting payment status for order: ${orderId}`);
     
     // TODO: Implement actual Cashfree API integration

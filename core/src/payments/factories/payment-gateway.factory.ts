@@ -1,13 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IPaymentGateway } from '../interfaces/payment-gateway.interface';
+import { IPaymentGateway, PaymentGatewayType } from '../interfaces/payment.interface';
 import { CashfreeGateway } from '../gateways/cashfree.gateway';
-
-export enum PaymentGatewayType {
-  CASHFREE = 'cashfree',
-  RAZORPAY = 'razorpay',
-  STRIPE = 'stripe',
-}
 
 @Injectable()
 export class PaymentGatewayFactory {

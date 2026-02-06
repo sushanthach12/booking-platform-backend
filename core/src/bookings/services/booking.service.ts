@@ -14,7 +14,8 @@ import {
 } from '../interfaces/booking.interface';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
 import { IRedisService, AvailabilityCache } from '../../common/redis';
-import { CreatePaymentOptions, IPaymentService, PaymentIntent } from '../../payments/interfaces/payment.interface';
+import { PaymentService } from '../../payments/services/payment.service';
+import { CustomerDetails } from '../../payments/interfaces/payment-gateway.interface';
 
 @Injectable()
 export class BookingService {
@@ -25,7 +26,7 @@ export class BookingService {
     private readonly bookingRepository: IBookingRepository,
     private readonly dataSource: DataSource,
     private readonly redisService: IRedisService,
-    private readonly paymentService: IPaymentService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   async createBooking(
@@ -73,7 +74,7 @@ export class BookingService {
       throw new ConflictException('Property is currently being booked by another user. Please try again.');
     }
 
-    let paymentIntent: PaymentIntent | null = null;
+    let paymentResponse: { transactionId: string; paymentLink?: string; paymentSessionId?: string } | null = null;
 
     try {
       // Step 3: Re-validate availability in database with pessimistic lock
@@ -90,8 +91,15 @@ export class BookingService {
       // Step 4: Generate booking ID upfront for payment-first approach
       const bookingId = randomUUID();
 
-      // Step 5: Create payment intent first (payment-first approach)
-      const paymentOptions: CreatePaymentOptions = {
+      // Step 5: Create payment first (payment-first approach)
+      const customerDetails: CustomerDetails = {
+        customerId: userId,
+        email: '', // TODO: Get from user service
+        name: '', // TODO: Get from user service
+        phone: '', // TODO: Get from user service
+      };
+
+      const paymentOptions = {
         amount: createBookingRequest.expectedTotalPrice || 0,
         currency: 'USD',
         bookingId: bookingId, // Use the generated booking ID
@@ -106,27 +114,28 @@ export class BookingService {
       };
 
       try {
-        paymentIntent = await this.paymentService.createPaymentIntent(
+        paymentResponse = await this.paymentService.createPayment(
           paymentOptions.amount,
           paymentOptions.currency,
-          paymentOptions.metadata
+          customerDetails,
+          paymentOptions,
         );
       } catch (error) {
-        this.logger.error(`Failed to create payment intent: ${error.message}`);
+        this.logger.error(`Failed to create payment: ${error.message}`);
         throw new BadRequestException('Unable to process payment. Please try again.');
       }
 
-      if(!paymentIntent) {
+      if(!paymentResponse) {
         throw new BadRequestException('Unable to process payment. Please try again.');
       }
 
-      // Step 6: Create booking in database transaction with payment intent ID
+      // Step 6: Create booking in database transaction with payment transaction ID
       return await this.dataSource.transaction(async (manager) => {
-        if(!paymentIntent) {
+        if(!paymentResponse) {
           throw new BadRequestException('Unable to process payment. Please try again.');
         }
 
-        // Create booking record with payment intent ID and pre-generated ID
+        // Create booking record with payment transaction ID and pre-generated ID
         const bookingData: Partial<BookingEntity> = {
           id: bookingId, // Use the pre-generated booking ID
           propertyId: createBookingRequest.propertyId,
@@ -140,7 +149,7 @@ export class BookingService {
           currency: 'USD',
           status: BookingStatus.PENDING,
           paymentStatus: BookingPaymentStatus.PENDING,
-          paymentIntentId: paymentIntent.id, // Set payment intent ID from the start
+          paymentTransactionId: paymentResponse.transactionId, // Use transaction ID instead of payment intent ID
           idempotencyKey: createBookingRequest.idempotencyKey,
           specialRequests: createBookingRequest.specialRequests,
           guestCount: createBookingRequest.guestCount,
@@ -174,10 +183,10 @@ export class BookingService {
         //   bookingId: booking.id,
         // });
 
-        this.logger.log(`Booking created successfully: ${booking.id} with payment intent: ${paymentIntent.id}`);
+        this.logger.log(`Booking created successfully: ${booking.id} with payment transaction: ${paymentResponse.transactionId}`);
         
         const response = this.mapToResponse(booking);
-        response.paymentIntentId = paymentIntent.id; // Include payment intent for frontend
+        response.paymentTransactionId = paymentResponse.transactionId; // Include payment transaction ID for frontend
         
         return response;
       });
