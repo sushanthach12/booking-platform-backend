@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus } from '../enums';
+import { BookingPaymentStatus, BookingStatus,  } from '../enums';
 
 export interface CreateBookingRequest {
   propertyId: string;
@@ -23,7 +23,7 @@ export interface BookingResponse {
   totalPrice: number;
   currency: string;
   status: BookingStatus;
-  paymentStatus: PaymentStatus;
+  paymentStatus: BookingPaymentStatus;
   paymentIntentId?: string;
   specialRequests?: string;
   guestCount: number;
@@ -38,7 +38,7 @@ export interface BookingResponse {
 export interface BookingQueryOptions {
   propertyId?: string;
   status?: BookingStatus;
-  paymentStatus?: PaymentStatus;
+  paymentStatus?: BookingPaymentStatus;
   startDate?: string;
   endDate?: string;
   page?: number;
@@ -62,9 +62,4 @@ export interface AvailabilityResult {
 export interface CancelBookingOptions {
   reason?: string;
   isHost?: boolean;
-}
-
-export interface UpdatePaymentStatusOptions {
-  paymentStatus: PaymentStatus;
-  paymentIntentId?: string;
 }

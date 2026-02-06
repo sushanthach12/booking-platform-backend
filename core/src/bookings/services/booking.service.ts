@@ -1,5 +1,6 @@
 import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { BOOKING_REPOSITORY } from '../../database';
 import { IBookingRepository } from '../repositories';
 import { BookingEntity } from '../entities';
@@ -13,7 +14,7 @@ import {
 } from '../interfaces/booking.interface';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
 import { IRedisService, AvailabilityCache } from '../../common/redis';
-import { CreatePaymentOptions, IPaymentService } from '../../payments/interfaces/payment.interface';
+import { CreatePaymentOptions, IPaymentService, PaymentIntent } from '../../payments/interfaces/payment.interface';
 
 @Injectable()
 export class BookingService {
@@ -72,6 +73,8 @@ export class BookingService {
       throw new ConflictException('Property is currently being booked by another user. Please try again.');
     }
 
+    let paymentIntent: PaymentIntent | null = null;
+
     try {
       // Step 3: Re-validate availability in database with pessimistic lock
       const overlappingBookings = await this.bookingRepository.findOverlappingBookings(
@@ -84,10 +87,48 @@ export class BookingService {
         throw new ConflictException('Property is not available for the selected dates');
       }
 
-      // Step 4: Create booking in database transaction
+      // Step 4: Generate booking ID upfront for payment-first approach
+      const bookingId = randomUUID();
+
+      // Step 5: Create payment intent first (payment-first approach)
+      const paymentOptions: CreatePaymentOptions = {
+        amount: createBookingRequest.expectedTotalPrice || 0,
+        currency: 'USD',
+        bookingId: bookingId, // Use the generated booking ID
+        guestId: userId,
+        propertyId: createBookingRequest.propertyId,
+        metadata: {
+          bookingId: bookingId,
+          propertyId: createBookingRequest.propertyId,
+          guestId: userId,
+          numberOfNights,
+        },
+      };
+
+      try {
+        paymentIntent = await this.paymentService.createPaymentIntent(
+          paymentOptions.amount,
+          paymentOptions.currency,
+          paymentOptions.metadata
+        );
+      } catch (error) {
+        this.logger.error(`Failed to create payment intent: ${error.message}`);
+        throw new BadRequestException('Unable to process payment. Please try again.');
+      }
+
+      if(!paymentIntent) {
+        throw new BadRequestException('Unable to process payment. Please try again.');
+      }
+
+      // Step 6: Create booking in database transaction with payment intent ID
       return await this.dataSource.transaction(async (manager) => {
-        // Create booking record
+        if(!paymentIntent) {
+          throw new BadRequestException('Unable to process payment. Please try again.');
+        }
+
+        // Create booking record with payment intent ID and pre-generated ID
         const bookingData: Partial<BookingEntity> = {
+          id: bookingId, // Use the pre-generated booking ID
           propertyId: createBookingRequest.propertyId,
           guestId: userId,
           hostId: hostId,
@@ -95,10 +136,11 @@ export class BookingService {
           checkInDate: createBookingRequest.checkInDate,
           checkOutDate: createBookingRequest.checkOutDate,
           numberOfNights,
-          totalPrice: createBookingRequest.expectedTotalPrice || 0, // Will be calculated by pricing service
+          totalPrice: createBookingRequest.expectedTotalPrice || 0,
           currency: 'USD',
           status: BookingStatus.PENDING,
           paymentStatus: BookingPaymentStatus.PENDING,
+          paymentIntentId: paymentIntent.id, // Set payment intent ID from the start
           idempotencyKey: createBookingRequest.idempotencyKey,
           specialRequests: createBookingRequest.specialRequests,
           guestCount: createBookingRequest.guestCount,
@@ -107,7 +149,23 @@ export class BookingService {
         const booking = manager.create(BookingEntity, bookingData);
         await manager.save(booking);
 
-        // Step 5: Update availability calendar atomically
+        // Step 6: Update payment intent metadata with booking ID
+        // Note: updatePaymentIntentMetadata not implemented in payment service yet
+        // TODO: Implement this when payment service supports metadata updates
+        // try {
+        //   await this.paymentService.updatePaymentIntentMetadata(
+        //     paymentIntent.id,
+        //     {
+        //       ...paymentOptions.metadata,
+        //       bookingId: booking.id,
+        //     }
+        //   );
+        // } catch (error) {
+        //   this.logger.warn(`Failed to update payment intent metadata: ${error.message}`);
+        //   // Non-critical error, continue with booking creation
+        // }
+
+        // Step 7: Update availability calendar atomically
         // TODO: Implement availability calendar update
         // await this.availabilityService.blockDates({
         //   propertyId: createBookingRequest.propertyId,
@@ -115,32 +173,6 @@ export class BookingService {
         //   checkOutDate: createBookingRequest.checkOutDate,
         //   bookingId: booking.id,
         // });
-
-        // Step 6: Create payment intent
-        const paymentOptions: CreatePaymentOptions = {
-          amount: booking.totalPrice,
-          currency: booking.currency,
-          bookingId: booking.id,
-          guestId: userId,
-          propertyId: createBookingRequest.propertyId,
-          metadata: {
-            bookingId: booking.id,
-            propertyId: createBookingRequest.propertyId,
-            guestId: userId,
-            numberOfNights,
-          },
-        };
-
-        const paymentIntent = await this.paymentService.createPaymentIntent(
-          paymentOptions.amount,
-          paymentOptions.currency,
-          paymentOptions.metadata
-        );
-
-        // Update booking with payment intent ID
-        await manager.update(BookingEntity, booking.id, {
-          paymentIntentId: paymentIntent.id,
-        });
 
         this.logger.log(`Booking created successfully: ${booking.id} with payment intent: ${paymentIntent.id}`);
         
@@ -150,11 +182,22 @@ export class BookingService {
         return response;
       });
 
+    } catch (error) {
+      // If booking creation fails, attempt to cancel the payment intent
+      if (typeof paymentIntent === 'object' && paymentIntent !== null) {
+        try {
+          await this.paymentService.cancelPayment((paymentIntent as PaymentIntent)?.id);
+          this.logger.log(`Cancelled payment intent ${(paymentIntent as PaymentIntent)?.id} due to booking creation failure`);
+        } catch (cancelError) {
+          this.logger.error(`Failed to cancel payment intent ${(paymentIntent as PaymentIntent)?.id}: ${cancelError.message}`);
+        }
+      }
+      throw error;
     } finally {
-      // Step 7: Release lock
+      // Step 8: Release lock
       await this.redisService.releaseLock(lockKey, lockValue);
       
-      // Step 8: Invalidate cache
+      // Step 9: Invalidate cache
       await this.invalidateAvailabilityCache(
         createBookingRequest.propertyId,
         createBookingRequest.checkInDate,

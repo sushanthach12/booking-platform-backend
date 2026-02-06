@@ -47,7 +47,7 @@ export enum PaymentStatus {
 export interface CreatePaymentOptions {
   amount: number;
   currency: string;
-  bookingId: string;
+  bookingId?: string; // Optional since we create payment intent before booking
   guestId: string;
   propertyId: string;
   metadata?: Record<string, any>;
