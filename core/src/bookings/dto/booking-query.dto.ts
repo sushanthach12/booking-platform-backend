@@ -1,0 +1,117 @@
+import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { BookingStatus } from '../enums/booking-status.enum';
+import { PaymentStatus } from '../enums/payment-status.enum';
+
+export class GetBookingsQueryDto {
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Property ID filter',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID()
+  @IsOptional()
+  propertyId?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Booking status filter',
+    enum: BookingStatus,
+    example: BookingStatus.CONFIRMED,
+  })
+  @IsEnum(BookingStatus)
+  @IsOptional()
+  status?: BookingStatus;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Payment status filter',
+    enum: PaymentStatus,
+    example: PaymentStatus.SUCCEEDED,
+  })
+  @IsEnum(PaymentStatus)
+  @IsOptional()
+  paymentStatus?: PaymentStatus;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Start date filter (YYYY-MM-DD)',
+    example: '2026-02-01',
+  })
+  @IsDateString()
+  @IsOptional()
+  startDate?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'End date filter (YYYY-MM-DD)',
+    example: '2026-02-28',
+  })
+  @IsDateString()
+  @IsOptional()
+  endDate?: string;
+
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Page number for pagination',
+    example: 1,
+    minimum: 1,
+  })
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  @IsOptional()
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Number of items per page',
+    example: 20,
+    minimum: 1,
+    maximum: 100,
+  })
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @Type(() => Number)
+  @IsOptional()
+  limit?: number = 20;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Sort field',
+    example: 'createdAt',
+  })
+  @IsString()
+  @IsOptional()
+  sortBy?: string = 'createdAt';
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Sort order',
+    example: 'desc',
+  })
+  @IsString()
+  @IsOptional()
+  sortOrder?: 'asc' | 'desc' = 'desc';
+}
+
+export class GetBookingParamsDto {
+  @ApiProperty({
+    type: String,
+    description: 'Booking ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID()
+  bookingId: string;
+}
