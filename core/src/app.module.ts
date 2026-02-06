@@ -9,6 +9,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { getTypeOrmConfig } from './database';
 import { PropertyModule } from './properties/property.module';
 import { BookingModule } from './bookings/booking.module';
+import { PaymentModule } from './payments/payment.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { BookingModule } from './bookings/booking.module';
     AuthModule,
     PropertyModule,
     BookingModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [

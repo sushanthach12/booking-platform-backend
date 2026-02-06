@@ -65,6 +65,9 @@ export class BookingEntity {
   @Column({ name: 'payment_intent_id', type: 'varchar', nullable: true })
   paymentIntentId?: string;
 
+  @Column({ name: 'payment_transaction_id', type: 'varchar', nullable: true })
+  paymentTransactionId?: string;
+
   @Column({ name: 'idempotency_key', type: 'varchar', unique: true })
   idempotencyKey: string;
 
