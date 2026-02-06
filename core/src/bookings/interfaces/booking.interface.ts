@@ -25,6 +25,7 @@ export interface BookingResponse {
   status: BookingStatus;
   paymentStatus: BookingPaymentStatus;
   paymentIntentId?: string;
+  paymentTransactionId?: string;
   specialRequests?: string;
   guestCount: number;
   cancellationReason?: string;

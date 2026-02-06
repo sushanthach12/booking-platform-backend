@@ -6,18 +6,15 @@ import {
   IPaymentService,
   PaymentGatewayType,
   PaymentOptions,
-  CustomerDetails,
+  PaymentCustomerDetails,
   PaymentResponse,
-  PaymentStatusResponse,
-  WebhookResult,
-  PaymentGatewayStatus,
-  IPaymentGateway,
+  PaymentStatus,
 } from '../interfaces/payment.interface';
 import { PaymentTransactionEntity } from '../entities/payment-transaction.entity';
 import { PaymentGatewayFactory } from '../factories/payment-gateway.factory';
 
 @Injectable()
-export class PaymentService {
+export class PaymentService implements IPaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
   constructor(
@@ -30,9 +27,9 @@ export class PaymentService {
   async createPayment(
     amount: number,
     currency: string,
-    customerDetails: CustomerDetails,
+    customerDetails: PaymentCustomerDetails,
     options?: PaymentOptions,
-  ): Promise<{ transactionId: string; paymentLink?: string; paymentSessionId?: string }> {
+  ): Promise<PaymentResponse> {
     this.logger.log(`Creating payment for amount: ${amount} ${currency}`);
 
     // Generate unique transaction ID
@@ -84,6 +81,7 @@ export class PaymentService {
         transactionId,
         paymentLink: paymentResponse.paymentLinkId,
         paymentSessionId: paymentResponse.paymentSessionId,
+        success: true,
       };
     } catch (error) {
       this.logger.error(`Payment creation failed: ${error.message}`);
@@ -194,6 +192,47 @@ export class PaymentService {
         success: false,
         error: error.message,
       };
+    }
+  }
+
+  async terminatePayment(transactionId: string): Promise<boolean> {
+    this.logger.log(`Terminating payment for transaction: ${transactionId}`);
+    
+    try {
+
+      if (!transactionId) {
+        this.logger.error(`Transaction ID not found: ${transactionId}`);
+        return false;
+      }  
+
+      const transaction = await this.paymentTransactionRepository.findOne({
+        where: { id: transactionId },
+        select: {id: true, status: true}
+      });
+
+      if (!transaction) {
+        this.logger.error(`Transaction not found: ${transactionId}`);
+        return false;
+      }
+
+      // Only allow termination of pending payments
+      if (transaction.status !== PaymentStatus.PENDING) {
+        this.logger.warn(`Cannot terminate transaction with status: ${transaction.status}`);
+        return false;
+      }
+
+      // Update transaction status to cancelled
+      await this.updateTransactionStatus(transactionId, PaymentStatus.CANCELLED);
+
+      // TODO: Call gateway to cancel payment if needed
+      // const gateway = this.paymentGatewayFactory.createGateway(transaction.gatewayType);
+      // await gateway.cancelPayment(transaction.gatewayOrderId!);
+
+      this.logger.log(`Payment terminated successfully for transaction`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to terminate payment: ${error.message}`);
+      return false;
     }
   }
 

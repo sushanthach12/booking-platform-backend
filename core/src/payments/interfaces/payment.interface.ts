@@ -3,7 +3,7 @@ export interface IPaymentService {
   createPayment(
     amount: number,
     currency: string,
-    customerDetails: CustomerDetails,
+    customerDetails: PaymentCustomerDetails,
     options?: PaymentOptions,
   ): Promise<PaymentResponse>;
   
@@ -16,10 +16,12 @@ export interface IPaymentService {
     payload: any,
     signature: string,
   ): Promise<WebhookResult>;
+  
+  terminatePayment(transactionId: string): Promise<boolean>;
 }
 
 // Customer Details
-export interface CustomerDetails {
+export interface PaymentCustomerDetails {
   customerId: string;
   email: string;
   name: string;
@@ -80,10 +82,11 @@ export enum PaymentStatus {
 
 // Gateway-specific interfaces (kept separate as they're implementation details)
 export interface IPaymentGateway {
-  createPayment(orderId: string, amount: number, currency: string, customerDetails: CustomerDetails, options?: PaymentOptions): Promise<GatewayPaymentResponse>;
+  createPayment(orderId: string, amount: number, currency: string, customerDetails: PaymentCustomerDetails, options?: PaymentOptions): Promise<GatewayPaymentResponse>;
   getPaymentStatus(orderId: string): Promise<GatewayStatusResponse>;
   verifyWebhook(payload: any, signature: string): Promise<WebhookVerificationResult>;
   refundPayment(orderId: string, amount?: number): Promise<RefundResponse>;
+  terminatePayment(orderId: string): Promise<boolean>;
 }
 
 export interface GatewayPaymentResponse {

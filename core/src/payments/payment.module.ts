@@ -5,7 +5,6 @@ import { PaymentService } from './services/payment.service';
 import { PaymentController } from './controllers/payment.controller';
 import { PaymentTransactionEntity } from './entities/payment-transaction.entity';
 import { CashfreeGateway } from './gateways/cashfree.gateway';
-import { PaymentGatewayFactory } from './factories/payment-gateway.factory';
 
 @Module({
   imports: [
@@ -14,10 +13,12 @@ import { PaymentGatewayFactory } from './factories/payment-gateway.factory';
   ],
   controllers: [PaymentController],
   providers: [
-    PaymentService,
+    {
+      provide: 'IPaymentService',
+      useClass: PaymentService,
+    },
     CashfreeGateway,
-    PaymentGatewayFactory,
   ],
-  exports: [PaymentService, PaymentGatewayFactory],
+  exports: [PaymentService, ],
 })
 export class PaymentModule {}

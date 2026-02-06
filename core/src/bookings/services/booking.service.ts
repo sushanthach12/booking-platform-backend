@@ -15,7 +15,7 @@ import {
 import { BookingPaymentStatus, BookingStatus } from '../enums';
 import { IRedisService, AvailabilityCache } from '../../common/redis';
 import { PaymentService } from '../../payments/services/payment.service';
-import { CustomerDetails } from '../../payments/interfaces/payment-gateway.interface';
+import { IPaymentService, PaymentCustomerDetails, PaymentResponse } from '../../payments/interfaces/payment.interface';
 
 @Injectable()
 export class BookingService {
@@ -26,7 +26,8 @@ export class BookingService {
     private readonly bookingRepository: IBookingRepository,
     private readonly dataSource: DataSource,
     private readonly redisService: IRedisService,
-    private readonly paymentService: PaymentService,
+    @Inject('IPaymentService')
+    private readonly paymentService: IPaymentService,
   ) {}
 
   async createBooking(
@@ -74,7 +75,7 @@ export class BookingService {
       throw new ConflictException('Property is currently being booked by another user. Please try again.');
     }
 
-    let paymentResponse: { transactionId: string; paymentLink?: string; paymentSessionId?: string } | null = null;
+    let paymentResponse: PaymentResponse | null = null;
 
     try {
       // Step 3: Re-validate availability in database with pessimistic lock
@@ -92,7 +93,7 @@ export class BookingService {
       const bookingId = randomUUID();
 
       // Step 5: Create payment first (payment-first approach)
-      const customerDetails: CustomerDetails = {
+      const customerDetails: PaymentCustomerDetails = {
         customerId: userId,
         email: '', // TODO: Get from user service
         name: '', // TODO: Get from user service
@@ -193,12 +194,12 @@ export class BookingService {
 
     } catch (error) {
       // If booking creation fails, attempt to cancel the payment intent
-      if (typeof paymentIntent === 'object' && paymentIntent !== null) {
+      if (paymentResponse) {
         try {
-          await this.paymentService.cancelPayment((paymentIntent as PaymentIntent)?.id);
-          this.logger.log(`Cancelled payment intent ${(paymentIntent as PaymentIntent)?.id} due to booking creation failure`);
+          await this.paymentService.terminatePayment((paymentResponse as  PaymentResponse)?.transactionId);
+          this.logger.log(`Cancelled payment intent due to booking creation failure`);
         } catch (cancelError) {
-          this.logger.error(`Failed to cancel payment intent ${(paymentIntent as PaymentIntent)?.id}: ${cancelError.message}`);
+          this.logger.error(`Failed to cancel payment intent: ${cancelError.message}`);
         }
       }
       throw error;

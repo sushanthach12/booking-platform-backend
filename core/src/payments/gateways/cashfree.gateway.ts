@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   IPaymentGateway,
-  CustomerDetails,
+  PaymentCustomerDetails,
   PaymentOptions,
   GatewayPaymentResponse,
   GatewayStatusResponse,
@@ -28,7 +28,7 @@ export class CashfreeGateway implements IPaymentGateway {
     orderId: string,
     amount: number,
     currency: string,
-    customerDetails: CustomerDetails,
+    customerDetails: PaymentCustomerDetails,
     options?: PaymentOptions,
   ): Promise<GatewayPaymentResponse> {
     this.logger.log(`Creating Cashfree payment for order: ${orderId}`);
@@ -126,6 +126,22 @@ export class CashfreeGateway implements IPaymentGateway {
         status: 'failed',
         error: error.message,
       };
+    }
+  }
+
+  async terminatePayment(orderId: string): Promise<boolean> {
+    this.logger.log(`Terminating payment for order: ${orderId}`);
+    
+    // TODO: Implement actual Cashfree API integration
+    // This is a placeholder implementation
+    
+    try {
+      // Placeholder implementation - replace with actual Cashfree API call
+      // In real implementation, this would call Cashfree's cancel/refund API
+      return true;
+    } catch (error) {
+      this.logger.error(`Payment termination failed: ${error.message}`);
+      return false;
     }
   }
 }
