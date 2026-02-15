@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PAYMENT_TRANSACTION_REPOSITORY } from '../database';
 import { PaymentController } from './controllers/payment.controller';
 import { PaymentTransactionEntity } from './entities/payment-transaction.entity';
 import { PaymentGatewayFactory } from './factories/payment-gateway.factory';
-import { QueuesModule } from '../queues/queues.module';
+import { PaymentTransactionRepository } from './repositories/implementations/payment-transaction.repository';
 import { PaymentService } from './services/payment.service';
+import { PaymentTransactionService } from './services/payment-transaction.service';
+import { QueuesModule } from '../queues/queues.module';
 
 @Module({
   imports: [
@@ -15,6 +18,11 @@ import { PaymentService } from './services/payment.service';
   ],
   controllers: [PaymentController],
   providers: [
+    {
+      provide: PAYMENT_TRANSACTION_REPOSITORY,
+      useClass: PaymentTransactionRepository,
+    },
+    PaymentTransactionService,
     {
       provide: 'IPaymentService',
       useClass: PaymentService,

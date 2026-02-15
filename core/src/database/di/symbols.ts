@@ -3,3 +3,6 @@ export const PROPERTY_REPOSITORY = Symbol('IPropertyRepository');
 export const PROPERTY_IMAGE_REPOSITORY = Symbol('IPropertyImageRepository');
 export const PROPERTY_AMENITY_REPOSITORY = Symbol('IPropertyAmenityRepository');
 export const BOOKING_REPOSITORY = Symbol('IBookingRepository');
+export const PAYMENT_TRANSACTION_REPOSITORY = Symbol(
+  'IPaymentTransactionRepository',
+);

@@ -1,12 +1,9 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { Repository } from 'typeorm';
 import { JOB_SYNC_PAYMENT_STATUS } from '../../bookings/booking-jobs/constants';
 import { QUEUE_PAYMENT_STATUS_SYNC } from '../../queues/queues.module';
-import { PaymentTransactionEntity } from '../entities/payment-transaction.entity';
 import { PaymentGatewayFactory } from '../factories/payment-gateway.factory';
 import {
   IPaymentService,
@@ -16,6 +13,7 @@ import {
   PaymentResponse,
   PaymentStatus,
 } from '../interfaces/payment.interface';
+import { PaymentTransactionService } from './payment-transaction.service';
 
 @Injectable()
 export class PaymentService implements IPaymentService {
@@ -24,10 +22,9 @@ export class PaymentService implements IPaymentService {
   constructor(
     private readonly paymentGatewayFactory: PaymentGatewayFactory,
     private readonly configService: ConfigService,
+    private readonly paymentTransactionService: PaymentTransactionService,
     @InjectQueue(QUEUE_PAYMENT_STATUS_SYNC)
     private readonly paymentStatusSyncQueue: Queue,
-    @InjectRepository(PaymentTransactionEntity)
-    private readonly paymentTransactionRepository: Repository<PaymentTransactionEntity>,
   ) {}
 
   async createPayment(
@@ -42,7 +39,7 @@ export class PaymentService implements IPaymentService {
     const transactionId = this.generateTransactionId();
 
     // Create payment transaction record
-    const paymentTransaction = this.paymentTransactionRepository.create({
+    await this.paymentTransactionService.create({
       id: transactionId,
       amount,
       currency,
@@ -56,8 +53,6 @@ export class PaymentService implements IPaymentService {
       ) as PaymentGatewayType,
       metadata: options?.metadata,
     });
-
-    await this.paymentTransactionRepository.save(paymentTransaction);
 
     try {
       // Get the appropriate payment gateway
@@ -74,7 +69,7 @@ export class PaymentService implements IPaymentService {
 
       if (!paymentResponse.success) {
         // Update transaction status to failed
-        await this.updateTransactionStatus(
+        await this.paymentTransactionService.updateStatus(
           transactionId,
           PaymentStatus.FAILED,
           paymentResponse.error,
@@ -83,7 +78,7 @@ export class PaymentService implements IPaymentService {
       }
 
       // Update transaction with gateway response
-      await this.paymentTransactionRepository.update(transactionId, {
+      await this.paymentTransactionService.update(transactionId, {
         gatewayOrderId: paymentResponse.orderId,
         paymentLinkId: paymentResponse.paymentLinkId,
         paymentSessionId: paymentResponse.paymentSessionId,
@@ -97,11 +92,12 @@ export class PaymentService implements IPaymentService {
         success: true,
       };
     } catch (error) {
-      this.logger.error(`Payment creation failed: ${error.message}`);
-      await this.updateTransactionStatus(
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Payment creation failed: ${message}`);
+      await this.paymentTransactionService.updateStatus(
         transactionId,
         PaymentStatus.FAILED,
-        error.message,
+        message,
       );
       throw error;
     }
@@ -110,11 +106,10 @@ export class PaymentService implements IPaymentService {
   async getPaymentId(transactionId: string): Promise<string | null> {
     this.logger.log(`Getting payment ID for transaction: ${transactionId}`);
 
-    const transaction = await this.paymentTransactionRepository.findOne({
-      where: { id: transactionId },
-    });
+    const transaction =
+      await this.paymentTransactionService.findById(transactionId);
 
-    return transaction?.gatewayOrderId || null;
+    return transaction?.gatewayOrderId ?? null;
   }
 
   async getPaymentStatus(transactionId: string): Promise<{
@@ -124,9 +119,8 @@ export class PaymentService implements IPaymentService {
   }> {
     this.logger.log(`Getting payment status for transaction: ${transactionId}`);
 
-    const transaction = await this.paymentTransactionRepository.findOne({
-      where: { id: transactionId },
-    });
+    const transaction =
+      await this.paymentTransactionService.findById(transactionId);
 
     if (!transaction) {
       throw new Error(`Transaction not found: ${transactionId}`);
@@ -155,11 +149,11 @@ export class PaymentService implements IPaymentService {
         transaction.gatewayType as PaymentGatewayType,
       );
       const statusResponse = await gateway.getPaymentStatus(
-        transaction.gatewayOrderId,
+        transaction.gatewayOrderId ?? '',
       );
 
       // Update transaction with latest status
-      await this.paymentTransactionRepository.update(transactionId, {
+      await this.paymentTransactionService.update(transactionId, {
         gatewayStatus: statusResponse.status,
         gatewayPaymentId: statusResponse.paymentId,
         status: this.mapGatewayStatusToTransactionStatus(statusResponse.status),
@@ -171,7 +165,8 @@ export class PaymentService implements IPaymentService {
         paymentId: statusResponse.paymentId,
       };
     } catch (error) {
-      this.logger.error(`Failed to get payment status: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to get payment status: ${message}`);
       return {
         status: transaction.status,
         gatewayStatus: transaction.gatewayStatus,
@@ -219,10 +214,11 @@ export class PaymentService implements IPaymentService {
         transactionId,
       };
     } catch (error) {
-      this.logger.error(`Webhook handling failed: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Webhook handling failed: ${message}`);
       return {
         success: false,
-        error: error.message,
+        error: message,
       };
     }
   }
@@ -236,10 +232,8 @@ export class PaymentService implements IPaymentService {
         return false;
       }
 
-      const transaction = await this.paymentTransactionRepository.findOne({
-        where: { id: transactionId },
-        select: { id: true, status: true },
-      });
+      const transaction =
+        await this.paymentTransactionService.findById(transactionId);
 
       if (!transaction) {
         this.logger.error(`Transaction not found: ${transactionId}`);
@@ -255,7 +249,7 @@ export class PaymentService implements IPaymentService {
       }
 
       // Update transaction status to cancelled
-      await this.updateTransactionStatus(
+      await this.paymentTransactionService.updateStatus(
         transactionId,
         PaymentStatus.CANCELLED,
       );
@@ -267,7 +261,8 @@ export class PaymentService implements IPaymentService {
       this.logger.log(`Payment terminated successfully for transaction`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to terminate payment: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to terminate payment: ${message}`);
       return false;
     }
   }
@@ -278,18 +273,6 @@ export class PaymentService implements IPaymentService {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
     return `${prefix}_${timestamp}_${random}`;
-  }
-
-  private async updateTransactionStatus(
-    transactionId: string,
-    status: string,
-    errorMessage?: string,
-  ): Promise<void> {
-    await this.paymentTransactionRepository.update(transactionId, {
-      status,
-      errorMessage,
-      updatedAt: new Date(),
-    });
   }
 
   private mapGatewayStatusToTransactionStatus(gatewayStatus: string): string {
@@ -307,15 +290,17 @@ export class PaymentService implements IPaymentService {
 
   private async processWebhookUpdate(
     transactionId: string,
-    webhookData: any,
+    webhookData: Record<string, unknown>,
   ): Promise<void> {
-    const status = this.mapGatewayStatusToTransactionStatus(webhookData.status);
+    const status = this.mapGatewayStatusToTransactionStatus(
+      (webhookData.status as string) ?? '',
+    );
 
-    await this.paymentTransactionRepository.update(transactionId, {
+    await this.paymentTransactionService.update(transactionId, {
       status,
-      gatewayStatus: webhookData.status,
-      gatewayPaymentId: webhookData.paymentId,
-      webhookData: webhookData,
+      gatewayStatus: webhookData.status as string,
+      gatewayPaymentId: webhookData.paymentId as string,
+      webhookData,
       updatedAt: new Date(),
     });
 

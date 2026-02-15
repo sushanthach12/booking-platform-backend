@@ -70,6 +70,30 @@ export enum PaymentGatewayType {
   STRIPE = 'stripe',
 }
 
+// Transaction data (plain type for service layer; no entity leakage)
+export interface IPaymentTransactionData {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  gatewayStatus?: string;
+  gatewayType: string;
+  gatewayOrderId?: string;
+  gatewayPaymentId?: string;
+  paymentLinkId?: string;
+  paymentSessionId?: string;
+  bookingId?: string;
+  guestId: string;
+  propertyId?: string;
+  metadata?: Record<string, unknown>;
+  webhookData?: Record<string, unknown>;
+  errorMessage?: string;
+  expiresAt?: Date;
+  processedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Payment Status
 export enum PaymentStatus {
   PENDING = 'pending',
