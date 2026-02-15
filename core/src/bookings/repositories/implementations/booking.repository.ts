@@ -217,6 +217,14 @@ export class BookingRepository implements IBookingRepository {
     });
   }
 
+  async findByPaymentTransactionId(
+    paymentTransactionId: string,
+  ): Promise<BookingEntity | null> {
+    return await this.repository.findOne({
+      where: { paymentTransactionId },
+    });
+  }
+
   async findBookingsInDateRange(
     propertyId: string,
     startDate: Date,

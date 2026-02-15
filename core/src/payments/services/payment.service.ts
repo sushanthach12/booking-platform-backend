@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+  PAYMENT_STATUS_UPDATED,
+  PaymentStatusUpdatedPayload,
+} from '../../common/events/payment.events';
 import {
   IPaymentService,
   PaymentGatewayType,
@@ -20,6 +25,7 @@ export class PaymentService implements IPaymentService {
   constructor(
     private readonly paymentGatewayFactory: PaymentGatewayFactory,
     private readonly configService: ConfigService,
+    private readonly eventEmitter: EventEmitter2,
     @InjectRepository(PaymentTransactionEntity)
     private readonly paymentTransactionRepository: Repository<PaymentTransactionEntity>,
   ) {}
@@ -269,9 +275,12 @@ export class PaymentService implements IPaymentService {
     return statusMap[gatewayStatus] || 'PENDING';
   }
 
-  private async processWebhookUpdate(transactionId: string, webhookData: any): Promise<void> {
+  private async processWebhookUpdate(
+    transactionId: string,
+    webhookData: any,
+  ): Promise<void> {
     const status = this.mapGatewayStatusToTransactionStatus(webhookData.status);
-    
+
     await this.paymentTransactionRepository.update(transactionId, {
       status,
       gatewayStatus: webhookData.status,
@@ -279,5 +288,8 @@ export class PaymentService implements IPaymentService {
       webhookData: webhookData,
       updatedAt: new Date(),
     });
+
+    const payload: PaymentStatusUpdatedPayload = { transactionId, status };
+    this.eventEmitter.emit(PAYMENT_STATUS_UPDATED, payload);
   }
 }

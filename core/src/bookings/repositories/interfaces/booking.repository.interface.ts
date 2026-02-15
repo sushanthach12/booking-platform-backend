@@ -51,8 +51,11 @@ export interface IBookingRepository {
   // Idempotency
   findByIdempotencyKey(idempotencyKey: string): Promise<BookingEntity | null>;
 
-  // Payment intent lookup
+  // Payment lookups
   findByPaymentIntentId(paymentIntentId: string): Promise<BookingEntity | null>;
+  findByPaymentTransactionId(
+    paymentTransactionId: string,
+  ): Promise<BookingEntity | null>;
 
   // Date range queries
   findBookingsInDateRange(

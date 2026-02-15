@@ -14,6 +14,7 @@ import {
   IPaymentService,
   PaymentCustomerDetails,
   PaymentResponse,
+  PaymentStatus,
 } from '../../payments/interfaces/payment.interface';
 import { BookingEntity } from '../entities';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
@@ -429,6 +430,37 @@ export class BookingService {
 
     this.logger.log(`Payment status updated for booking ${bookingId}`);
     return this.mapToResponse(updatedBooking);
+  }
+
+  /**
+   * Called from payment webhook listener (event-based) to avoid circular dependency.
+   * Finds booking by paymentTransactionId and updates payment status.
+   */
+  async syncPaymentStatusFromTransaction(
+    transactionId: string,
+    paymentStatus: string,
+  ): Promise<void> {
+    const booking =
+      await this.bookingRepository.findByPaymentTransactionId(transactionId);
+    if (!booking) {
+      this.logger.debug(
+        `No booking found for payment transaction ${transactionId}, skipping sync`,
+      );
+      return;
+    }
+    const status = this.mapPaymentTransactionStatusToBooking(paymentStatus);
+    await this.updatePaymentStatus(booking.id, status);
+  }
+
+  private mapPaymentTransactionStatusToBooking(
+    status: string,
+  ): BookingPaymentStatus {
+    const upper = status?.toLocaleLowerCase() ?? '';
+    if (upper === PaymentStatus.SUCCESS) return BookingPaymentStatus.SUCCEEDED;
+    if (upper === PaymentStatus.FAILED || upper === PaymentStatus.CANCELLED) {
+      return BookingPaymentStatus.FAILED;
+    }
+    return BookingPaymentStatus.PENDING;
   }
 
   async checkAvailability(

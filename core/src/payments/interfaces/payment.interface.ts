@@ -6,17 +6,17 @@ export interface IPaymentService {
     customerDetails: PaymentCustomerDetails,
     options?: PaymentOptions,
   ): Promise<PaymentResponse>;
-  
+
   getPaymentId(transactionId: string): Promise<string | null>;
-  
+
   getPaymentStatus(transactionId: string): Promise<PaymentStatusResponse>;
-  
+
   handleWebhook(
     gatewayType: PaymentGatewayType,
     payload: any,
     signature: string,
   ): Promise<WebhookResult>;
-  
+
   terminatePayment(transactionId: string): Promise<boolean>;
 }
 
@@ -72,19 +72,28 @@ export enum PaymentGatewayType {
 
 // Payment Status
 export enum PaymentStatus {
-  PENDING = 'PENDING',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED',
-  CANCELLED = 'CANCELLED',
-  REFUNDED = 'REFUNDED',
-  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
+  PENDING = 'pending',
+  SUCCESS = 'success',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled',
+  REFUNDED = 'refunded',
+  PARTIALLY_REFUNDED = 'partially_refunded',
 }
 
 // Gateway-specific interfaces (kept separate as they're implementation details)
 export interface IPaymentGateway {
-  createPayment(orderId: string, amount: number, currency: string, customerDetails: PaymentCustomerDetails, options?: PaymentOptions): Promise<GatewayPaymentResponse>;
+  createPayment(
+    orderId: string,
+    amount: number,
+    currency: string,
+    customerDetails: PaymentCustomerDetails,
+    options?: PaymentOptions,
+  ): Promise<GatewayPaymentResponse>;
   getPaymentStatus(orderId: string): Promise<GatewayStatusResponse>;
-  verifyWebhook(payload: any, signature: string): Promise<WebhookVerificationResult>;
+  verifyWebhook(
+    payload: any,
+    signature: string,
+  ): Promise<WebhookVerificationResult>;
   refundPayment(orderId: string, amount?: number): Promise<RefundResponse>;
   terminatePayment(orderId: string): Promise<boolean>;
 }

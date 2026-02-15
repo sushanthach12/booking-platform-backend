@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BOOKING_REPOSITORY } from '../database';
 import { BookingController } from './controllers';
+import { BookingPaymentEventListener } from './listeners/booking-payment-event.listener';
 import { BookingService } from './services';
 import {
   BookingEntity,
@@ -27,6 +28,7 @@ import { BookingRepository } from './repositories';
   controllers: [BookingController],
   providers: [
     BookingService,
+    BookingPaymentEventListener,
     {
       provide: BOOKING_REPOSITORY,
       useClass: BookingRepository,
