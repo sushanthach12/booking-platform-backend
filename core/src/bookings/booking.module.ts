@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BOOKING_REPOSITORY } from '../database';
 import { PaymentModule } from '../payments/payment.module';
 import { PropertyModule } from '../properties/property.module';
+import { QueuesModule } from '../queues/queues.module';
 import { BookingController } from './controllers';
 import {
   BookingDetailsEntity,
@@ -12,12 +13,12 @@ import {
   SlotReservationEntity,
   WaitlistEntity,
 } from './entities';
-import { BookingPaymentEventListener } from './listeners/booking-payment-event.listener';
 import { BookingRepository } from './repositories';
 import { BookingService } from './services';
 
 @Module({
   imports: [
+    QueuesModule,
     PropertyModule,
     TypeOrmModule.forFeature([
       BookingEntity,
@@ -32,7 +33,6 @@ import { BookingService } from './services';
   controllers: [BookingController],
   providers: [
     BookingService,
-    BookingPaymentEventListener,
     {
       provide: BOOKING_REPOSITORY,
       useClass: BookingRepository,

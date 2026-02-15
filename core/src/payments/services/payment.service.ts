@@ -1,12 +1,11 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
-import {
-  PAYMENT_STATUS_UPDATED,
-  PaymentStatusUpdatedPayload,
-} from '../../common/events/payment.events';
+import { JOB_SYNC_PAYMENT_STATUS } from '../../bookings/booking-jobs/constants';
+import { QUEUE_PAYMENT_STATUS_SYNC } from '../../queues/queues.module';
 import { PaymentTransactionEntity } from '../entities/payment-transaction.entity';
 import { PaymentGatewayFactory } from '../factories/payment-gateway.factory';
 import {
@@ -25,7 +24,8 @@ export class PaymentService implements IPaymentService {
   constructor(
     private readonly paymentGatewayFactory: PaymentGatewayFactory,
     private readonly configService: ConfigService,
-    private readonly eventEmitter: EventEmitter2,
+    @InjectQueue(QUEUE_PAYMENT_STATUS_SYNC)
+    private readonly paymentStatusSyncQueue: Queue,
     @InjectRepository(PaymentTransactionEntity)
     private readonly paymentTransactionRepository: Repository<PaymentTransactionEntity>,
   ) {}
@@ -319,7 +319,9 @@ export class PaymentService implements IPaymentService {
       updatedAt: new Date(),
     });
 
-    const payload: PaymentStatusUpdatedPayload = { transactionId, status };
-    this.eventEmitter.emit(PAYMENT_STATUS_UPDATED, payload);
+    await this.paymentStatusSyncQueue.add(JOB_SYNC_PAYMENT_STATUS, {
+      transactionId,
+      status,
+    });
   }
 }

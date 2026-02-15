@@ -6,10 +6,17 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
 import { randomUUID } from 'crypto';
+import { Queue } from 'bullmq';
 import { DataSource } from 'typeorm';
 import { AvailabilityCache, IRedisService } from '../../common/redis';
 import { BOOKING_REPOSITORY } from '../../database';
+import {
+  JOB_EXPIRE_UNPAID_BOOKING,
+  PAYMENT_TIMEOUT_MS,
+} from '../booking-jobs/constants';
+import { QUEUE_BOOKING_PAYMENT_TIMEOUT } from '../../queues/queues.module';
 import {
   IPaymentService,
   PaymentCustomerDetails,
@@ -42,6 +49,8 @@ export class BookingService {
     private readonly redisService: IRedisService,
     @Inject('IPaymentService')
     private readonly paymentService: IPaymentService,
+    @InjectQueue(QUEUE_BOOKING_PAYMENT_TIMEOUT)
+    private readonly bookingPaymentTimeoutQueue: Queue,
   ) {}
 
   async createBooking(
@@ -205,6 +214,15 @@ export class BookingService {
       const updatedBooking = await this.bookingRepository.update(booking.id, {
         paymentTransactionId: paymentResponse.transactionId,
       });
+
+      await this.bookingPaymentTimeoutQueue.add(
+        JOB_EXPIRE_UNPAID_BOOKING,
+        {
+          bookingId: updatedBooking.id,
+          paymentTransactionId: paymentResponse.transactionId,
+        },
+        { delay: PAYMENT_TIMEOUT_MS },
+      );
 
       this.logger.log(
         `Booking created successfully: ${booking.id} with payment transaction: ${paymentResponse.transactionId}`,
@@ -438,6 +456,39 @@ export class BookingService {
    * Called from payment webhook listener (event-based) to avoid circular dependency.
    * Finds booking by paymentTransactionId and updates payment status.
    */
+  /**
+   * Called from booking-payment-timeout queue processor. Expires the booking if
+   * still PENDING and terminates the payment. No-op if already paid/cancelled.
+   */
+  async expireUnpaidBookingIfStillPending(
+    bookingId: string,
+    paymentTransactionId: string,
+  ): Promise<boolean> {
+    const booking = await this.bookingRepository.findById(bookingId);
+    if (!booking) return false;
+    if (
+      booking.status !== BookingStatus.PENDING ||
+      booking.paymentStatus !== BookingPaymentStatus.PENDING
+    ) {
+      return false;
+    }
+    try {
+      await this.paymentService.terminatePayment(paymentTransactionId);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to terminate payment ${paymentTransactionId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    await this.bookingRepository.update(bookingId, {
+      status: BookingStatus.CANCELLED,
+      paymentStatus: BookingPaymentStatus.FAILED,
+      cancellationReason: 'Payment window expired',
+      cancelledAt: new Date(),
+    });
+    this.logger.log(`Expired unpaid booking ${bookingId}`);
+    return true;
+  }
+
   async syncPaymentStatusFromTransaction(
     transactionId: string,
     paymentStatus: string,
