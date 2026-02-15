@@ -112,6 +112,20 @@ export class PaymentService implements IPaymentService {
     return transaction?.gatewayOrderId ?? null;
   }
 
+  async getPaymentLinkForTransaction(
+    transactionId: string,
+  ): Promise<{ paymentLink?: string; paymentSessionId?: string }> {
+    const transaction =
+      await this.paymentTransactionService.findById(transactionId);
+    if (!transaction) {
+      return {};
+    }
+    return {
+      paymentLink: transaction.paymentLinkId,
+      paymentSessionId: transaction.paymentSessionId,
+    };
+  }
+
   async getPaymentStatus(transactionId: string): Promise<{
     status: string;
     gatewayStatus?: string;

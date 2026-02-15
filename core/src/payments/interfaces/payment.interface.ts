@@ -9,6 +9,10 @@ export interface IPaymentService {
 
   getPaymentId(transactionId: string): Promise<string | null>;
 
+  getPaymentLinkForTransaction(
+    transactionId: string,
+  ): Promise<{ paymentLink?: string; paymentSessionId?: string }>;
+
   getPaymentStatus(transactionId: string): Promise<PaymentStatusResponse>;
 
   handleWebhook(

@@ -72,6 +72,7 @@ export interface IBookingRepository {
     propertyId: string,
     status?: BookingStatus,
   ): Promise<number>;
+  countBookingsCreatedInMonth(year: number, month: number): Promise<number>;
 
   // Pagination
   findWithPagination(

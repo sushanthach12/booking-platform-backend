@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ConflictException,
@@ -6,29 +7,29 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { randomUUID } from 'crypto';
 import { Queue } from 'bullmq';
+import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { AvailabilityCache, IRedisService } from '../../common/redis';
 import { BOOKING_REPOSITORY } from '../../database';
-import {
-  JOB_EXPIRE_UNPAID_BOOKING,
-  PAYMENT_TIMEOUT_MS,
-} from '../booking-jobs/constants';
-import { QUEUE_BOOKING_PAYMENT_TIMEOUT } from '../../queues/queues.module';
 import {
   IPaymentService,
   PaymentCustomerDetails,
   PaymentResponse,
   PaymentStatus,
 } from '../../payments/interfaces/payment.interface';
+import { QUEUE_BOOKING_PAYMENT_TIMEOUT } from '../../queues/queues.module';
+import {
+  JOB_EXPIRE_UNPAID_BOOKING,
+  PAYMENT_TIMEOUT_MS,
+} from '../booking-jobs/constants';
 import { BookingEntity } from '../entities';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
 import {
   AvailabilityResult,
   BookingQueryOptions,
   BookingResponse,
+  CreateBookingApiResponse,
   CreateBookingRequest,
   PaginatedBookings,
 } from '../interfaces/booking.interface';
@@ -57,7 +58,7 @@ export class BookingService {
     createBookingRequest: CreateBookingRequest,
     userId: string,
     hostId: string,
-  ): Promise<BookingResponse> {
+  ): Promise<CreateBookingApiResponse> {
     this.logger.log(
       `Creating booking for property ${createBookingRequest.propertyId} by user ${userId}`,
     );
@@ -70,7 +71,8 @@ export class BookingService {
       this.logger.log(
         `Booking already exists with idempotency key: ${createBookingRequest.idempotencyKey}`,
       );
-      return this.mapToResponse(existingBooking);
+      // Client already has payment link from first response; return empty so they use cached link
+      return this.toCreateBookingApiResponse(existingBooking, '', '');
     }
 
     // Validate dates
@@ -211,8 +213,21 @@ export class BookingService {
       }
 
       // Step 5: Attach payment transaction to booking
-      const updatedBooking = await this.bookingRepository.update(booking.id, {
+      let updatedBooking = await this.bookingRepository.update(booking.id, {
         paymentTransactionId: paymentResponse.transactionId,
+      });
+
+      // Step 6: Generate booking number (BKYYYYMM-NNNN)
+      const created = new Date(updatedBooking.createdAt);
+      const year = created.getFullYear();
+      const month = created.getMonth() + 1;
+      const count = await this.bookingRepository.countBookingsCreatedInMonth(
+        year,
+        month,
+      );
+      const bookingNumber = `BK${year}${String(month).padStart(2, '0')}-${String(count).padStart(4, '0')}`;
+      updatedBooking = await this.bookingRepository.update(updatedBooking.id, {
+        bookingNumber,
       });
 
       await this.bookingPaymentTimeoutQueue.add(
@@ -228,11 +243,11 @@ export class BookingService {
         `Booking created successfully: ${booking.id} with payment transaction: ${paymentResponse.transactionId}`,
       );
 
-      const response = this.mapToResponse(updatedBooking);
-
-      response.paymentTransactionId = paymentResponse.transactionId;
-
-      return response;
+      return this.toCreateBookingApiResponse(
+        updatedBooking,
+        paymentResponse.paymentLink ?? '',
+        paymentResponse.paymentSessionId ?? '',
+      );
     } catch (error) {
       if (paymentResponse) {
         try {
@@ -581,7 +596,25 @@ export class BookingService {
     return Math.ceil(timeDiff / (1000 * 3600 * 24));
   }
 
+  private toCreateBookingApiResponse(
+    booking: BookingEntity,
+    paymentLink = '',
+    paymentSessionId = '',
+  ): CreateBookingApiResponse {
+    return {
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber ?? '',
+      paymentLink,
+      paymentSessionId,
+    };
+  }
+
   private mapToResponse(booking: BookingEntity): BookingResponse {
+    const paymentStatus = booking.paymentStatus as BookingPaymentStatus;
+    const status = booking.status as BookingStatus;
+    const requiresHostConfirmation =
+      paymentStatus === BookingPaymentStatus.SUCCEEDED &&
+      status === BookingStatus.PENDING;
     return {
       id: booking.id,
       propertyId: booking.propertyId,
@@ -593,10 +626,11 @@ export class BookingService {
       numberOfNights: booking.numberOfNights,
       totalPrice: booking.totalPrice,
       currency: booking.currency,
-      status: booking.status as BookingStatus,
-      paymentStatus: booking.paymentStatus as BookingPaymentStatus,
+      status,
+      paymentStatus,
       paymentIntentId: booking.paymentIntentId,
       paymentTransactionId: booking.paymentTransactionId,
+      bookingNumber: booking.bookingNumber,
       specialRequests: booking.specialRequests,
       guestCount: booking.guestCount,
       cancellationReason: booking.cancellationReason,
@@ -605,6 +639,7 @@ export class BookingService {
       completedAt: booking.completedAt,
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
+      requiresHostConfirmation,
     };
   }
 

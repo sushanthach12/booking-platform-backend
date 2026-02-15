@@ -15,6 +15,14 @@ export interface CreateBookingRequest {
   customerPhone?: string;
 }
 
+/** Response shape for POST /bookings (create) only */
+export interface CreateBookingApiResponse {
+  bookingId: string;
+  bookingNumber: string;
+  paymentLink: string;
+  paymentSessionId: string;
+}
+
 export interface BookingResponse {
   id: string;
   propertyId: string;
@@ -30,6 +38,7 @@ export interface BookingResponse {
   paymentStatus: BookingPaymentStatus;
   paymentIntentId?: string;
   paymentTransactionId?: string;
+  bookingNumber?: string;
   specialRequests?: string;
   guestCount: number;
   cancellationReason?: string;
@@ -38,6 +47,8 @@ export interface BookingResponse {
   completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  /** True when payment succeeded but host has not yet confirmed */
+  requiresHostConfirmation: boolean;
 }
 
 export interface BookingQueryOptions {

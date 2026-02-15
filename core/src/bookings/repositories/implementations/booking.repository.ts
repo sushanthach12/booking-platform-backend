@@ -288,6 +288,19 @@ export class BookingRepository implements IBookingRepository {
     return await query.getCount();
   }
 
+  async countBookingsCreatedInMonth(
+    year: number,
+    month: number,
+  ): Promise<number> {
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+    return await this.repository
+      .createQueryBuilder('booking')
+      .where('booking.createdAt >= :start', { start })
+      .andWhere('booking.createdAt < :end', { end })
+      .getCount();
+  }
+
   async findWithPagination(
     options: FindBookingsOptions,
   ): Promise<PaginatedBookingsResult> {

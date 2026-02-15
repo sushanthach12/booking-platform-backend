@@ -19,13 +19,11 @@ import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { PropertyService } from '../../properties/services/property.service';
 import {
-  BookingResponseDto,
   CreateBookingDto,
   CreatePriceAlertDto,
   GetBookingParamsDto,
   GetBookingsQueryDto,
   JoinWaitlistDto,
-  PriceAlertResponseDto,
 } from '../dto';
 import { BookingService } from '../services/booking.service';
 
@@ -52,8 +50,22 @@ export class BookingController {
   @ApiOperation({ summary: 'Create a new booking' })
   @ApiResponse({
     status: 200,
-    description: 'Booking created successfully',
-    type: BookingResponseDto,
+    description: 'Booking created successfully. Returns bookingId, bookingNumber, paymentLink, paymentSessionId.',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            bookingId: { type: 'string', example: '123e4567-e89b-12d3-a456-426614174000' },
+            bookingNumber: { type: 'string', example: 'BK202602-0001' },
+            paymentLink: { type: 'string' },
+            paymentSessionId: { type: 'string' },
+          },
+          required: ['bookingId', 'bookingNumber', 'paymentLink', 'paymentSessionId'],
+        },
+      },
+    },
   })
   async createBooking(
     @Res() res: Response,
@@ -143,8 +155,7 @@ export class BookingController {
   @ApiOperation({ summary: 'Get booking by ID' })
   @ApiResponse({
     status: 200,
-    description: 'Booking retrieved successfully',
-    type: BookingResponseDto,
+    description: 'Booking retrieved successfully. Returns booking per BookingResponse interface.',
   })
   async getBookingById(
     @Param() params: GetBookingParamsDto,
@@ -178,8 +189,7 @@ export class BookingController {
   @ApiOperation({ summary: 'Cancel a booking' })
   @ApiResponse({
     status: 200,
-    description: 'Booking cancelled successfully',
-    type: BookingResponseDto,
+    description: 'Booking cancelled successfully. Returns booking per BookingResponse interface.',
   })
   async cancelBooking(
     @Param() params: GetBookingParamsDto,
@@ -211,8 +221,7 @@ export class BookingController {
   @ApiOperation({ summary: 'Confirm a booking' })
   @ApiResponse({
     status: 200,
-    description: 'Booking confirmed successfully',
-    type: BookingResponseDto,
+    description: 'Booking confirmed successfully. Returns booking per BookingResponse interface.',
   })
   async confirmBooking(
     @Param() params: GetBookingParamsDto,
@@ -310,7 +319,6 @@ export class BookingController {
   @ApiResponse({
     status: 200,
     description: 'Price alert created successfully',
-    type: PriceAlertResponseDto,
   })
   async createPriceAlert(
     @Res() res: Response,
