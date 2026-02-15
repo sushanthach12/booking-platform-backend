@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -12,20 +11,20 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
-import { BookingService } from '../services/booking.service';
 import {
-  CreateBookingDto,
   BookingResponseDto,
-  GetBookingsQueryDto,
-  GetBookingParamsDto,
-  JoinWaitlistDto,
+  CreateBookingDto,
   CreatePriceAlertDto,
+  GetBookingParamsDto,
+  GetBookingsQueryDto,
+  JoinWaitlistDto,
   PriceAlertResponseDto,
 } from '../dto';
+import { BookingService } from '../services/booking.service';
 
 @ApiTags('bookings')
 @Controller('bookings')
@@ -45,7 +44,11 @@ export class BookingController {
   @Post()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Create a new booking' })
-  @ApiResponse({ status: 200, description: 'Booking created successfully', type: BookingResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking created successfully',
+    type: BookingResponseDto,
+  })
   async createBooking(
     @Res() res: Response,
     @CurrentUser() user: RequestUser,
@@ -57,7 +60,11 @@ export class BookingController {
       // TODO: Get hostId from property service
       const hostId = 'temp-host-id'; // This should come from property service
 
-      const response = await this.bookingService.createBooking(body, user.id, hostId);
+      const response = await this.bookingService.createBooking(
+        body,
+        user.id,
+        hostId,
+      );
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -78,7 +85,11 @@ export class BookingController {
     try {
       this.logger.log(`Get bookings request received from user ${user.id}`);
 
-      const response = await this.bookingService.getBookings(user.id, query, false);
+      const response = await this.bookingService.getBookings(
+        user.id,
+        query,
+        false,
+      );
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -90,16 +101,25 @@ export class BookingController {
   @Get('host')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get host bookings' })
-  @ApiResponse({ status: 200, description: 'Host bookings retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Host bookings retrieved successfully',
+  })
   async getHostBookings(
     @Res() res: Response,
     @CurrentUser() user: RequestUser,
     @Query() query: GetBookingsQueryDto,
   ) {
     try {
-      this.logger.log(`Get host bookings request received from user ${user.id}`);
+      this.logger.log(
+        `Get host bookings request received from user ${user.id}`,
+      );
 
-      const response = await this.bookingService.getBookings(user.id, query, true);
+      const response = await this.bookingService.getBookings(
+        user.id,
+        query,
+        true,
+      );
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -111,16 +131,24 @@ export class BookingController {
   @Get(':bookingId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get booking by ID' })
-  @ApiResponse({ status: 200, description: 'Booking retrieved successfully', type: BookingResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking retrieved successfully',
+    type: BookingResponseDto,
+  })
   async getBookingById(
     @Param() params: GetBookingParamsDto,
     @Res() res: Response,
     @CurrentUser() user: RequestUser,
   ) {
     try {
-      this.logger.log(`Get booking request received for booking: ${params.bookingId}`);
+      this.logger.log(
+        `Get booking request received for booking: ${params.bookingId}`,
+      );
 
-      const response = await this.bookingService.getBookingById(params.bookingId);
+      const response = await this.bookingService.getBookingById(
+        params.bookingId,
+      );
 
       // TODO: Add authorization check to ensure user can access this booking
       // User should be either guest or host of the booking
@@ -135,7 +163,11 @@ export class BookingController {
   @Patch(':bookingId/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cancel a booking' })
-  @ApiResponse({ status: 200, description: 'Booking cancelled successfully', type: BookingResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking cancelled successfully',
+    type: BookingResponseDto,
+  })
   async cancelBooking(
     @Param() params: GetBookingParamsDto,
     @Res() res: Response,
@@ -143,7 +175,9 @@ export class BookingController {
     @Body() body: { reason?: string },
   ) {
     try {
-      this.logger.log(`Cancel booking request received for booking: ${params.bookingId}`);
+      this.logger.log(
+        `Cancel booking request received for booking: ${params.bookingId}`,
+      );
 
       const response = await this.bookingService.cancelBooking(
         params.bookingId,
@@ -162,17 +196,25 @@ export class BookingController {
   @Patch(':bookingId/confirm')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Confirm a booking' })
-  @ApiResponse({ status: 200, description: 'Booking confirmed successfully', type: BookingResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking confirmed successfully',
+    type: BookingResponseDto,
+  })
   async confirmBooking(
     @Param() params: GetBookingParamsDto,
     @Res() res: Response,
     @CurrentUser() user: RequestUser,
   ) {
     try {
-      this.logger.log(`Confirm booking request received for booking: ${params.bookingId}`);
+      this.logger.log(
+        `Confirm booking request received for booking: ${params.bookingId}`,
+      );
 
       // TODO: Add authorization check - only host or system can confirm
-      const response = await this.bookingService.confirmBooking(params.bookingId);
+      const response = await this.bookingService.confirmBooking(
+        params.bookingId,
+      );
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -184,17 +226,23 @@ export class BookingController {
   @Post('check-availability')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Check property availability' })
-  @ApiResponse({ status: 200, description: 'Availability checked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Availability checked successfully',
+  })
   async checkAvailability(
     @Res() res: Response,
-    @Body() body: {
+    @Body()
+    body: {
       propertyId: string;
       checkInDate: Date;
       checkOutDate: Date;
     },
   ) {
     try {
-      this.logger.log(`Check availability request received for property: ${body.propertyId}`);
+      this.logger.log(
+        `Check availability request received for property: ${body.propertyId}`,
+      );
 
       const response = await this.bookingService.checkAvailability(
         body.propertyId,
@@ -223,7 +271,9 @@ export class BookingController {
       this.logger.log(`Join waitlist request received from user ${user.id}`);
 
       // TODO: Implement waitlist service
-      const response = { message: 'Waitlist functionality not yet implemented' };
+      const response = {
+        message: 'Waitlist functionality not yet implemented',
+      };
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -236,17 +286,25 @@ export class BookingController {
   @Post('price-alerts')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Create price alert' })
-  @ApiResponse({ status: 200, description: 'Price alert created successfully', type: PriceAlertResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Price alert created successfully',
+    type: PriceAlertResponseDto,
+  })
   async createPriceAlert(
     @Res() res: Response,
     @CurrentUser() user: RequestUser,
     @Body() body: CreatePriceAlertDto,
   ) {
     try {
-      this.logger.log(`Create price alert request received from user ${user.id}`);
+      this.logger.log(
+        `Create price alert request received from user ${user.id}`,
+      );
 
       // TODO: Implement price alert service
-      const response = { message: 'Price alert functionality not yet implemented' };
+      const response = {
+        message: 'Price alert functionality not yet implemented',
+      };
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -258,11 +316,11 @@ export class BookingController {
   @Get('price-alerts')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get user price alerts' })
-  @ApiResponse({ status: 200, description: 'Price alerts retrieved successfully' })
-  async getPriceAlerts(
-    @Res() res: Response,
-    @CurrentUser() user: RequestUser,
-  ) {
+  @ApiResponse({
+    status: 200,
+    description: 'Price alerts retrieved successfully',
+  })
+  async getPriceAlerts(@Res() res: Response, @CurrentUser() user: RequestUser) {
     try {
       this.logger.log(`Get price alerts request received from user ${user.id}`);
 

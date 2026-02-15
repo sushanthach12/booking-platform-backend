@@ -1,21 +1,32 @@
-import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { randomUUID } from 'crypto';
-import { BOOKING_REPOSITORY } from '../../database';
-import { IBookingRepository } from '../repositories';
-import { BookingEntity } from '../entities';
 import {
-  CreateBookingRequest,
-  BookingResponse,
-  BookingQueryOptions,
-  PaginatedBookings,
-  AvailabilityResult,
-  CancelBookingOptions,
-} from '../interfaces/booking.interface';
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { DataSource } from 'typeorm';
+import { AvailabilityCache, IRedisService } from '../../common/redis';
+import { BOOKING_REPOSITORY } from '../../database';
+import {
+  IPaymentService,
+  PaymentCustomerDetails,
+  PaymentResponse,
+} from '../../payments/interfaces/payment.interface';
+import { BookingEntity } from '../entities';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
-import { IRedisService, AvailabilityCache } from '../../common/redis';
-import { PaymentService } from '../../payments/services/payment.service';
-import { IPaymentService, PaymentCustomerDetails, PaymentResponse } from '../../payments/interfaces/payment.interface';
+import {
+  AvailabilityResult,
+  BookingQueryOptions,
+  BookingResponse,
+  CreateBookingRequest,
+  PaginatedBookings,
+} from '../interfaces/booking.interface';
+import { IBookingRepository } from '../repositories';
+
+const PAYMENT_CREATE_TIMEOUT_MS = 15000;
 
 @Injectable()
 export class BookingService {
@@ -35,110 +46,91 @@ export class BookingService {
     userId: string,
     hostId: string,
   ): Promise<BookingResponse> {
-    this.logger.log(`Creating booking for property ${createBookingRequest.propertyId} by user ${userId}`);
+    this.logger.log(
+      `Creating booking for property ${createBookingRequest.propertyId} by user ${userId}`,
+    );
 
     // Check for idempotency first
     const existingBooking = await this.bookingRepository.findByIdempotencyKey(
-      createBookingRequest.idempotencyKey
+      createBookingRequest.idempotencyKey,
     );
     if (existingBooking) {
-      this.logger.log(`Booking already exists with idempotency key: ${createBookingRequest.idempotencyKey}`);
+      this.logger.log(
+        `Booking already exists with idempotency key: ${createBookingRequest.idempotencyKey}`,
+      );
       return this.mapToResponse(existingBooking);
     }
 
     // Validate dates
     if (createBookingRequest.checkInDate >= createBookingRequest.checkOutDate) {
-      throw new BadRequestException('Check-out date must be after check-in date');
+      throw new BadRequestException(
+        'Check-out date must be after check-in date',
+      );
     }
 
     const numberOfNights = this.calculateNights(
       createBookingRequest.checkInDate,
-      createBookingRequest.checkOutDate
+      createBookingRequest.checkOutDate,
     );
 
-    // Step 1: Check availability in Redis cache (fast path)
-    const availabilityCacheKey = `property:${createBookingRequest.propertyId}:availability:${createBookingRequest.checkInDate.toISOString().split('T')[0]}`;
-    const cachedAvailability = await this.redisService.get(availabilityCacheKey);
-    
-    if (cachedAvailability) {
-      const availability: AvailabilityCache = JSON.parse(cachedAvailability);
-      if (!availability.available) {
-        throw new ConflictException('Property is not available for the selected dates');
+    // Step 1: Check availability in Redis cache for full date range (fast path)
+    const datesInRange = this.getDatesInRange(
+      createBookingRequest.checkInDate,
+      createBookingRequest.checkOutDate,
+    );
+
+    const availabilityCacheKeys = datesInRange.map(
+      (d) =>
+        `property:${createBookingRequest.propertyId}:availability:${d.toISOString().split('T')[0]}`,
+    );
+
+    const cachedValues = await this.redisService.getMany(availabilityCacheKeys);
+
+    for (let i = 0; i < cachedValues.length; i++) {
+      const raw = cachedValues[i];
+      if (raw) {
+        const availability: AvailabilityCache = JSON.parse(raw);
+        if (!availability.available) {
+          throw new ConflictException(
+            'Property is not available for the selected dates',
+          );
+        }
       }
     }
 
-    // Step 2: Acquire distributed lock
+    // Step 2: Acquire distributed lock (short hold: overlap check + insert only)
     const lockKey = `lock:property:${createBookingRequest.propertyId}:${createBookingRequest.checkInDate.toISOString().split('T')[0]}:${createBookingRequest.checkOutDate.toISOString().split('T')[0]}`;
-    const lockValue = await this.redisService.acquireLock(lockKey, 30000); // 30 seconds TTL
-    
+    const lockValue = await this.redisService.acquireLock(lockKey, 30000);
+
     if (!lockValue) {
-      throw new ConflictException('Property is currently being booked by another user. Please try again.');
+      throw new ConflictException(
+        'Property is currently being booked by another user. Please try again.',
+      );
     }
 
     let paymentResponse: PaymentResponse | null = null;
+    let createdBookingId: string | null = null;
 
     try {
-      // Step 3: Re-validate availability in database with pessimistic lock
-      const overlappingBookings = await this.bookingRepository.findOverlappingBookings(
-        createBookingRequest.propertyId,
-        createBookingRequest.checkInDate,
-        createBookingRequest.checkOutDate
-      );
+      // Step 3: Transaction with pessimistic lock: overlap check + insert (lock released before payment)
+      const booking = await this.dataSource.transaction(async (manager) => {
+        const overlappingBookings =
+          await this.bookingRepository.findOverlappingBookingsWithLock(
+            manager,
+            createBookingRequest.propertyId,
+            createBookingRequest.checkInDate,
+            createBookingRequest.checkOutDate,
+          );
 
-      if (overlappingBookings.length > 0) {
-        throw new ConflictException('Property is not available for the selected dates');
-      }
-
-      // Step 4: Generate booking ID upfront for payment-first approach
-      const bookingId = randomUUID();
-
-      // Step 5: Create payment first (payment-first approach)
-      const customerDetails: PaymentCustomerDetails = {
-        customerId: userId,
-        email: '', // TODO: Get from user service
-        name: '', // TODO: Get from user service
-        phone: '', // TODO: Get from user service
-      };
-
-      const paymentOptions = {
-        amount: createBookingRequest.expectedTotalPrice || 0,
-        currency: 'USD',
-        bookingId: bookingId, // Use the generated booking ID
-        guestId: userId,
-        propertyId: createBookingRequest.propertyId,
-        metadata: {
-          bookingId: bookingId,
-          propertyId: createBookingRequest.propertyId,
-          guestId: userId,
-          numberOfNights,
-        },
-      };
-
-      try {
-        paymentResponse = await this.paymentService.createPayment(
-          paymentOptions.amount,
-          paymentOptions.currency,
-          customerDetails,
-          paymentOptions,
-        );
-      } catch (error) {
-        this.logger.error(`Failed to create payment: ${error.message}`);
-        throw new BadRequestException('Unable to process payment. Please try again.');
-      }
-
-      if(!paymentResponse) {
-        throw new BadRequestException('Unable to process payment. Please try again.');
-      }
-
-      // Step 6: Create booking in database transaction with payment transaction ID
-      return await this.dataSource.transaction(async (manager) => {
-        if(!paymentResponse) {
-          throw new BadRequestException('Unable to process payment. Please try again.');
+        if (overlappingBookings.length > 0) {
+          throw new ConflictException(
+            'Property is not available for the selected dates',
+          );
         }
 
-        // Create booking record with payment transaction ID and pre-generated ID
+        const bookingId = randomUUID();
         const bookingData: Partial<BookingEntity> = {
-          id: bookingId, // Use the pre-generated booking ID
+          id: bookingId,
           propertyId: createBookingRequest.propertyId,
           guestId: userId,
           hostId: hostId,
@@ -150,70 +142,148 @@ export class BookingService {
           currency: 'USD',
           status: BookingStatus.PENDING,
           paymentStatus: BookingPaymentStatus.PENDING,
-          paymentTransactionId: paymentResponse.transactionId, // Use transaction ID instead of payment intent ID
           idempotencyKey: createBookingRequest.idempotencyKey,
           specialRequests: createBookingRequest.specialRequests,
           guestCount: createBookingRequest.guestCount,
         };
 
-        const booking = manager.create(BookingEntity, bookingData);
-        await manager.save(booking);
+        const entity = manager.create(BookingEntity, bookingData);
 
-        // Step 6: Update payment intent metadata with booking ID
-        // Note: updatePaymentIntentMetadata not implemented in payment service yet
-        // TODO: Implement this when payment service supports metadata updates
-        // try {
-        //   await this.paymentService.updatePaymentIntentMetadata(
-        //     paymentIntent.id,
-        //     {
-        //       ...paymentOptions.metadata,
-        //       bookingId: booking.id,
-        //     }
-        //   );
-        // } catch (error) {
-        //   this.logger.warn(`Failed to update payment intent metadata: ${error.message}`);
-        //   // Non-critical error, continue with booking creation
-        // }
+        await manager.save(entity);
 
-        // Step 7: Update availability calendar atomically
-        // TODO: Implement availability calendar update
-        // await this.availabilityService.blockDates({
-        //   propertyId: createBookingRequest.propertyId,
-        //   checkInDate: createBookingRequest.checkInDate,
-        //   checkOutDate: createBookingRequest.checkOutDate,
-        //   bookingId: booking.id,
-        // });
-
-        this.logger.log(`Booking created successfully: ${booking.id} with payment transaction: ${paymentResponse.transactionId}`);
-        
-        const response = this.mapToResponse(booking);
-        response.paymentTransactionId = paymentResponse.transactionId; // Include payment transaction ID for frontend
-        
-        return response;
+        return entity;
       });
 
+      createdBookingId = booking.id;
+
+      // Step 4: Create payment after releasing lock (with timeout)
+      const customerDetails: PaymentCustomerDetails = {
+        customerId: userId,
+        email: createBookingRequest.customerEmail ?? '',
+        name: createBookingRequest.customerName ?? '',
+        phone: createBookingRequest.customerPhone ?? '',
+      };
+
+      const paymentOptions = {
+        amount: createBookingRequest.expectedTotalPrice || 0,
+        currency: 'INR',
+        bookingId: booking.id,
+        guestId: userId,
+        propertyId: createBookingRequest.propertyId,
+        metadata: {
+          bookingId: booking.id,
+          propertyId: createBookingRequest.propertyId,
+          guestId: userId,
+          numberOfNights,
+        },
+      };
+
+      try {
+        paymentResponse = await this.createPaymentWithTimeout(
+          paymentOptions.amount,
+          paymentOptions.currency,
+          customerDetails,
+          paymentOptions,
+        );
+      } catch (error) {
+        this.logger.error(`Failed to create payment: ${error.message}`);
+        throw new BadRequestException(
+          error.message ?? 'Unable to process payment. Please try again.',
+        );
+      }
+
+      if (!paymentResponse) {
+        throw new BadRequestException(
+          'Unable to process payment. Please try again.',
+        );
+      }
+
+      // Step 5: Attach payment transaction to booking
+      const updatedBooking = await this.bookingRepository.update(booking.id, {
+        paymentTransactionId: paymentResponse.transactionId,
+      });
+
+      this.logger.log(
+        `Booking created successfully: ${booking.id} with payment transaction: ${paymentResponse.transactionId}`,
+      );
+
+      const response = this.mapToResponse(updatedBooking);
+
+      response.paymentTransactionId = paymentResponse.transactionId;
+
+      return response;
     } catch (error) {
-      // If booking creation fails, attempt to cancel the payment intent
       if (paymentResponse) {
         try {
-          await this.paymentService.terminatePayment((paymentResponse as  PaymentResponse)?.transactionId);
-          this.logger.log(`Cancelled payment intent due to booking creation failure`);
+          await this.paymentService.terminatePayment(
+            paymentResponse.transactionId,
+          );
+          this.logger.log(
+            `Cancelled payment intent due to booking creation failure`,
+          );
         } catch (cancelError) {
-          this.logger.error(`Failed to cancel payment intent: ${cancelError.message}`);
+          this.logger.error(
+            `Failed to cancel payment intent: ${cancelError.message}`,
+          );
         }
       }
+
+      if (createdBookingId && !paymentResponse) {
+        try {
+          await this.bookingRepository.update(createdBookingId, {
+            status: BookingStatus.CANCELLED,
+            cancellationReason: 'Payment failed',
+          });
+        } catch (updateError) {
+          this.logger.error(
+            `Failed to mark booking ${createdBookingId} as cancelled: ${updateError.message}`,
+          );
+        }
+      }
+
       throw error;
     } finally {
-      // Step 8: Release lock
       await this.redisService.releaseLock(lockKey, lockValue);
-      
-      // Step 9: Invalidate cache
       await this.invalidateAvailabilityCache(
         createBookingRequest.propertyId,
         createBookingRequest.checkInDate,
-        createBookingRequest.checkOutDate
+        createBookingRequest.checkOutDate,
       );
     }
+  }
+
+  private createPaymentWithTimeout(
+    amount: number,
+    currency: string,
+    customerDetails: PaymentCustomerDetails,
+    options: {
+      amount: number;
+      currency: string;
+      bookingId: string;
+      guestId: string;
+      propertyId: string;
+      metadata: Record<string, unknown>;
+    },
+  ): Promise<PaymentResponse> {
+    return Promise.race([
+      this.paymentService.createPayment(
+        amount,
+        currency,
+        customerDetails,
+        options,
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new BadRequestException(
+                'Payment request timed out. Please try again.',
+              ),
+            ),
+          PAYMENT_CREATE_TIMEOUT_MS,
+        ),
+      ),
+    ]);
   }
 
   async getBookingById(bookingId: string): Promise<BookingResponse> {
@@ -251,7 +321,7 @@ export class BookingService {
     });
 
     return {
-      bookings: result.bookings.map(booking => this.mapToResponse(booking)),
+      bookings: result.bookings.map((booking) => this.mapToResponse(booking)),
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -273,7 +343,9 @@ export class BookingService {
 
     // Check permissions
     if (isHost && booking.hostId !== userId) {
-      throw new BadRequestException('You can only cancel bookings for your properties');
+      throw new BadRequestException(
+        'You can only cancel bookings for your properties',
+      );
     }
     if (!isHost && booking.guestId !== userId) {
       throw new BadRequestException('You can only cancel your own bookings');
@@ -324,7 +396,9 @@ export class BookingService {
     paymentStatus: BookingPaymentStatus,
     paymentIntentId?: string,
   ): Promise<BookingResponse> {
-    this.logger.log(`Updating payment status for booking ${bookingId} to ${paymentStatus}`);
+    this.logger.log(
+      `Updating payment status for booking ${bookingId} to ${paymentStatus}`,
+    );
 
     const booking = await this.bookingRepository.findById(bookingId);
     if (!booking) {
@@ -340,12 +414,18 @@ export class BookingService {
     }
 
     // Auto-confirm booking if payment succeeds
-    if (paymentStatus === BookingPaymentStatus.SUCCEEDED && booking.status === BookingStatus.PENDING) {
+    if (
+      paymentStatus === BookingPaymentStatus.SUCCEEDED &&
+      booking.status === BookingStatus.PENDING
+    ) {
       updateData.status = BookingStatus.CONFIRMED;
       updateData.confirmedAt = new Date();
     }
 
-    const updatedBooking = await this.bookingRepository.update(bookingId, updateData);
+    const updatedBooking = await this.bookingRepository.update(
+      bookingId,
+      updateData,
+    );
 
     this.logger.log(`Payment status updated for booking ${bookingId}`);
     return this.mapToResponse(updatedBooking);
@@ -358,15 +438,16 @@ export class BookingService {
   ): Promise<AvailabilityResult> {
     this.logger.log(`Checking availability for property ${propertyId}`);
 
-    const overlappingBookings = await this.bookingRepository.findOverlappingBookings(
-      propertyId,
-      checkInDate,
-      checkOutDate
-    );
+    const overlappingBookings =
+      await this.bookingRepository.findOverlappingBookings(
+        propertyId,
+        checkInDate,
+        checkOutDate,
+      );
 
     return {
       available: overlappingBookings.length === 0,
-      conflictingBookings: overlappingBookings.map(booking => booking.id),
+      conflictingBookings: overlappingBookings.map((booking) => booking.id),
     };
   }
 
@@ -404,25 +485,25 @@ export class BookingService {
   private async invalidateAvailabilityCache(
     propertyId: string,
     checkInDate: Date,
-    checkOutDate: Date
+    checkOutDate: Date,
   ): Promise<void> {
     const dates = this.getDatesInRange(checkInDate, checkOutDate);
-    
-    for (const date of dates) {
-      const cacheKey = `property:${propertyId}:availability:${date.toISOString().split('T')[0]}`;
-      await this.redisService.del(cacheKey);
-    }
+    const keys = dates.map(
+      (d) =>
+        `property:${propertyId}:availability:${d.toISOString().split('T')[0]}`,
+    );
+    await this.redisService.delMany(keys);
   }
 
   private getDatesInRange(startDate: Date, endDate: Date): Date[] {
     const dates: Date[] = [];
     const currentDate = new Date(startDate);
-    
+
     while (currentDate < endDate) {
       dates.push(new Date(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return dates;
   }
 }

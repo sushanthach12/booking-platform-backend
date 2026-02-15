@@ -9,6 +9,10 @@ export interface CreateBookingRequest {
   specialRequests?: string;
   idempotencyKey: string;
   expectedTotalPrice?: number;
+  /** Pass from controller/auth when available to avoid extra user lookup */
+  customerEmail?: string;
+  customerName?: string;
+  customerPhone?: string;
 }
 
 export interface BookingResponse {

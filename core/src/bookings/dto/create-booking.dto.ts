@@ -91,4 +91,28 @@ export class CreateBookingDto {
   @IsNumber()
   @IsOptional()
   expectedTotalPrice?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Guest email for payment (from auth when available)',
+  })
+  @IsString()
+  @IsOptional()
+  customerEmail?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Guest name for payment (from auth when available)',
+  })
+  @IsString()
+  @IsOptional()
+  customerName?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Guest phone for payment (from auth when available)',
+  })
+  @IsString()
+  @IsOptional()
+  customerPhone?: string;
 }
