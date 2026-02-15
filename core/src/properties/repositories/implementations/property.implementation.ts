@@ -104,6 +104,9 @@ export class PropertyRepository implements IPropertyRepository {
     private readonly propertyPricingRepository: Repository<PropertyPricingEntity>,
     private readonly dataSource: DataSource,
   ) {}
+  getAllPropertySlugs(): Promise<string[]> {
+    throw new Error('Method not implemented.');
+  }
 
   /**
    * Common error handler for database-level errors
@@ -236,6 +239,7 @@ export class PropertyRepository implements IPropertyRepository {
           id: savedProperty.id,
           title: savedProperty.title,
           description: savedProperty.description,
+          slug: savedProperty.slug,
           propertyType: savedProperty.propertyType,
           status: savedProperty.status,
           createdAt: savedProperty.createdAt,
@@ -247,6 +251,7 @@ export class PropertyRepository implements IPropertyRepository {
         id: result.id,
         title: result.title,
         description: result.description,
+        slug: result.slug,
         propertyType: result.propertyType as EPropertyType,
         status: result.status as EPropertyStatus,
         createdAt: result.createdAt,

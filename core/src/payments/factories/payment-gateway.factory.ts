@@ -1,34 +1,34 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IPaymentGateway, PaymentGatewayType } from '../interfaces/payment.interface';
 import { CashfreeGateway } from '../gateways/cashfree.gateway';
+import {
+  IPaymentGateway,
+  PaymentGatewayType,
+} from '../interfaces/payment.interface';
 
 @Injectable()
 export class PaymentGatewayFactory {
   private readonly logger = new Logger(PaymentGatewayFactory.name);
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly cashfreeGateway: CashfreeGateway,
-  ) {}
+  constructor(private readonly configService: ConfigService) {}
 
   createGateway(gatewayType: PaymentGatewayType): IPaymentGateway {
     this.logger.log(`Creating payment gateway: ${gatewayType}`);
 
     switch (gatewayType) {
       case PaymentGatewayType.CASHFREE:
-        return this.cashfreeGateway;
-      
+        return new CashfreeGateway(this.configService);
+
       case PaymentGatewayType.RAZORPAY:
         // TODO: Implement Razorpay gateway
         throw new Error('Razorpay gateway not implemented yet');
-      
+
       case PaymentGatewayType.STRIPE:
         // TODO: Implement Stripe gateway
         throw new Error('Stripe gateway not implemented yet');
-      
+
       default:
-        throw new Error(`Unsupported payment gateway: ${gatewayType}`);
+        throw new Error(`Unsupported payment gateway`);
     }
   }
 

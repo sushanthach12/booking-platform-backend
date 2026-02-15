@@ -7,16 +7,16 @@ import {
   PAYMENT_STATUS_UPDATED,
   PaymentStatusUpdatedPayload,
 } from '../../common/events/payment.events';
+import { PaymentTransactionEntity } from '../entities/payment-transaction.entity';
+import { PaymentGatewayFactory } from '../factories/payment-gateway.factory';
 import {
   IPaymentService,
+  PaymentCustomerDetails,
   PaymentGatewayType,
   PaymentOptions,
-  PaymentCustomerDetails,
   PaymentResponse,
   PaymentStatus,
 } from '../interfaces/payment.interface';
-import { PaymentTransactionEntity } from '../entities/payment-transaction.entity';
-import { PaymentGatewayFactory } from '../factories/payment-gateway.factory';
 
 @Injectable()
 export class PaymentService implements IPaymentService {
@@ -39,18 +39,21 @@ export class PaymentService implements IPaymentService {
     this.logger.log(`Creating payment for amount: ${amount} ${currency}`);
 
     // Generate unique transaction ID
-    const transactionId = await this.generateTransactionId();
-    
+    const transactionId = this.generateTransactionId();
+
     // Create payment transaction record
     const paymentTransaction = this.paymentTransactionRepository.create({
       id: transactionId,
       amount,
       currency,
-      status: 'PENDING',
+      status: PaymentStatus.PENDING,
       bookingId: options?.bookingId,
       guestId: customerDetails.customerId,
       propertyId: options?.propertyId,
-      gatewayType: this.configService.get<string>('DEFAULT_PAYMENT_GATEWAY', PaymentGatewayType.CASHFREE) as PaymentGatewayType,
+      gatewayType: this.configService.get<string>(
+        'DEFAULT_PAYMENT_GATEWAY',
+        PaymentGatewayType.CASHFREE,
+      ) as PaymentGatewayType,
       metadata: options?.metadata,
     });
 
@@ -59,7 +62,7 @@ export class PaymentService implements IPaymentService {
     try {
       // Get the appropriate payment gateway
       const gateway = this.paymentGatewayFactory.getDefaultGateway();
-      
+
       // Create payment with gateway
       const paymentResponse = await gateway.createPayment(
         transactionId,
@@ -71,7 +74,11 @@ export class PaymentService implements IPaymentService {
 
       if (!paymentResponse.success) {
         // Update transaction status to failed
-        await this.updateTransactionStatus(transactionId, 'FAILED', paymentResponse.error);
+        await this.updateTransactionStatus(
+          transactionId,
+          PaymentStatus.FAILED,
+          paymentResponse.error,
+        );
         throw new Error(`Payment creation failed: ${paymentResponse.error}`);
       }
 
@@ -91,14 +98,18 @@ export class PaymentService implements IPaymentService {
       };
     } catch (error) {
       this.logger.error(`Payment creation failed: ${error.message}`);
-      await this.updateTransactionStatus(transactionId, 'FAILED', error.message);
+      await this.updateTransactionStatus(
+        transactionId,
+        PaymentStatus.FAILED,
+        error.message,
+      );
       throw error;
     }
   }
 
   async getPaymentId(transactionId: string): Promise<string | null> {
     this.logger.log(`Getting payment ID for transaction: ${transactionId}`);
-    
+
     const transaction = await this.paymentTransactionRepository.findOne({
       where: { id: transactionId },
     });
@@ -112,7 +123,7 @@ export class PaymentService implements IPaymentService {
     paymentId?: string;
   }> {
     this.logger.log(`Getting payment status for transaction: ${transactionId}`);
-    
+
     const transaction = await this.paymentTransactionRepository.findOne({
       where: { id: transactionId },
     });
@@ -122,7 +133,14 @@ export class PaymentService implements IPaymentService {
     }
 
     // If transaction is already in final state, return cached status
-    if (['SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED'].includes(transaction.status)) {
+    if (
+      [
+        PaymentStatus.SUCCESS,
+        PaymentStatus.FAILED,
+        PaymentStatus.CANCELLED,
+        PaymentStatus.REFUNDED,
+      ].includes(transaction.status as PaymentStatus)
+    ) {
       return {
         status: transaction.status,
         gatewayStatus: transaction.gatewayStatus,
@@ -132,8 +150,12 @@ export class PaymentService implements IPaymentService {
 
     try {
       // Get fresh status from gateway
-      const gateway = this.paymentGatewayFactory.createGateway(transaction.gatewayType);
-      const statusResponse = await gateway.getPaymentStatus(transaction.gatewayOrderId!);
+      const gateway = this.paymentGatewayFactory.createGateway(
+        transaction.gatewayType as PaymentGatewayType,
+      );
+      const statusResponse = await gateway.getPaymentStatus(
+        transaction.gatewayOrderId,
+      );
 
       // Update transaction with latest status
       await this.paymentTransactionRepository.update(transactionId, {
@@ -166,7 +188,10 @@ export class PaymentService implements IPaymentService {
 
     try {
       const gateway = this.paymentGatewayFactory.createGateway(gatewayType);
-      const verificationResult = await gateway.verifyWebhook(payload, signature);
+      const verificationResult = await gateway.verifyWebhook(
+        payload,
+        signature,
+      );
 
       if (!verificationResult.valid) {
         return {
@@ -203,17 +228,16 @@ export class PaymentService implements IPaymentService {
 
   async terminatePayment(transactionId: string): Promise<boolean> {
     this.logger.log(`Terminating payment for transaction: ${transactionId}`);
-    
-    try {
 
+    try {
       if (!transactionId) {
         this.logger.error(`Transaction ID not found: ${transactionId}`);
         return false;
-      }  
+      }
 
       const transaction = await this.paymentTransactionRepository.findOne({
         where: { id: transactionId },
-        select: {id: true, status: true}
+        select: { id: true, status: true },
       });
 
       if (!transaction) {
@@ -223,12 +247,17 @@ export class PaymentService implements IPaymentService {
 
       // Only allow termination of pending payments
       if (transaction.status !== PaymentStatus.PENDING) {
-        this.logger.warn(`Cannot terminate transaction with status: ${transaction.status}`);
+        this.logger.warn(
+          `Cannot terminate transaction with status: ${transaction.status}`,
+        );
         return false;
       }
 
       // Update transaction status to cancelled
-      await this.updateTransactionStatus(transactionId, PaymentStatus.CANCELLED);
+      await this.updateTransactionStatus(
+        transactionId,
+        PaymentStatus.CANCELLED,
+      );
 
       // TODO: Call gateway to cancel payment if needed
       // const gateway = this.paymentGatewayFactory.createGateway(transaction.gatewayType);
@@ -242,7 +271,7 @@ export class PaymentService implements IPaymentService {
     }
   }
 
-  private async generateTransactionId(): Promise<string> {
+  private generateTransactionId(): string {
     // Generate unique transaction ID with prefix
     const prefix = 'txn';
     const timestamp = Date.now();
@@ -264,15 +293,15 @@ export class PaymentService implements IPaymentService {
 
   private mapGatewayStatusToTransactionStatus(gatewayStatus: string): string {
     const statusMap: Record<string, string> = {
-      'PENDING': 'PENDING',
-      'SUCCESS': 'SUCCESS',
-      'FAILED': 'FAILED',
-      'CANCELLED': 'CANCELLED',
-      'REFUNDED': 'REFUNDED',
-      'PARTIALLY_REFUNDED': 'PARTIALLY_REFUNDED',
+      PENDING: PaymentStatus.PENDING,
+      SUCCESS: PaymentStatus.SUCCESS,
+      FAILED: PaymentStatus.FAILED,
+      CANCELLED: PaymentStatus.CANCELLED,
+      REFUNDED: PaymentStatus.REFUNDED,
+      PARTIALLY_REFUNDED: PaymentStatus.PARTIALLY_REFUNDED,
     };
 
-    return statusMap[gatewayStatus] || 'PENDING';
+    return statusMap[gatewayStatus] || PaymentStatus.PENDING;
   }
 
   private async processWebhookUpdate(

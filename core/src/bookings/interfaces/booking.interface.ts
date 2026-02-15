@@ -1,4 +1,4 @@
-import { BookingPaymentStatus, BookingStatus,  } from '../enums';
+import { BookingPaymentStatus, BookingStatus } from '../enums';
 
 export interface CreateBookingRequest {
   propertyId: string;

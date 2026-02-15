@@ -1,5 +1,6 @@
+import { PaymentStatus } from '../../payments/interfaces/payment.interface';
 import { BookingEntity } from '../entities';
-import { BookingStatus, PaymentStatus } from '../enums';
+import { BookingPaymentStatus, BookingStatus } from '../enums';
 
 export interface BaseBookingOptions {
   status?: BookingStatus;
@@ -25,7 +26,7 @@ export interface FindBookingsOptions extends PaginationOptions {
   hostId?: string;
   propertyId?: string;
   status?: BookingStatus;
-  paymentStatus?: PaymentStatus;
+  paymentStatus?: BookingPaymentStatus;
   startDate?: Date;
   endDate?: Date;
 }

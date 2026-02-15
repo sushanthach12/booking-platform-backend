@@ -1,6 +1,14 @@
-import { Controller, Post, Body, Headers, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Post,
+} from '@nestjs/common';
+import { PaymentGatewayType } from '../interfaces/payment.interface';
 import { PaymentService } from '../services/payment.service';
-import { PaymentGatewayType } from '../factories/payment-gateway.factory';
 
 @Controller('payments')
 export class PaymentController {
@@ -15,7 +23,7 @@ export class PaymentController {
     @Headers('x-cashfree-signature') signature: string,
   ) {
     this.logger.log('Received Cashfree webhook');
-    
+
     const result = await this.paymentService.handleWebhook(
       PaymentGatewayType.CASHFREE,
       payload,
@@ -43,7 +51,7 @@ export class PaymentController {
     @Headers('x-razorpay-signature') signature: string,
   ) {
     this.logger.log('Received Razorpay webhook');
-    
+
     const result = await this.paymentService.handleWebhook(
       PaymentGatewayType.RAZORPAY,
       payload,
@@ -71,7 +79,7 @@ export class PaymentController {
     @Headers('stripe-signature') signature: string,
   ) {
     this.logger.log('Received Stripe webhook');
-    
+
     const result = await this.paymentService.handleWebhook(
       PaymentGatewayType.STRIPE,
       payload,

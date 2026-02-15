@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BookingStatus } from '../enums/booking-status.enum';
-import { PaymentStatus } from '../enums/payment-status.enum';
+import {
+  BookingPaymentStatus,
+  BookingStatus,
+} from '../enums/booking-status.enum';
 
 export class BookingResponseDto {
   @ApiProperty({
@@ -62,7 +64,7 @@ export class BookingResponseDto {
   @ApiProperty({
     type: Number,
     description: 'Total price',
-    example: 200.00,
+    example: 200.0,
   })
   totalPrice: number;
 
@@ -84,10 +86,10 @@ export class BookingResponseDto {
   @ApiProperty({
     type: String,
     description: 'Payment status',
-    enum: PaymentStatus,
-    example: PaymentStatus.SUCCEEDED,
+    enum: BookingPaymentStatus,
+    example: BookingPaymentStatus.SUCCEEDED,
   })
-  paymentStatus: PaymentStatus;
+  paymentStatus: BookingPaymentStatus;
 
   @ApiPropertyOptional({
     type: String,

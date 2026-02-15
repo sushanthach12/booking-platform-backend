@@ -1,17 +1,19 @@
-import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
-  IsOptional,
-  IsString,
-  IsUUID,
   IsDateString,
   IsEnum,
   IsInt,
-  Min,
+  IsOptional,
+  IsString,
+  IsUUID,
   Max,
+  Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { BookingStatus } from '../enums/booking-status.enum';
-import { PaymentStatus } from '../enums/payment-status.enum';
+import {
+  BookingPaymentStatus,
+  BookingStatus,
+} from '../enums/booking-status.enum';
 
 export class GetBookingsQueryDto {
   @ApiPropertyOptional({
@@ -36,12 +38,13 @@ export class GetBookingsQueryDto {
   @ApiPropertyOptional({
     type: String,
     description: 'Payment status filter',
-    enum: PaymentStatus,
-    example: PaymentStatus.SUCCEEDED,
+    enum: BookingPaymentStatus,
+    example: BookingPaymentStatus.SUCCEEDED,
   })
-  @IsEnum(PaymentStatus)
+  @IsString()
+  @IsEnum(BookingPaymentStatus)
   @IsOptional()
-  paymentStatus?: PaymentStatus;
+  paymentStatus?: BookingPaymentStatus;
 
   @ApiPropertyOptional({
     type: String,

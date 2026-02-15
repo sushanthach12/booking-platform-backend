@@ -1,5 +1,11 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { PaymentGatewayType } from '../factories/payment-gateway.factory';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { PaymentGatewayType } from '../interfaces/payment.interface';
 
 @Entity('payment_transactions')
 export class PaymentTransactionEntity {
@@ -18,8 +24,11 @@ export class PaymentTransactionEntity {
   @Column({ type: 'varchar', length: 50, nullable: true })
   gatewayStatus: string;
 
-  @Column({ type: 'enum', enum: PaymentGatewayType, default: PaymentGatewayType.CASHFREE })
-  gatewayType: PaymentGatewayType;
+  @Column({
+    type: 'varchar',
+    default: PaymentGatewayType.CASHFREE,
+  })
+  gatewayType: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   gatewayOrderId: string;

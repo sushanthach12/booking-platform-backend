@@ -38,6 +38,7 @@ export class BookingService {
     @Inject(BOOKING_REPOSITORY)
     private readonly bookingRepository: IBookingRepository,
     private readonly dataSource: DataSource,
+    @Inject('IRedisService')
     private readonly redisService: IRedisService,
     @Inject('IPaymentService')
     private readonly paymentService: IPaymentService,

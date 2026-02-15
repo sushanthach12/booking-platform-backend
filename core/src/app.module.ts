@@ -6,11 +6,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app/app.controller';
 import { AppService } from './app/app.service';
 import { AuthModule } from './auth/auth.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { getTypeOrmConfig } from './database';
-import { PropertyModule } from './properties/property.module';
 import { BookingModule } from './bookings/booking.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { RedisModule } from './common/redis';
+import { getTypeOrmConfig } from './database';
 import { PaymentModule } from './payments/payment.module';
+import { PropertyModule } from './properties/property.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { PaymentModule } from './payments/payment.module';
       inject: [ConfigService],
       useFactory: getTypeOrmConfig,
     }),
+    RedisModule,
 
     AuthModule,
     PropertyModule,
