@@ -4,17 +4,23 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Inject,
   Logger,
   Post,
 } from '@nestjs/common';
-import { PaymentGatewayType } from '../interfaces/payment.interface';
-import { PaymentService } from '../services/payment.service';
+import {
+  IPaymentService,
+  PaymentGatewayType,
+} from '../interfaces/payment.interface';
 
 @Controller('payments')
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    @Inject('IPaymentService')
+    private readonly paymentService: IPaymentService,
+  ) {}
 
   @Post('webhook/cashfree')
   @HttpCode(HttpStatus.OK)

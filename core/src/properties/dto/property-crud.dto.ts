@@ -1253,10 +1253,10 @@ export class GetHostPropertiesDto {
     example: 1,
     required: false,
   })
+  @Transform(({ value }) => parseInt(value) || 1)
   @IsOptional()
   @IsNumber()
-  @Min(1)
-  page?: number = 1;
+  page: number;
 
   @ApiProperty({
     type: Number,
@@ -1264,11 +1264,10 @@ export class GetHostPropertiesDto {
     example: 10,
     required: false,
   })
+  @Transform(({ value }) => parseInt(value) || 10)
   @IsOptional()
   @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 10;
+  limit: number;
 
   @ApiProperty({
     enum: EPropertyStatus,
@@ -1277,8 +1276,9 @@ export class GetHostPropertiesDto {
     required: false,
   })
   @IsOptional()
+  @IsString()
   @IsEnum(EPropertyStatus)
-  status?: EPropertyStatus;
+  status: EPropertyStatus;
 
   @ApiProperty({
     enum: EPropertyType,
@@ -1287,8 +1287,9 @@ export class GetHostPropertiesDto {
     required: false,
   })
   @IsOptional()
+  @IsString()
   @IsEnum(EPropertyType)
-  propertyType?: EPropertyType;
+  propertyType: EPropertyType;
 }
 
 export class GetPropertyAnalyticsParamsDto {

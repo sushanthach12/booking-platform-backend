@@ -543,8 +543,6 @@ export class BookingService {
     checkInDate: Date,
     checkOutDate: Date,
   ): Promise<AvailabilityResult> {
-    this.logger.log(`Checking availability for property ${propertyId}`);
-
     const overlappingBookings =
       await this.bookingRepository.findOverlappingBookings(
         propertyId,

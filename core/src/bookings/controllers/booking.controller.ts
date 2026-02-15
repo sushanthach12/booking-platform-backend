@@ -50,19 +50,28 @@ export class BookingController {
   @ApiOperation({ summary: 'Create a new booking' })
   @ApiResponse({
     status: 200,
-    description: 'Booking created successfully. Returns bookingId, bookingNumber, paymentLink, paymentSessionId.',
+    description:
+      'Booking created successfully. Returns bookingId, bookingNumber, paymentLink, paymentSessionId.',
     schema: {
       type: 'object',
       properties: {
         data: {
           type: 'object',
           properties: {
-            bookingId: { type: 'string', example: '123e4567-e89b-12d3-a456-426614174000' },
+            bookingId: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174000',
+            },
             bookingNumber: { type: 'string', example: 'BK202602-0001' },
             paymentLink: { type: 'string' },
             paymentSessionId: { type: 'string' },
           },
-          required: ['bookingId', 'bookingNumber', 'paymentLink', 'paymentSessionId'],
+          required: [
+            'bookingId',
+            'bookingNumber',
+            'paymentLink',
+            'paymentSessionId',
+          ],
         },
       },
     },
@@ -155,7 +164,8 @@ export class BookingController {
   @ApiOperation({ summary: 'Get booking by ID' })
   @ApiResponse({
     status: 200,
-    description: 'Booking retrieved successfully. Returns booking per BookingResponse interface.',
+    description:
+      'Booking retrieved successfully. Returns booking per BookingResponse interface.',
   })
   async getBookingById(
     @Param() params: GetBookingParamsDto,
@@ -189,7 +199,8 @@ export class BookingController {
   @ApiOperation({ summary: 'Cancel a booking' })
   @ApiResponse({
     status: 200,
-    description: 'Booking cancelled successfully. Returns booking per BookingResponse interface.',
+    description:
+      'Booking cancelled successfully. Returns booking per BookingResponse interface.',
   })
   async cancelBooking(
     @Param() params: GetBookingParamsDto,
@@ -221,7 +232,8 @@ export class BookingController {
   @ApiOperation({ summary: 'Confirm a booking' })
   @ApiResponse({
     status: 200,
-    description: 'Booking confirmed successfully. Returns booking per BookingResponse interface.',
+    description:
+      'Booking confirmed successfully. Returns booking per BookingResponse interface.',
   })
   async confirmBooking(
     @Param() params: GetBookingParamsDto,
@@ -269,9 +281,7 @@ export class BookingController {
     },
   ) {
     try {
-      this.logger.log(
-        `Check availability request received for property: ${body.propertyId}`,
-      );
+      this.logger.log(`Check availability request received for property`);
 
       const response = await this.bookingService.checkAvailability(
         body.propertyId,

@@ -6,8 +6,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { timeToMinutes } from '../../common/helpers/time.helper';
 import { SlugHelper } from '../../common/helpers/slug.helper';
+import { timeToMinutes } from '../../common/helpers/time.helper';
 import { parseWithZod } from '../../common/zod';
 import { PROPERTY_REPOSITORY } from '../../database';
 import { EUserRole } from '../../users/enums/user.enum';
@@ -174,9 +174,9 @@ export class PropertyService {
     // Generate unique slug based on title and location
     const baseSlug = SlugHelper.generatePropertySlug(
       payload.details.title,
-      payload.address
+      payload.address,
     );
-    
+
     // Generate unique slug with random ID
     const uniqueSlug = SlugHelper.ensureUniqueSlug(baseSlug);
 

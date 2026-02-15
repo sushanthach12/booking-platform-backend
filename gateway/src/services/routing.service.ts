@@ -56,6 +56,11 @@ export class RoutingService {
       '/api/core/v1/properties/search',
       '/api/core/v1/properties/details',
     ]);
+
+    this.addRoute('/api/core/v1/bookings/*', 'core', 'ALL', [
+      // bookings
+      '/api/core/v1/bookings/check-availability',
+    ]);
   }
 
   private addRoute(
