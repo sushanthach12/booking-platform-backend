@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
   Logger,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -15,6 +17,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
+import { PropertyService } from '../../properties/services/property.service';
 import {
   BookingResponseDto,
   CreateBookingDto,
@@ -31,7 +34,10 @@ import { BookingService } from '../services/booking.service';
 export class BookingController {
   private readonly logger = new Logger(BookingController.name);
 
-  constructor(private readonly bookingService: BookingService) {}
+  constructor(
+    private readonly bookingService: BookingService,
+    private readonly propertyService: PropertyService,
+  ) {}
 
   private handleError(res: Response, error: any) {
     const errorMessage =
@@ -57,8 +63,12 @@ export class BookingController {
     try {
       this.logger.log(`Create booking request received from user ${user.id}`);
 
-      // TODO: Get hostId from property service
-      const hostId = 'temp-host-id'; // This should come from property service
+      const hostId = await this.propertyService.getHostIdByPropertyId(
+        body.propertyId,
+      );
+      if (!hostId) {
+        throw new NotFoundException('Property not found');
+      }
 
       const response = await this.bookingService.createBooking(
         body,
@@ -150,8 +160,11 @@ export class BookingController {
         params.bookingId,
       );
 
-      // TODO: Add authorization check to ensure user can access this booking
-      // User should be either guest or host of the booking
+      const isGuestOrHost =
+        response.guestId === user.id || response.hostId === user.id;
+      if (!isGuestOrHost) {
+        throw new ForbiddenException('You do not have access to this booking');
+      }
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -211,7 +224,14 @@ export class BookingController {
         `Confirm booking request received for booking: ${params.bookingId}`,
       );
 
-      // TODO: Add authorization check - only host or system can confirm
+      const booking = await this.bookingService.getBookingById(
+        params.bookingId,
+      );
+      if (booking.hostId !== user.id) {
+        throw new ForbiddenException(
+          'Only the property host can confirm this booking',
+        );
+      }
       const response = await this.bookingService.confirmBooking(
         params.bookingId,
       );
@@ -271,9 +291,10 @@ export class BookingController {
       this.logger.log(`Join waitlist request received from user ${user.id}`);
 
       // TODO: Implement waitlist service
-      const response = {
+      const response = await Promise.resolve({
         message: 'Waitlist functionality not yet implemented',
-      };
+        body,
+      });
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -302,9 +323,10 @@ export class BookingController {
       );
 
       // TODO: Implement price alert service
-      const response = {
+      const response = await Promise.resolve({
         message: 'Price alert functionality not yet implemented',
-      };
+        body,
+      });
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -325,7 +347,7 @@ export class BookingController {
       this.logger.log(`Get price alerts request received from user ${user.id}`);
 
       // TODO: Implement price alert service
-      const response = { alerts: [], total: 0 };
+      const response = await Promise.resolve({ alerts: [], total: 0 });
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {

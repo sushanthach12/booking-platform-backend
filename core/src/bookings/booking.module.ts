@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BOOKING_REPOSITORY } from '../database';
+import { PropertyModule } from '../properties/property.module';
 import { BookingController } from './controllers';
 import { BookingPaymentEventListener } from './listeners/booking-payment-event.listener';
 import { BookingService } from './services';
@@ -16,6 +17,7 @@ import { BookingRepository } from './repositories';
 
 @Module({
   imports: [
+    PropertyModule,
     TypeOrmModule.forFeature([
       BookingEntity,
       BookingDetailsEntity,

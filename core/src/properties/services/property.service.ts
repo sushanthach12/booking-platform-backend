@@ -42,6 +42,13 @@ export class PropertyService {
     private readonly propertyRepository: IPropertyRepository,
   ) {}
 
+  async getHostIdByPropertyId(propertyId: string): Promise<string | null> {
+    const property = await this.propertyRepository.findPropertyById({
+      id: propertyId,
+    });
+    return property?.hostId ?? null;
+  }
+
   async getProperties(
     data: IGetPropertiesRequestParams,
   ): Promise<IGetPropertiesResponse> {

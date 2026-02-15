@@ -28,6 +28,7 @@ import {
 import { IBookingRepository } from '../repositories';
 
 const PAYMENT_CREATE_TIMEOUT_MS = 15000;
+const AVAILABILITY_CACHE_TTL_MS = 300_000; // 5 minutes
 
 @Injectable()
 export class BookingService {
@@ -477,10 +478,43 @@ export class BookingService {
         checkOutDate,
       );
 
-    return {
-      available: overlappingBookings.length === 0,
+    const available = overlappingBookings.length === 0;
+    const result: AvailabilityResult = {
+      available,
       conflictingBookings: overlappingBookings.map((booking) => booking.id),
     };
+
+    await this.setAvailabilityCache(
+      propertyId,
+      checkInDate,
+      checkOutDate,
+      available,
+    );
+
+    return result;
+  }
+
+  private async setAvailabilityCache(
+    propertyId: string,
+    checkInDate: Date,
+    checkOutDate: Date,
+    available: boolean,
+    price: number = 0,
+  ): Promise<void> {
+    const dates = this.getDatesInRange(checkInDate, checkOutDate);
+    const value: AvailabilityCache = { available, price };
+    const serialized = JSON.stringify(value);
+
+    await Promise.all(
+      dates.map((d) => {
+        const key = `property:${propertyId}:availability:${d.toISOString().split('T')[0]}`;
+        return this.redisService.set(
+          key,
+          serialized,
+          AVAILABILITY_CACHE_TTL_MS,
+        );
+      }),
+    );
   }
 
   private calculateNights(checkInDate: Date, checkOutDate: Date): number {
@@ -503,6 +537,7 @@ export class BookingService {
       status: booking.status as BookingStatus,
       paymentStatus: booking.paymentStatus as BookingPaymentStatus,
       paymentIntentId: booking.paymentIntentId,
+      paymentTransactionId: booking.paymentTransactionId,
       specialRequests: booking.specialRequests,
       guestCount: booking.guestCount,
       cancellationReason: booking.cancellationReason,
