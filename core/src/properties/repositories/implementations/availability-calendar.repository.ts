@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { AvailabilityCalenderEntity } from '../../entities/availablity-calender.entity';
 import {
   IAvailabilityCalendarRepository,
@@ -36,13 +36,17 @@ export class AvailabilityCalendarRepository implements IAvailabilityCalendarRepo
 
   async upsertMany(
     rows: IUpsertAvailabilityParams[],
+    manager?: EntityManager,
   ): Promise<AvailabilityCalenderEntity[]> {
     if (rows.length === 0) return [];
 
+    const repo = manager
+      ? manager.getRepository(AvailabilityCalenderEntity)
+      : this.repository;
     const saved: AvailabilityCalenderEntity[] = [];
 
     for (const row of rows) {
-      const existing = await this.repository.findOne({
+      const existing = await repo.findOne({
         where: {
           propertyId: row.propertyId,
           date: row.date,
@@ -55,6 +59,7 @@ export class AvailabilityCalendarRepository implements IAvailabilityCalendarRepo
         roomId: row.roomId,
         date: row.date,
         available: row.available,
+        bookingId: row.bookingId ?? null,
         price: row.price ?? null,
         minNights: row.minNights ?? null,
         maxNights: row.maxNights ?? null,
@@ -64,10 +69,10 @@ export class AvailabilityCalendarRepository implements IAvailabilityCalendarRepo
 
       if (existing) {
         Object.assign(existing, payload);
-        saved.push(await this.repository.save(existing));
+        saved.push(await repo.save(existing));
       } else {
-        const created = this.repository.create(payload);
-        saved.push(await this.repository.save(created));
+        const created = repo.create(payload);
+        saved.push(await repo.save(created));
       }
     }
 

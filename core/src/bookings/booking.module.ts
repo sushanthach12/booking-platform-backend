@@ -14,7 +14,7 @@ import {
   WaitlistEntity,
 } from './entities';
 import { BookingRepository } from './repositories';
-import { BookingService } from './services';
+import { BookingDetailsService, BookingService } from './services';
 
 @Module({
   imports: [
@@ -33,11 +33,12 @@ import { BookingService } from './services';
   controllers: [BookingController],
   providers: [
     BookingService,
+    BookingDetailsService,
     {
       provide: BOOKING_REPOSITORY,
       useClass: BookingRepository,
     },
   ],
-  exports: [BookingService],
+  exports: [BookingService, BookingDetailsService],
 })
 export class BookingModule {}

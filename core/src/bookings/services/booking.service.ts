@@ -11,15 +11,23 @@ import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { AvailabilityCache, IRedisService } from '../../common/redis';
-import { BOOKING_REPOSITORY } from '../../database';
+import {
+  AVAILABILITY_CALENDAR_REPOSITORY,
+  BOOKING_REPOSITORY,
+} from '../../database';
+import { IAvailabilityCalendarRepository } from '../../properties/repositories/interfaces/availability-calendar.repository.interface';
 import {
   IPaymentService,
   PaymentCustomerDetails,
   PaymentResponse,
   PaymentStatus,
 } from '../../payments/interfaces/payment.interface';
-import { QUEUE_BOOKING_PAYMENT_TIMEOUT } from '../../queues/queues.module';
 import {
+  QUEUE_BOOKING_DETAILS,
+  QUEUE_BOOKING_PAYMENT_TIMEOUT,
+} from '../../queues/queues.module';
+import {
+  JOB_CREATE_BOOKING_DETAILS,
   JOB_EXPIRE_UNPAID_BOOKING,
   PAYMENT_TIMEOUT_MS,
 } from '../booking-jobs/constants';
@@ -52,6 +60,10 @@ export class BookingService {
     private readonly paymentService: IPaymentService,
     @InjectQueue(QUEUE_BOOKING_PAYMENT_TIMEOUT)
     private readonly bookingPaymentTimeoutQueue: Queue,
+    @InjectQueue(QUEUE_BOOKING_DETAILS)
+    private readonly bookingDetailsQueue: Queue,
+    @Inject(AVAILABILITY_CALENDAR_REPOSITORY)
+    private readonly availabilityCalendarRepository: IAvailabilityCalendarRepository,
   ) {}
 
   async createBooking(
@@ -112,6 +124,31 @@ export class BookingService {
       }
     }
 
+    // Check availability calendar: reject if any date in range is explicitly blocked
+    const calendarRows = await this.availabilityCalendarRepository.findByRange({
+      propertyId: createBookingRequest.propertyId,
+      roomId: createBookingRequest.roomId ?? null,
+      startDate: createBookingRequest.checkInDate,
+      endDate: createBookingRequest.checkOutDate,
+    });
+    const calendarByDate = new Map<string, { available: boolean }>(
+      calendarRows.map((r) => [
+        r.date instanceof Date
+          ? r.date.toISOString().split('T')[0]
+          : String(r.date).split('T')[0],
+        { available: r.available },
+      ]),
+    );
+    for (const d of datesInRange) {
+      const key = d.toISOString().split('T')[0];
+      const row = calendarByDate.get(key);
+      if (row && !row.available) {
+        throw new ConflictException(
+          'Property is not available for the selected dates',
+        );
+      }
+    }
+
     // Step 2: Acquire distributed lock (short hold: overlap check + insert only)
     const lockKey = `lock:property:${createBookingRequest.propertyId}:${createBookingRequest.checkInDate.toISOString().split('T')[0]}:${createBookingRequest.checkOutDate.toISOString().split('T')[0]}`;
     const lockValue = await this.redisService.acquireLock(lockKey, 30000);
@@ -164,6 +201,19 @@ export class BookingService {
         const entity = manager.create(BookingEntity, bookingData);
 
         await manager.save(entity);
+
+        // Block dates in availability calendar for this booking (same transaction)
+        const availabilityRows = datesInRange.map((date) => ({
+          propertyId: createBookingRequest.propertyId,
+          roomId: createBookingRequest.roomId ?? null,
+          date: new Date(date),
+          available: false,
+          bookingId: entity.id,
+        }));
+        await this.availabilityCalendarRepository.upsertMany(
+          availabilityRows,
+          manager,
+        );
 
         return entity;
       });
@@ -238,6 +288,14 @@ export class BookingService {
         },
         { delay: PAYMENT_TIMEOUT_MS },
       );
+
+      this.bookingDetailsQueue
+        .add(JOB_CREATE_BOOKING_DETAILS, { bookingId: updatedBooking.id })
+        .catch((err) =>
+          this.logger.warn(
+            `Failed to enqueue booking details job: ${err?.message ?? err}`,
+          ),
+        );
 
       this.logger.log(
         `Booking created successfully: ${booking.id} with payment transaction: ${paymentResponse.transactionId}`,

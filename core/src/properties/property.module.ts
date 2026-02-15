@@ -73,6 +73,6 @@ import { PropertyService } from './services/property.service';
       useClass: AvailabilityCalendarRepository,
     },
   ],
-  exports: [PropertyService],
+  exports: [PropertyService, AVAILABILITY_CALENDAR_REPOSITORY],
 })
 export class PropertyModule {}

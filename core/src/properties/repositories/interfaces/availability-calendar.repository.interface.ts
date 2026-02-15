@@ -1,3 +1,4 @@
+import { EntityManager } from 'typeorm';
 import { AvailabilityCalenderEntity } from '../../entities/availablity-calender.entity';
 
 export interface IFindAvailabilityByRangeParams {
@@ -12,6 +13,7 @@ export interface IUpsertAvailabilityParams {
   roomId: string | null;
   date: Date;
   available: boolean;
+  bookingId?: string | null;
   price?: number | null;
   minNights?: number | null;
   maxNights?: number | null;
@@ -26,5 +28,6 @@ export interface IAvailabilityCalendarRepository {
 
   upsertMany(
     rows: IUpsertAvailabilityParams[],
+    manager?: EntityManager,
   ): Promise<AvailabilityCalenderEntity[]>;
 }
