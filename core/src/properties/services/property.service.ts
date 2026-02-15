@@ -313,13 +313,10 @@ export class PropertyService {
   ): Promise<{ updated: number }> {
     const { user, params: p, payload } = params;
 
-    console.log({ user, p });
-
     const property = await this.propertyRepository.findPropertyById({
       id: p.propertyId,
     });
 
-    console.log({ property });
     if (!property) {
       throw new NotFoundException('Property not found');
     }
