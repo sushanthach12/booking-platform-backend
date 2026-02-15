@@ -1,3 +1,4 @@
+export * from './availablity-calender.entity';
 export * from './property.entity';
 export * from './amenity.entity';
 export * from './property-location.entity';

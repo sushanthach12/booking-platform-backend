@@ -15,6 +15,18 @@ import {
 } from 'class-validator';
 import { EPropertyStatus, EPropertyType } from '../enums/property.enum';
 
+export class PropertyQueryDto {
+  @ApiProperty({
+    type: String,
+    description: 'Property ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  propertyId: string;
+}
+
 // Property CRUD DTOs
 export class GetPropertyDetailsQueryDto {
   @ApiProperty({
@@ -645,6 +657,49 @@ export class RoomParamsDto {
 }
 
 // Availability Management DTOs
+export class GetPropertyAvailabilityQueryDto {
+  @ApiProperty({
+    type: String,
+    description: 'Property ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  propertyId: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Start date (YYYY-MM-DD format)',
+    example: '2024-01-01',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  startDate: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'End date (YYYY-MM-DD format)',
+    example: '2024-01-07',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  endDate: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Room ID (optional, for specific room availability)',
+    example: '456e7890-e89b-12d3-a456-426614174001',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @IsOptional()
+  roomId?: string;
+}
+
 export class GetPropertyAvailabilityParamsDto {
   @ApiProperty({
     type: String,
@@ -1292,7 +1347,7 @@ export class GetHostPropertiesDto {
   propertyType: EPropertyType;
 }
 
-export class GetPropertyAnalyticsParamsDto {
+export class GetPropertyAnalyticsQueryDto {
   @ApiProperty({
     type: String,
     description: 'Property ID',

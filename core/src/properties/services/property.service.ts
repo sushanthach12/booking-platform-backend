@@ -6,13 +6,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import moment from 'moment';
 import { SlugHelper } from '../../common/helpers/slug.helper';
 import { timeToMinutes } from '../../common/helpers/time.helper';
 import { parseWithZod } from '../../common/zod';
-import { PROPERTY_REPOSITORY } from '../../database';
+import {
+  AVAILABILITY_CALENDAR_REPOSITORY,
+  PROPERTY_REPOSITORY,
+} from '../../database';
 import { EUserRole } from '../../users/enums/user.enum';
 import { EPropertyStatus, EPropertyType } from '../enums/property.enum';
 import {
+  IBulkUpdateAvailabilityRequestParams,
   ICreatePropertyAvailabilityRequestParams,
   ICreatePropertyAvailabilityResponse,
   ICreatePropertyRequestParams,
@@ -23,23 +28,32 @@ import {
   IGetPropertiesResponse,
   IGetPropertyAnalyticsRequestParams,
   IGetPropertyAnalyticsResponse,
+  IGetPropertyAvailabilityRequestParams,
+  IGetPropertyAvailabilityResponse,
   IGetPropertyDetailsRequestParams,
   IGetPropertyDetailsResponse,
   INearbyPropertiesRequestParams,
   ISearchPropertiesRequestParams,
+  IUpdatePropertyAvailabilityRequestParams,
   IUpdatePropertyRequestParams,
   IUpdatePropertyResponse,
   IUpdatePropertyStatusRequestParams,
   IUpdatePropertyStatusResponse,
 } from '../interfaces/property.interface';
+import {
+  IAvailabilityCalendarRepository,
+  IUpsertAvailabilityParams,
+} from '../repositories/interfaces/availability-calendar.repository.interface';
 import { IPropertyRepository } from '../repositories/interfaces/property-repository.interfaces';
-import { CreatePropertyRequestSchema } from '../validations/schema/create.property.schema';
+import { CreatePropertyRequestSchema } from '../validations/schema';
 
 @Injectable()
 export class PropertyService {
   constructor(
     @Inject(PROPERTY_REPOSITORY)
     private readonly propertyRepository: IPropertyRepository,
+    @Inject(AVAILABILITY_CALENDAR_REPOSITORY)
+    private readonly availabilityCalendarRepository: IAvailabilityCalendarRepository,
   ) {}
 
   async getHostIdByPropertyId(propertyId: string): Promise<string | null> {
@@ -221,6 +235,184 @@ export class PropertyService {
     });
   }
 
+  async getPropertyAvailability(
+    params: IGetPropertyAvailabilityRequestParams,
+  ): Promise<IGetPropertyAvailabilityResponse> {
+    const { user, params: p } = params;
+
+    const property = await this.propertyRepository.findPropertyById({
+      id: p.propertyId,
+    });
+
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    if (property.hostId !== user.id) {
+      throw new ForbiddenException('You do not have access to this property');
+    }
+
+    const startDate = moment
+      .utc(p.startDate, 'YYYY-MM-DD')
+      .startOf('day')
+      .toDate();
+    const endDate = moment.utc(p.endDate, 'YYYY-MM-DD').startOf('day').toDate();
+
+    if (startDate > endDate) {
+      throw new BadRequestException(
+        'startDate must be before or equal to endDate',
+      );
+    }
+
+    const roomId = p.roomId ?? null;
+    const rows = await this.availabilityCalendarRepository.findByRange({
+      propertyId: p.propertyId,
+      roomId,
+      startDate,
+      endDate,
+    });
+
+    const toDateKey = (d: Date | string): string =>
+      d instanceof Date
+        ? moment.utc(d).format('YYYY-MM-DD')
+        : moment.utc(d).format('YYYY-MM-DD');
+
+    const byDate = new Map(
+      rows.map((r) => [
+        toDateKey(r.date),
+        {
+          date: toDateKey(r.date),
+          available: r.available,
+          price: r.price != null ? Number(r.price) : null,
+          minNights: r.minNights ?? null,
+          maxNights: r.maxNights ?? null,
+          note: r.note ?? null,
+          blockReason: r.blockReason ?? null,
+        },
+      ]),
+    );
+
+    const items = this.getDatesInRangeInclusive(startDate, endDate).map((d) => {
+      const key = moment.utc(d).format('YYYY-MM-DD');
+
+      // default to true if not found
+      return byDate.get(key) ?? { date: key, available: true };
+    });
+
+    return {
+      propertyId: p.propertyId,
+      roomId: p.roomId ?? undefined,
+      startDate: p.startDate,
+      endDate: p.endDate,
+      items,
+    };
+  }
+
+  async bulkUpdateAvailability(
+    params: IBulkUpdateAvailabilityRequestParams,
+  ): Promise<{ updated: number }> {
+    const { user, params: p, payload } = params;
+
+    console.log({ user, p });
+
+    const property = await this.propertyRepository.findPropertyById({
+      id: p.propertyId,
+    });
+
+    console.log({ property });
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    if (property.hostId !== user.id) {
+      throw new ForbiddenException('You do not have access to this property');
+    }
+
+    if (!payload.updates?.length) {
+      throw new BadRequestException('updates array must not be empty');
+    }
+
+    const rows: IUpsertAvailabilityParams[] = payload.updates.map((u) => ({
+      propertyId: p.propertyId,
+      roomId: u.roomId ?? null,
+      date: moment.utc(u.date, 'YYYY-MM-DD').startOf('day').toDate(),
+      available: u.available,
+      price: u.price ?? null,
+      minNights: u.minNights ?? null,
+      maxNights: u.maxNights ?? null,
+      note: u.note ?? null,
+      blockReason: u.blockReason ?? null,
+    }));
+
+    const saved = await this.availabilityCalendarRepository.upsertMany(rows);
+
+    return { updated: saved.length };
+  }
+
+  async updateAvailabilityRange(
+    params: IUpdatePropertyAvailabilityRequestParams,
+  ): Promise<{ updated: number }> {
+    const { user, params: p, payload } = params;
+
+    const property = await this.propertyRepository.findPropertyById({
+      id: p.propertyId,
+    });
+
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+    if (property.hostId !== user.id) {
+      throw new ForbiddenException('You do not have access to this property');
+    }
+
+    const startDate = moment
+      .utc(payload.startDate, 'YYYY-MM-DD')
+      .startOf('day')
+      .toDate();
+    const endDate = moment
+      .utc(payload.endDate, 'YYYY-MM-DD')
+      .endOf('day')
+      .toDate();
+
+    if (startDate > endDate) {
+      throw new BadRequestException(
+        'startDate must be before or equal to endDate',
+      );
+    }
+
+    const roomId = payload.roomId ?? null;
+    const dates = this.getDatesInRangeInclusive(startDate, endDate);
+
+    const rows: IUpsertAvailabilityParams[] = dates.map((date) => ({
+      propertyId: p.propertyId,
+      roomId,
+      date,
+      available: payload.available,
+      price: payload.price ?? null,
+      minNights: payload.minNights ?? null,
+      maxNights: payload.maxNights ?? null,
+      note: payload.note ?? null,
+      blockReason: payload.blockReason ?? null,
+    }));
+
+    const saved = await this.availabilityCalendarRepository.upsertMany(rows);
+
+    return { updated: saved.length };
+  }
+
+  private getDatesInRangeInclusive(start: Date, end: Date): Date[] {
+    const out: Date[] = [];
+    let cur = moment.utc(start).startOf('day').toDate();
+    const endNorm = moment.utc(end).startOf('day').toDate();
+
+    while (cur <= endNorm) {
+      out.push(moment.utc(cur).toDate());
+      cur = moment.utc(cur).add(1, 'day').toDate();
+    }
+
+    return out;
+  }
+
   // New CRUD Methods
   async getPropertyDetails(
     params: IGetPropertyDetailsRequestParams,
@@ -233,6 +425,7 @@ export class PropertyService {
     const property = await this.propertyRepository.findPropertyById({
       id: propertyId,
     });
+
     if (!property) {
       throw new NotFoundException('Property not found');
     }

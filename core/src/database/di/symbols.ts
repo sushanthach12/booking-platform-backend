@@ -6,3 +6,6 @@ export const BOOKING_REPOSITORY = Symbol('IBookingRepository');
 export const PAYMENT_TRANSACTION_REPOSITORY = Symbol(
   'IPaymentTransactionRepository',
 );
+export const AVAILABILITY_CALENDAR_REPOSITORY = Symbol(
+  'IAvailabilityCalendarRepository',
+);

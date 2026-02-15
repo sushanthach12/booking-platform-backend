@@ -156,7 +156,7 @@ export class AuthService {
     // Parallel token generation for better performance
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        expiresIn: '15m', // Short-lived access token
+        expiresIn: '30m', // Short-lived access token
       }),
       this.jwtService.signAsync(payload, {
         expiresIn: '7d', // Longer-lived refresh token
@@ -166,7 +166,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: 15 * 60, // 15 minutes in seconds
+      expiresIn: 30 * 60, // 30 minutes in seconds
     };
   }
   /**

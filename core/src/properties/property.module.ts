@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
+  AVAILABILITY_CALENDAR_REPOSITORY,
   PROPERTY_AMENITY_REPOSITORY,
   PROPERTY_IMAGE_REPOSITORY,
   PROPERTY_REPOSITORY,
@@ -9,6 +10,7 @@ import { PropertyAmenityController } from './controllers/property-amenity.contro
 import { PropertyImageController } from './controllers/property-image.controller';
 import { PropertyController } from './controllers/property.controller';
 import {
+  AvailabilityCalenderEntity,
   Amenity,
   HouseRuleEntity,
   PropertyAmenityEntity,
@@ -21,7 +23,7 @@ import {
   PropertyRatingEntity,
   RoomEntity,
 } from './entities';
-import { PropertyRepository } from './repositories';
+import { AvailabilityCalendarRepository, PropertyRepository } from './repositories';
 import { PropertyAmenityRepository } from './repositories/implementations/property-amenity.repository';
 import { PropertyImageRepository } from './repositories/implementations/property-image.repository';
 import { PropertyAmenityService } from './services/property-amenity.service';
@@ -32,6 +34,7 @@ import { PropertyService } from './services/property.service';
   imports: [
     TypeOrmModule.forFeature([
       PropertyEntity,
+      AvailabilityCalenderEntity,
       Amenity,
       PropertyLocationEntity,
       PropertyAmenityEntity,
@@ -64,6 +67,10 @@ import { PropertyService } from './services/property.service';
     {
       provide: PROPERTY_AMENITY_REPOSITORY,
       useClass: PropertyAmenityRepository,
+    },
+    {
+      provide: AVAILABILITY_CALENDAR_REPOSITORY,
+      useClass: AvailabilityCalendarRepository,
     },
   ],
   exports: [PropertyService],

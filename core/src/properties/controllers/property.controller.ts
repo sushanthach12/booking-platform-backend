@@ -6,7 +6,6 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
-  Param,
   Patch,
   Post,
   Query,
@@ -18,11 +17,15 @@ import { RequestUser } from '../../common/types/users.types';
 import { CreatePropertyDto } from '../dto/create-property.dto';
 import { PropertyListingDto } from '../dto/listing.dto';
 import {
+  BulkUpdateAvailabilityDto,
   GetHostPropertiesDto,
-  GetPropertyAnalyticsParamsDto,
+  GetPropertyAnalyticsQueryDto,
+  GetPropertyAvailabilityQueryDto,
   GetPropertyDetailsQueryDto,
   NearbyPropertiesDto,
+  PropertyQueryDto,
   SearchPropertiesDto,
+  UpdatePropertyAvailabilityDto,
   UpdatePropertyDto,
   UpdatePropertyStatusDto,
 } from '../dto/property-crud.dto';
@@ -104,22 +107,20 @@ export class PropertyController {
     }
   }
 
-  @Patch(':id')
+  @Patch('details')
   @HttpCode(HttpStatus.OK)
   async updateProperty(
-    @Param('id') propertyId: string,
+    @Query() query: PropertyQueryDto,
     @CurrentUser() user: RequestUser,
     @Body() body: UpdatePropertyDto,
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(
-        `Update property request received for property: ${propertyId}`,
-      );
+      this.logger.log(`Update property request received for property`);
 
       const response = await this.propertyService.updateProperty({
         user,
-        params: { propertyId },
+        params: query,
         payload: body,
       });
 
@@ -130,21 +131,19 @@ export class PropertyController {
     }
   }
 
-  @Delete(':id')
+  @Delete()
   @HttpCode(HttpStatus.OK)
   async deleteProperty(
-    @Param('id') propertyId: string,
+    @Query() query: PropertyQueryDto,
     @CurrentUser() user: RequestUser,
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(
-        `Delete property request received for property: ${propertyId}`,
-      );
+      this.logger.log(`Delete property request received for property`);
 
       await this.propertyService.deleteProperty({
         user,
-        params: { propertyId },
+        params: query,
       });
 
       return res
@@ -156,22 +155,20 @@ export class PropertyController {
     }
   }
 
-  @Patch(':id/status')
+  @Patch('status')
   @HttpCode(HttpStatus.OK)
   async updatePropertyStatus(
-    @Param('id') propertyId: string,
+    @Query() query: PropertyQueryDto,
     @CurrentUser() user: RequestUser,
     @Body() body: UpdatePropertyStatusDto,
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(
-        `Update property status request received for property: ${propertyId}`,
-      );
+      this.logger.log(`Update property status request received for property`);
 
       const response = await this.propertyService.updatePropertyStatus({
         user,
-        params: { propertyId },
+        params: query,
         payload: body,
       });
 
@@ -244,31 +241,112 @@ export class PropertyController {
     }
   }
 
-  @Get(':id/analytics')
+  @Get('analytics')
   @HttpCode(HttpStatus.OK)
   async getPropertyAnalytics(
-    @Param() params: GetPropertyAnalyticsParamsDto,
+    @Query() query: GetPropertyAnalyticsQueryDto,
     @CurrentUser() user: RequestUser,
-    @Query() query: { startDate?: string; endDate?: string },
     @Res() res: Response,
   ) {
     try {
-      this.logger.log(
-        `Get property analytics request received for property: ${params.propertyId}`,
-      );
+      this.logger.log(`Get property analytics request received for property`);
 
       const response = await this.propertyService.getPropertyAnalytics({
         user,
-        params: {
-          propertyId: params.propertyId,
-          startDate: query.startDate,
-          endDate: query.endDate,
-        },
+        params: query,
       });
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
       this.logger.error(`Error getting property analytics:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Get('availability')
+  @HttpCode(HttpStatus.OK)
+  async getPropertyAvailability(
+    @CurrentUser() user: RequestUser,
+    @Query() query: GetPropertyAvailabilityQueryDto,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Get property availability request for property`);
+
+      const response = await this.propertyService.getPropertyAvailability({
+        user,
+        params: query,
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(`Error getting property availability:`, error.message);
+      return this.handleError(res, error);
+    }
+  }
+
+  @Patch('availability/bulk')
+  @HttpCode(HttpStatus.OK)
+  async bulkUpdatePropertyAvailability(
+    @CurrentUser() user: RequestUser,
+    @Body() body: BulkUpdateAvailabilityDto,
+    @Query() query: PropertyQueryDto,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(`Bulk update property availability request for property`);
+
+      const response = await this.propertyService.bulkUpdateAvailability({
+        user,
+        params: query,
+        payload: { updates: body.updates },
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(
+        `Error bulk updating property availability:`,
+        error.message,
+      );
+      return this.handleError(res, error);
+    }
+  }
+
+  @Patch('availability/range')
+  @HttpCode(HttpStatus.OK)
+  async updatePropertyAvailabilityRange(
+    @Query() query: PropertyQueryDto,
+    @CurrentUser() user: RequestUser,
+    @Body() body: UpdatePropertyAvailabilityDto,
+    @Res() res: Response,
+  ) {
+    try {
+      this.logger.log(
+        `Range update property availability request for property`,
+      );
+
+      const response = await this.propertyService.updateAvailabilityRange({
+        user,
+        params: query,
+        payload: {
+          startDate: body.startDate,
+          endDate: body.endDate,
+          roomId: body.roomId,
+          available: body.available,
+          price: body.price,
+          minNights: body.minNights,
+          maxNights: body.maxNights,
+          note: body.note,
+          blockReason: body.blockReason,
+        },
+      });
+
+      return res.status(HttpStatus.OK).json({ data: response });
+    } catch (error) {
+      this.logger.error(
+        `Error range updating property availability:`,
+        error.message,
+      );
       return this.handleError(res, error);
     }
   }

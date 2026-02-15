@@ -347,6 +347,22 @@ export interface IGetPropertyAvailabilityRequestParams {
   };
 }
 
+export interface IGetPropertyAvailabilityResponse {
+  propertyId: string;
+  roomId?: string | null;
+  startDate: string;
+  endDate: string;
+  items: {
+    date: string;
+    available: boolean;
+    price?: number | null;
+    minNights?: number | null;
+    maxNights?: number | null;
+    note?: string | null;
+    blockReason?: string | null;
+  }[];
+}
+
 export interface IUpdatePropertyAvailabilityRequestParams {
   user: RequestUser;
   params: {
