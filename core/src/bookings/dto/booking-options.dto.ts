@@ -1,10 +1,9 @@
-import { PaymentStatus } from '../../payments/interfaces/payment.interface';
 import { BookingEntity } from '../entities';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
 
 export interface BaseBookingOptions {
   status?: BookingStatus;
-  paymentStatus?: PaymentStatus;
+  paymentStatus?: BookingPaymentStatus;
   limit?: number;
   offset?: number;
 }

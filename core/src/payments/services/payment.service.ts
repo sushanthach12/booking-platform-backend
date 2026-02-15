@@ -139,6 +139,7 @@ export class PaymentService implements IPaymentService {
         PaymentStatus.FAILED,
         PaymentStatus.CANCELLED,
         PaymentStatus.REFUNDED,
+        PaymentStatus.PARTIALLY_REFUNDED,
       ].includes(transaction.status as PaymentStatus)
     ) {
       return {
@@ -293,15 +294,15 @@ export class PaymentService implements IPaymentService {
 
   private mapGatewayStatusToTransactionStatus(gatewayStatus: string): string {
     const statusMap: Record<string, string> = {
-      PENDING: PaymentStatus.PENDING,
-      SUCCESS: PaymentStatus.SUCCESS,
-      FAILED: PaymentStatus.FAILED,
-      CANCELLED: PaymentStatus.CANCELLED,
-      REFUNDED: PaymentStatus.REFUNDED,
-      PARTIALLY_REFUNDED: PaymentStatus.PARTIALLY_REFUNDED,
+      pending: PaymentStatus.PENDING,
+      success: PaymentStatus.SUCCESS,
+      failed: PaymentStatus.FAILED,
+      cancelled: PaymentStatus.CANCELLED,
+      refunded: PaymentStatus.REFUNDED,
+      partially_refunded: PaymentStatus.PARTIALLY_REFUNDED,
     };
-
-    return statusMap[gatewayStatus] || PaymentStatus.PENDING;
+    const key = String(gatewayStatus ?? '').toLowerCase();
+    return statusMap[key] ?? PaymentStatus.PENDING;
   }
 
   private async processWebhookUpdate(

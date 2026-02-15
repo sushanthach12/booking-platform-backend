@@ -5,7 +5,10 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { PaymentGatewayType } from '../interfaces/payment.interface';
+import {
+  PaymentGatewayType,
+  PaymentStatus,
+} from '../interfaces/payment.interface';
 
 @Entity('payment_transactions')
 export class PaymentTransactionEntity {
@@ -18,7 +21,11 @@ export class PaymentTransactionEntity {
   @Column({ type: 'varchar', length: 3, default: 'INR' })
   currency: string;
 
-  @Column({ type: 'varchar', length: 50, default: 'PENDING' })
+  @Column({
+    type: 'varchar',
+    length: 50,
+    default: PaymentStatus.PENDING,
+  })
   status: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })

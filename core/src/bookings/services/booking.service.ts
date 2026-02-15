@@ -457,9 +457,16 @@ export class BookingService {
   private mapPaymentTransactionStatusToBooking(
     status: string,
   ): BookingPaymentStatus {
-    const upper = status?.toLocaleLowerCase() ?? '';
-    if (upper === PaymentStatus.SUCCESS) return BookingPaymentStatus.SUCCEEDED;
-    if (upper === PaymentStatus.FAILED || upper === PaymentStatus.CANCELLED) {
+    const normalized = String(status ?? '').toLowerCase();
+    if (normalized === PaymentStatus.SUCCESS) {
+      return BookingPaymentStatus.SUCCEEDED;
+    }
+    if (
+      normalized === PaymentStatus.FAILED ||
+      normalized === PaymentStatus.CANCELLED ||
+      normalized === PaymentStatus.REFUNDED ||
+      normalized === PaymentStatus.PARTIALLY_REFUNDED
+    ) {
       return BookingPaymentStatus.FAILED;
     }
     return BookingPaymentStatus.PENDING;
