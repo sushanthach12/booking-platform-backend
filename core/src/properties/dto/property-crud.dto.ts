@@ -13,6 +13,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { ECurrency } from '../../common/enums/currency.enum';
 import { EPropertyStatus, EPropertyType } from '../enums/property.enum';
 
 export class PropertyQueryDto {
@@ -993,12 +994,12 @@ export class UpdatePropertyPricingDto {
   @ApiProperty({
     type: String,
     description: 'Currency code',
-    example: 'USD',
+    example: ECurrency.INR,
     required: false,
   })
   @IsOptional()
   @IsString()
-  currency?: string = 'USD';
+  currency?: string = ECurrency.INR;
 
   @ApiProperty({
     type: Number,

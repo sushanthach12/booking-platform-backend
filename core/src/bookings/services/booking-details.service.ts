@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
+import { ECurrency } from '../../common/enums/currency.enum';
 import { BOOKING_REPOSITORY } from '../../database';
 import { PropertyService } from '../../properties/services/property.service';
 import { BookingDetailsEntity } from '../entities';
@@ -93,7 +94,7 @@ export class BookingDetailsService {
       taxes: undefined,
       discountAmount: undefined,
       totalPrice,
-      currency: booking.currency ?? 'USD',
+      currency: booking.currency ?? ECurrency.INR,
       cancellationPolicy: cancellationPolicy as Record<string, any>,
       houseRules: undefined,
     } as DeepPartial<BookingDetailsEntity>;

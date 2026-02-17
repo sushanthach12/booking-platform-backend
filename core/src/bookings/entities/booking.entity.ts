@@ -1,14 +1,16 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
+  Entity,
   Index,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { BookingPaymentStatus, BookingStatus } from '../enums/booking-status.enum';
+import { ECurrency } from '../../common/enums/currency.enum';
+import {
+  BookingPaymentStatus,
+  BookingStatus,
+} from '../enums/booking-status.enum';
 
 @Entity('bookings')
 @Index(['propertyId', 'checkInDate', 'checkOutDate'])
@@ -43,7 +45,12 @@ export class BookingEntity {
   @Column({ name: 'total_price', type: 'decimal', precision: 10, scale: 2 })
   totalPrice: number;
 
-  @Column({ name: 'currency', type: 'varchar', length: 3, default: 'USD' })
+  @Column({
+    name: 'currency',
+    type: 'varchar',
+    length: 3,
+    default: ECurrency.INR,
+  })
   currency: string;
 
   @Column({

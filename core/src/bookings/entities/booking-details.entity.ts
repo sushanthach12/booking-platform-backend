@@ -1,13 +1,14 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
+  Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+import { ECurrency } from '../../common/enums/currency.enum';
 import { BookingEntity } from './booking.entity';
 
 @Entity('booking_details')
@@ -42,22 +43,51 @@ export class BookingDetailsEntity {
   @Column({ name: 'base_price', type: 'decimal', precision: 10, scale: 2 })
   basePrice: number;
 
-  @Column({ name: 'cleaning_fee', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'cleaning_fee',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   cleaningFee?: number;
 
-  @Column({ name: 'service_fee', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'service_fee',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   serviceFee?: number;
 
-  @Column({ name: 'taxes', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'taxes',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   taxes?: number;
 
-  @Column({ name: 'discount_amount', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'discount_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   discountAmount?: number;
 
   @Column({ name: 'total_price', type: 'decimal', precision: 10, scale: 2 })
   totalPrice: number;
 
-  @Column({ name: 'currency', type: 'varchar', length: 3, default: 'USD' })
+  @Column({
+    name: 'currency',
+    type: 'varchar',
+    length: 3,
+    default: ECurrency.INR,
+  })
   currency: string;
 
   // Cancellation policy snapshot

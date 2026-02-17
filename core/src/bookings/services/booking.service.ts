@@ -10,18 +10,19 @@ import {
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
+import { ECurrency } from '../../common/enums/currency.enum';
 import { AvailabilityCache, IRedisService } from '../../common/redis';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,
   BOOKING_REPOSITORY,
 } from '../../database';
-import { IAvailabilityCalendarRepository } from '../../properties/repositories/interfaces/availability-calendar.repository.interface';
 import {
   IPaymentService,
   PaymentCustomerDetails,
   PaymentResponse,
   PaymentStatus,
 } from '../../payments/interfaces/payment.interface';
+import { IAvailabilityCalendarRepository } from '../../properties/repositories/interfaces/availability-calendar.repository.interface';
 import {
   QUEUE_BOOKING_DETAILS,
   QUEUE_BOOKING_PAYMENT_TIMEOUT,
@@ -190,7 +191,7 @@ export class BookingService {
           checkOutDate: createBookingRequest.checkOutDate,
           numberOfNights,
           totalPrice: createBookingRequest.expectedTotalPrice || 0,
-          currency: 'USD',
+          currency: ECurrency.INR,
           status: BookingStatus.PENDING,
           paymentStatus: BookingPaymentStatus.PENDING,
           idempotencyKey: createBookingRequest.idempotencyKey,
@@ -230,7 +231,7 @@ export class BookingService {
 
       const paymentOptions = {
         amount: createBookingRequest.expectedTotalPrice || 0,
-        currency: 'INR',
+        currency: ECurrency.INR,
         bookingId: booking.id,
         guestId: userId,
         propertyId: createBookingRequest.propertyId,

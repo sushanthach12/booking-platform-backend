@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ECurrency } from '../../common/enums/currency.enum';
 import { PropertyEntity } from './property.entity';
 
 @Entity('property_pricing')
@@ -22,7 +23,7 @@ export class PropertyPricingEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2, name: 'base_price' })
   basePrice: number;
 
-  @Column({ type: 'varchar', length: 3, default: 'USD' })
+  @Column({ type: 'varchar', length: 3, default: ECurrency.INR })
   currency: string;
 
   @Column({

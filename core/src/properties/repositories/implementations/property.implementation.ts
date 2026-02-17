@@ -7,6 +7,7 @@ import {
   QueryFailedError,
   Repository,
 } from 'typeorm';
+import { ECurrency } from '../../../common/enums/currency.enum';
 import { Amenity } from '../../entities/amenity.entity';
 import { HouseRuleEntity } from '../../entities/house-rules.entity';
 import { PropertyAmenityEntity } from '../../entities/property-amenity.entity';
@@ -1277,7 +1278,7 @@ export class PropertyRepository implements IPropertyRepository {
       const pricing = this.propertyPricingRepository.create({
         propertyId: params.propertyId,
         basePrice: params.basePrice,
-        currency: params.currency ?? 'USD',
+        currency: params.currency ?? ECurrency.INR,
         cleaningFee: params.cleaningFee ?? 0,
         serviceFeePercentage: params.serviceFeePercentage ?? 10.0,
       });
