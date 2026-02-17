@@ -7,7 +7,7 @@ import {
   PaginatedBookingsResult,
   PropertyBookingOptions,
 } from '../../dto/booking-options.dto';
-import { BookingEntity } from '../../entities';
+import { BookingDetailsEntity, BookingEntity } from '../../entities';
 import { BookingStatus } from '../../enums';
 import { IBookingRepository } from '../interfaces/booking.repository.interface';
 
@@ -16,6 +16,8 @@ export class BookingRepository implements IBookingRepository {
   constructor(
     @InjectRepository(BookingEntity)
     private readonly repository: Repository<BookingEntity>,
+    @InjectRepository(BookingDetailsEntity)
+    private readonly bookingDetailsRepository: Repository<BookingDetailsEntity>,
   ) {}
 
   async create(booking: Partial<BookingEntity>): Promise<BookingEntity> {
@@ -367,5 +369,13 @@ export class BookingRepository implements IBookingRepository {
       page: options.page,
       limit: options.limit,
     };
+  }
+
+  async findBookingDetailsByBookingId(
+    bookingId: string,
+  ): Promise<BookingDetailsEntity | null> {
+    return await this.bookingDetailsRepository.findOne({
+      where: { bookingId },
+    });
   }
 }

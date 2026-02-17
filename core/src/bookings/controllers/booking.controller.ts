@@ -164,7 +164,7 @@ export class BookingController {
   @ApiResponse({
     status: 200,
     description:
-      'Booking retrieved successfully. Returns booking per BookingResponse interface.',
+      'Booking retrieved successfully. Returns booking details with property and host information per IGetBookingDetailsResponse interface.',
   })
   async getBookingDetails(
     @Query() query: GetBookingQueryDto,

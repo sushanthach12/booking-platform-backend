@@ -5,7 +5,7 @@ import {
   PaginatedBookingsResult,
   PropertyBookingOptions,
 } from '../../dto/booking-options.dto';
-import { BookingEntity } from '../../entities';
+import { BookingDetailsEntity, BookingEntity } from '../../entities';
 import { BookingStatus } from '../../enums';
 
 export interface IBookingRepository {
@@ -78,4 +78,9 @@ export interface IBookingRepository {
   findWithPagination(
     options: FindBookingsOptions,
   ): Promise<PaginatedBookingsResult>;
+
+  // Booking details
+  findBookingDetailsByBookingId(
+    bookingId: string,
+  ): Promise<BookingDetailsEntity | null>;
 }

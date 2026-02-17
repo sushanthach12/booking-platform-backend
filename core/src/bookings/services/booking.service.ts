@@ -28,6 +28,7 @@ import {
   QUEUE_BOOKING_DETAILS,
   QUEUE_BOOKING_PAYMENT_TIMEOUT,
 } from '../../queues/queues.module';
+import { UserService } from '../../users/services/user.service';
 import {
   JOB_CREATE_BOOKING_DETAILS,
   JOB_EXPIRE_UNPAID_BOOKING,
@@ -43,6 +44,7 @@ import {
   CreateBookingRequest,
   IConfirmBookingParams,
   IGetBookingDetailsParams,
+  IGetBookingDetailsResponse,
   PaginatedBookings,
 } from '../interfaces/booking.interface';
 import { IBookingRepository } from '../repositories';
@@ -68,6 +70,7 @@ export class BookingService {
     private readonly bookingDetailsQueue: Queue,
     @Inject(AVAILABILITY_CALENDAR_REPOSITORY)
     private readonly availabilityCalendarRepository: IAvailabilityCalendarRepository,
+    private readonly userService: UserService,
   ) {}
 
   async createBooking(
@@ -386,7 +389,7 @@ export class BookingService {
 
   async getBookingDetails(
     data: IGetBookingDetailsParams,
-  ): Promise<BookingResponse> {
+  ): Promise<IGetBookingDetailsResponse> {
     const { query, user } = data;
 
     const booking = await this.bookingRepository.findById(query.bookingId);
@@ -403,7 +406,122 @@ export class BookingService {
       );
     }
 
-    return this.mapToResponse(booking);
+    // Fetch booking details snapshot (property details at time of booking)
+    const bookingDetails =
+      await this.bookingRepository.findBookingDetailsByBookingId(booking.id);
+
+    // Fetch host and guest details
+    const [hostProfile, guestProfile] = await Promise.all([
+      this.userService.getProfile(booking.hostId),
+      this.userService.getProfile(booking.guestId),
+    ]);
+
+    // Map booking data (excluding payment links/IDs)
+    const paymentStatus = booking.paymentStatus as BookingPaymentStatus;
+    const status = booking.status as BookingStatus;
+    const requiresHostConfirmation =
+      paymentStatus === BookingPaymentStatus.SUCCEEDED &&
+      status === BookingStatus.PENDING;
+
+    const response: IGetBookingDetailsResponse = {
+      booking: {
+        id: booking.id,
+        bookingNumber: booking.bookingNumber,
+        checkInDate: booking.checkInDate,
+        checkOutDate: booking.checkOutDate,
+        numberOfNights: booking.numberOfNights,
+        totalPrice: booking.totalPrice,
+        currency: booking.currency,
+        status,
+        paymentStatus,
+        specialRequests: booking.specialRequests,
+        guestCount: booking.guestCount,
+        cancellationReason: booking.cancellationReason,
+        cancelledAt: booking.cancelledAt,
+        confirmedAt: booking.confirmedAt,
+        completedAt: booking.completedAt,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+        requiresHostConfirmation,
+      },
+      property: bookingDetails
+        ? {
+            id: booking.propertyId,
+            title: bookingDetails.propertyTitle,
+            description: bookingDetails.propertyDescription || null,
+            location: bookingDetails.propertyAddress
+              ? {
+                  addressLine1: bookingDetails.propertyAddress.addressLine1,
+                  addressLine2: bookingDetails.propertyAddress.addressLine2,
+                  city: bookingDetails.propertyAddress.city,
+                  state: bookingDetails.propertyAddress.state,
+                  country: bookingDetails.propertyAddress.country,
+                  postalCode: bookingDetails.propertyAddress.postalCode,
+                  latitude: bookingDetails.propertyAddress.latitude,
+                  longitude: bookingDetails.propertyAddress.longitude,
+                }
+              : undefined,
+            pricing: {
+              basePrice: Number(bookingDetails.basePrice),
+              currency: bookingDetails.currency,
+              cleaningFee: bookingDetails.cleaningFee
+                ? Number(bookingDetails.cleaningFee)
+                : 0,
+              serviceFee: bookingDetails.serviceFee
+                ? Number(bookingDetails.serviceFee)
+                : 0,
+            },
+            images: bookingDetails.propertyImages?.map((url, index) => ({
+              url,
+              displayOrder: index,
+              isPrimary: index === 0,
+            })),
+            amenities: bookingDetails.propertyAmenities,
+            room: bookingDetails.roomDetails
+              ? {
+                  name: bookingDetails.roomDetails.name,
+                  description: bookingDetails.roomDetails.description,
+                  roomType: bookingDetails.roomDetails.roomType,
+                  beds: bookingDetails.roomDetails.beds,
+                  bedType: bookingDetails.roomDetails.bedType,
+                  maxGuests: bookingDetails.roomDetails.maxGuests,
+                  basePrice: bookingDetails.roomDetails.basePrice,
+                  isPrivate: bookingDetails.roomDetails.isPrivate,
+                  hasBathroom: bookingDetails.roomDetails.hasBathroom,
+                  hasBalcony: bookingDetails.roomDetails.hasBalcony,
+                  floorNumber: bookingDetails.roomDetails.floorNumber,
+                  squareMeters: bookingDetails.roomDetails.squareMeters,
+                }
+              : undefined,
+            cancellationPolicy: bookingDetails.cancellationPolicy,
+            houseRules: bookingDetails.houseRules,
+          }
+        : {
+            id: booking.propertyId,
+            title: 'Property',
+            description: null,
+            pricing: {
+              basePrice: Number(booking.totalPrice),
+              currency: booking.currency,
+              cleaningFee: 0,
+              serviceFee: 0,
+            },
+          },
+      host: {
+        id: hostProfile.id,
+        name: hostProfile.name,
+        email: hostProfile.email,
+        phone: hostProfile.phone,
+      },
+      guest: {
+        id: guestProfile.id,
+        name: guestProfile.name,
+        email: guestProfile.email,
+        phone: guestProfile.phone,
+      },
+    };
+
+    return response;
   }
 
   async getBookings(

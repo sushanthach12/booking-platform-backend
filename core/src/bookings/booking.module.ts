@@ -4,6 +4,7 @@ import { BOOKING_REPOSITORY } from '../database';
 import { PaymentModule } from '../payments/payment.module';
 import { PropertyModule } from '../properties/property.module';
 import { QueuesModule } from '../queues/queues.module';
+import { UserModule } from '../users/user.module';
 import { BookingController } from './controllers';
 import {
   BookingDetailsEntity,
@@ -20,6 +21,7 @@ import { BookingDetailsService, BookingService } from './services';
   imports: [
     QueuesModule,
     PropertyModule,
+    UserModule,
     TypeOrmModule.forFeature([
       BookingEntity,
       BookingDetailsEntity,

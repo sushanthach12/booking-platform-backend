@@ -20,4 +20,5 @@ export interface IGetProfileResponse {
   email: string;
   name: string;
   role: EUserRole;
+  phone?: string;
 }
