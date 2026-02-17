@@ -2,6 +2,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -40,6 +41,8 @@ import {
   BookingResponse,
   CreateBookingApiResponse,
   CreateBookingRequest,
+  IConfirmBookingParams,
+  IGetBookingDetailsParams,
   PaginatedBookings,
 } from '../interfaces/booking.interface';
 import { IBookingRepository } from '../repositories';
@@ -381,12 +384,23 @@ export class BookingService {
     ]);
   }
 
-  async getBookingById(bookingId: string): Promise<BookingResponse> {
-    this.logger.log(`Getting booking by ID: ${bookingId}`);
+  async getBookingDetails(
+    data: IGetBookingDetailsParams,
+  ): Promise<BookingResponse> {
+    const { query, user } = data;
 
-    const booking = await this.bookingRepository.findById(bookingId);
+    const booking = await this.bookingRepository.findById(query.bookingId);
+
     if (!booking) {
-      throw new NotFoundException(`Booking with ID ${bookingId} not found`);
+      throw new NotFoundException(
+        `Booking with ID ${query.bookingId} not found`,
+      );
+    }
+
+    if (booking.guestId !== user.id && booking.hostId !== user.id) {
+      throw new ForbiddenException(
+        'You are not authorized to access this booking',
+      );
     }
 
     return this.mapToResponse(booking);
@@ -465,24 +479,35 @@ export class BookingService {
     return this.mapToResponse(updatedBooking);
   }
 
-  async confirmBooking(bookingId: string): Promise<BookingResponse> {
-    this.logger.log(`Confirming booking ${bookingId}`);
+  async confirmBooking(data: IConfirmBookingParams): Promise<BookingResponse> {
+    const { query, user } = data;
 
-    const booking = await this.bookingRepository.findByIdWithLock(bookingId);
+    const booking = await this.bookingRepository.findByIdWithLock(
+      query.bookingId,
+    );
+
     if (!booking) {
-      throw new NotFoundException(`Booking with ID ${bookingId} not found`);
+      throw new NotFoundException(`Booking not found`);
+    }
+
+    if (booking.hostId !== user.id) {
+      throw new ForbiddenException(
+        'You are not authorized to confirm this booking',
+      );
     }
 
     if (booking.status !== BookingStatus.PENDING) {
       throw new BadRequestException('Only pending bookings can be confirmed');
     }
 
-    const updatedBooking = await this.bookingRepository.update(bookingId, {
-      status: BookingStatus.CONFIRMED,
-      confirmedAt: new Date(),
-    });
+    const updatedBooking = await this.bookingRepository.update(
+      query.bookingId,
+      {
+        status: BookingStatus.CONFIRMED,
+        confirmedAt: new Date(),
+      },
+    );
 
-    this.logger.log(`Booking ${bookingId} confirmed successfully`);
     return this.mapToResponse(updatedBooking);
   }
 

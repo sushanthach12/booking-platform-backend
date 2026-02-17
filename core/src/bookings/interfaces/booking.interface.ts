@@ -1,3 +1,4 @@
+import { RequestUser } from '../../common/types/users.types';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
 
 export interface CreateBookingRequest {
@@ -78,4 +79,18 @@ export interface AvailabilityResult {
 export interface CancelBookingOptions {
   reason?: string;
   isHost?: boolean;
+}
+
+export interface IGetBookingDetailsParams {
+  query: {
+    bookingId: string;
+  };
+  user: RequestUser;
+}
+
+export interface IConfirmBookingParams {
+  query: {
+    bookingId: string;
+  };
+  user: RequestUser;
 }

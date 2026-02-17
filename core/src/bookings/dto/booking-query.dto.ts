@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -109,12 +110,13 @@ export class GetBookingsQueryDto {
   sortOrder?: 'asc' | 'desc' = 'desc';
 }
 
-export class GetBookingParamsDto {
+export class GetBookingQueryDto {
   @ApiProperty({
     type: String,
     description: 'Booking ID',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   bookingId: string;
 }

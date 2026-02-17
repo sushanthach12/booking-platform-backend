@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -21,7 +20,7 @@ import { PropertyService } from '../../properties/services/property.service';
 import {
   CreateBookingDto,
   CreatePriceAlertDto,
-  GetBookingParamsDto,
+  GetBookingQueryDto,
   GetBookingsQueryDto,
   JoinWaitlistDto,
 } from '../dto';
@@ -159,7 +158,7 @@ export class BookingController {
     }
   }
 
-  @Get(':bookingId')
+  @Get('details')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get booking by ID' })
   @ApiResponse({
@@ -167,25 +166,18 @@ export class BookingController {
     description:
       'Booking retrieved successfully. Returns booking per BookingResponse interface.',
   })
-  async getBookingById(
-    @Param() params: GetBookingParamsDto,
+  async getBookingDetails(
+    @Query() query: GetBookingQueryDto,
     @Res() res: Response,
     @CurrentUser() user: RequestUser,
   ) {
     try {
-      this.logger.log(
-        `Get booking request received for booking: ${params.bookingId}`,
-      );
+      this.logger.log(`Get booking request received for booking`);
 
-      const response = await this.bookingService.getBookingById(
-        params.bookingId,
-      );
-
-      const isGuestOrHost =
-        response.guestId === user.id || response.hostId === user.id;
-      if (!isGuestOrHost) {
-        throw new ForbiddenException('You do not have access to this booking');
-      }
+      const response = await this.bookingService.getBookingDetails({
+        query,
+        user,
+      });
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
@@ -203,7 +195,7 @@ export class BookingController {
       'Booking cancelled successfully. Returns booking per BookingResponse interface.',
   })
   async cancelBooking(
-    @Param() params: GetBookingParamsDto,
+    @Param() params: GetBookingQueryDto,
     @Res() res: Response,
     @CurrentUser() user: RequestUser,
     @Body() body: { reason?: string },
@@ -236,7 +228,7 @@ export class BookingController {
       'Booking confirmed successfully. Returns booking per BookingResponse interface.',
   })
   async confirmBooking(
-    @Param() params: GetBookingParamsDto,
+    @Param() params: GetBookingQueryDto,
     @Res() res: Response,
     @CurrentUser() user: RequestUser,
   ) {
@@ -245,17 +237,10 @@ export class BookingController {
         `Confirm booking request received for booking: ${params.bookingId}`,
       );
 
-      const booking = await this.bookingService.getBookingById(
-        params.bookingId,
-      );
-      if (booking.hostId !== user.id) {
-        throw new ForbiddenException(
-          'Only the property host can confirm this booking',
-        );
-      }
-      const response = await this.bookingService.confirmBooking(
-        params.bookingId,
-      );
+      const response = await this.bookingService.confirmBooking({
+        query: params,
+        user,
+      });
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {
