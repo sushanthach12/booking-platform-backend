@@ -108,6 +108,17 @@ export interface IConfirmBookingParams {
   user: RequestUser;
 }
 
+/** Financial summary in get booking details response. */
+export interface IBookingDetailsSummary {
+  subtotal: number;
+  totalFees: number;
+  taxRate: number;
+  taxAmount: number;
+  totalDiscount: number;
+  grandTotal: number;
+  currency: string;
+}
+
 export interface IGetBookingDetailsResponse {
   booking: {
     id: string;
@@ -115,7 +126,6 @@ export interface IGetBookingDetailsResponse {
     checkInDate: Date;
     checkOutDate: Date;
     numberOfNights: number;
-    totalPrice: number;
     currency: string;
     status: BookingStatus;
     paymentStatus: BookingPaymentStatus;
@@ -129,6 +139,7 @@ export interface IGetBookingDetailsResponse {
     updatedAt: Date;
     requiresHostConfirmation: boolean;
   };
+  summary: IBookingDetailsSummary;
   property: {
     id: string;
     title: string;
@@ -142,12 +153,6 @@ export interface IGetBookingDetailsResponse {
       postalCode?: string;
       latitude?: number;
       longitude?: number;
-    };
-    pricing: {
-      basePrice: number;
-      currency: string;
-      cleaningFee: number;
-      serviceFee: number;
     };
     images?: Array<{
       url: string;

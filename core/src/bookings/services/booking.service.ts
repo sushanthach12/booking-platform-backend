@@ -38,7 +38,6 @@ import {
 } from '../booking-jobs/constants';
 import { BookingEntity } from '../entities';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
-import { BookingPriceItemType } from '../enums/booking-price-item.enum';
 import {
   AvailabilityResult,
   BookingQueryOptions,
@@ -433,14 +432,11 @@ export class BookingService {
       );
     }
 
-    const [snapshot, priceItems, hostProfile, guestProfile] = await Promise.all(
-      [
-        this.bookingRepository.findSnapshotByBookingId(booking.id),
-        this.bookingRepository.findPriceItemsByBookingId(booking.id),
-        this.userService.getProfile(booking.hostId),
-        this.userService.getProfile(booking.guestId),
-      ],
-    );
+    const [snapshot, hostProfile, guestProfile] = await Promise.all([
+      this.bookingRepository.findSnapshotByBookingId(booking.id),
+      this.userService.getProfile(booking.hostId),
+      this.userService.getProfile(booking.guestId),
+    ]);
 
     const paymentStatus = booking.paymentStatus as BookingPaymentStatus;
     const status = booking.status as BookingStatus;
@@ -448,15 +444,15 @@ export class BookingService {
       paymentStatus === BookingPaymentStatus.SUCCEEDED &&
       status === BookingStatus.PENDING;
 
-    const totalPrice = Number(booking.grandTotal ?? 0);
-    const basePrice =
-      priceItems.find((i) => i.type === BookingPriceItemType.BASE_PRICE)
-        ?.amount ??
-      (booking.subtotal != null ? Number(booking.subtotal) : totalPrice);
-    const cleaningFee = 0;
-    const serviceFee =
-      priceItems.find((i) => i.type === BookingPriceItemType.SERVICE_FEE)
-        ?.amount ?? Number(booking.totalFees);
+    const summary = {
+      subtotal: Number(booking.subtotal ?? 0),
+      totalFees: Number(booking.totalFees ?? 0),
+      taxRate: Number(booking.taxRate ?? 0),
+      taxAmount: Number(booking.taxAmount ?? 0),
+      totalDiscount: Number(booking.totalDiscount ?? 0),
+      grandTotal: Number(booking.grandTotal ?? 0),
+      currency: booking.currency,
+    };
 
     const response: IGetBookingDetailsResponse = {
       booking: {
@@ -465,7 +461,6 @@ export class BookingService {
         checkInDate: booking.checkInDate,
         checkOutDate: booking.checkOutDate,
         numberOfNights: booking.numberOfNights,
-        totalPrice,
         currency: booking.currency,
         status,
         paymentStatus,
@@ -479,6 +474,7 @@ export class BookingService {
         updatedAt: booking.updatedAt,
         requiresHostConfirmation,
       },
+      summary,
       property: {
         id: booking.propertyId,
         title: snapshot?.propertyTitle ?? 'Property',
@@ -495,12 +491,6 @@ export class BookingService {
               longitude: snapshot.propertyAddress.longitude,
             }
           : undefined,
-        pricing: {
-          basePrice: Number(basePrice),
-          currency: booking.currency,
-          cleaningFee,
-          serviceFee: Number(serviceFee),
-        },
         images:
           snapshot?.propertyImage != null
             ? [
