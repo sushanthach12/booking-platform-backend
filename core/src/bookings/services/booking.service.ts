@@ -742,15 +742,40 @@ export class BookingService {
     propertyId: string,
     checkInDate: Date,
     checkOutDate: Date,
+    roomId?: string | null,
   ): Promise<AvailabilityResult> {
-    const overlappingBookings =
-      await this.bookingRepository.findOverlappingBookings(
+    const datesInRange = this.getDatesInRange(checkInDate, checkOutDate);
+
+    const [overlappingBookings, calendarRows] = await Promise.all([
+      this.bookingRepository.findOverlappingBookings(
         propertyId,
         checkInDate,
         checkOutDate,
-      );
+      ),
+      this.availabilityCalendarRepository.findByRange({
+        propertyId,
+        roomId: roomId ?? null,
+        startDate: checkInDate,
+        endDate: checkOutDate,
+      }),
+    ]);
 
-    const available = overlappingBookings.length === 0;
+    const hasOverlap = overlappingBookings.length > 0;
+    const calendarByDate = new Map<string, boolean>(
+      calendarRows.map((r) => {
+        const key =
+          r.date instanceof Date
+            ? r.date.toISOString().split('T')[0]
+            : String(r.date).split('T')[0];
+        return [key, r.available];
+      }),
+    );
+    const hasBlockedDate = datesInRange.some((d) => {
+      const key = d.toISOString().split('T')[0];
+      return calendarByDate.get(key) === false;
+    });
+
+    const available = !hasOverlap && !hasBlockedDate;
     const result: AvailabilityResult = {
       available,
       conflictingBookings: overlappingBookings.map((booking) => booking.id),

@@ -1,17 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsString,
-  IsNotEmpty,
-  IsDate,
-  IsNumber,
-  IsOptional,
-  IsBoolean,
-  IsInt,
-  Min,
-  MaxLength,
-  IsUUID,
-} from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+  IsDate,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateBookingDto {
   @ApiProperty({
@@ -82,15 +80,6 @@ export class CreateBookingDto {
   @IsString()
   @IsNotEmpty()
   idempotencyKey: string;
-
-  @ApiPropertyOptional({
-    type: Number,
-    description: 'Expected total price (for validation)',
-    example: 200.00,
-  })
-  @IsNumber()
-  @IsOptional()
-  expectedTotalPrice?: number;
 
   @ApiPropertyOptional({
     type: String,

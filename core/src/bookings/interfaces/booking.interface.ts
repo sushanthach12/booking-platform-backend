@@ -13,7 +13,6 @@ export interface CreateBookingRequest {
   guestCount: number;
   specialRequests?: string;
   idempotencyKey: string;
-  expectedTotalPrice?: number;
   /** Pass from controller/auth when available to avoid extra user lookup */
   customerEmail?: string;
   customerName?: string;
