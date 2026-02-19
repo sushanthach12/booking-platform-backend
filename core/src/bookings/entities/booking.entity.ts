@@ -42,8 +42,66 @@ export class BookingEntity {
   @Column({ name: 'number_of_nights', type: 'int' })
   numberOfNights: number;
 
-  @Column({ name: 'total_price', type: 'decimal', precision: 10, scale: 2 })
-  totalPrice: number;
+  @Column({ name: 'guest_count', type: 'int', default: 1 })
+  guestCount: number;
+
+  /** Financial summary (source of truth). Nullable until migration backfill and create flow updated. */
+  @Column({
+    name: 'subtotal',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  subtotal?: number;
+
+  @Column({
+    name: 'total_fees',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  totalFees: number;
+
+  /** Tax rate as percentage (e.g. 10 for 10%). */
+  @Column({
+    name: 'tax_rate',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 0,
+    nullable: true,
+  })
+  taxRate?: number;
+
+  /** Computed tax amount in booking currency. */
+  @Column({
+    name: 'tax_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  taxAmount: number;
+
+  @Column({
+    name: 'total_discount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  totalDiscount: number;
+
+  @Column({
+    name: 'grand_total',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  grandTotal?: number;
 
   @Column({
     name: 'currency',
@@ -89,9 +147,6 @@ export class BookingEntity {
 
   @Column({ name: 'special_requests', type: 'text', nullable: true })
   specialRequests?: string;
-
-  @Column({ name: 'guest_count', type: 'int', default: 1 })
-  guestCount: number;
 
   @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
   cancellationReason?: string;

@@ -1,5 +1,9 @@
 import { RequestUser } from '../../common/types/users.types';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
+import {
+  BookingPriceItemCalculationMode,
+  BookingPriceItemType,
+} from '../enums/booking-price-item.enum';
 
 export interface CreateBookingRequest {
   propertyId: string;
@@ -37,8 +41,6 @@ export interface BookingResponse {
   currency: string;
   status: BookingStatus;
   paymentStatus: BookingPaymentStatus;
-  paymentIntentId?: string;
-  paymentTransactionId?: string;
   bookingNumber?: string;
   specialRequests?: string;
   guestCount: number;
@@ -171,4 +173,53 @@ export interface IGetBookingDetailsResponse {
     email: string;
     phone?: string;
   };
+}
+
+/** Snapshot address at time of booking (e.g. for confirmations and check-in). */
+export interface SnapshotAddress {
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state?: string;
+  country: string;
+  postalCode?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+/** Booking snapshot result (property snapshot at time of booking). */
+export interface IBookingSnapshot {
+  id: string;
+  bookingId: string;
+  propertyTitle: string;
+  propertyImage?: string;
+  locationLabel: string;
+  propertyAddress?: SnapshotAddress;
+  roomName?: string;
+  cancellationPolicy: Record<string, unknown>;
+  houseRules?: Record<string, unknown>[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Booking price item result (line item in pricing breakdown). */
+export interface IBookingPriceItem {
+  id: string;
+  bookingId: string;
+  type: BookingPriceItemType;
+  calculationMode: BookingPriceItemCalculationMode;
+  value: number;
+  amount: number;
+}
+
+/** Minimal booking shape used when building price items (no entity dependency). */
+export interface IBookingFinancialSummary {
+  id: string;
+  subtotal?: number;
+  totalPrice?: number;
+  totalFees: number;
+  taxAmount: number;
+  totalDiscount: number;
+  taxRate?: number;
+  grandTotal?: number;
 }

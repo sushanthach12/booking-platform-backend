@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { QUEUE_BOOKING_DETAILS } from '../../../queues/queues.module';
-import { BookingDetailsService } from '../../services/booking-details.service';
+import { BookingSnapshotService } from '../../services/booking-snapshot.service';
 import { JOB_CREATE_BOOKING_DETAILS } from '../constants';
 
 export interface CreateBookingDetailsPayload {
@@ -14,7 +14,7 @@ export interface CreateBookingDetailsPayload {
 export class CreateBookingDetailsProcessor extends WorkerHost {
   private readonly logger = new Logger(CreateBookingDetailsProcessor.name);
 
-  constructor(private readonly bookingDetailsService: BookingDetailsService) {
+  constructor(private readonly bookingSnapshotService: BookingSnapshotService) {
     super();
   }
 
@@ -22,10 +22,10 @@ export class CreateBookingDetailsProcessor extends WorkerHost {
     if (job.name !== JOB_CREATE_BOOKING_DETAILS) return;
     const { bookingId } = job.data;
     try {
-      await this.bookingDetailsService.createForBooking(bookingId);
+      await this.bookingSnapshotService.createForBooking(bookingId);
     } catch (error) {
       this.logger.error(
-        `Failed to create booking details for ${bookingId}: ${error?.message ?? error}`,
+        `Failed to create booking snapshot for ${bookingId}: ${error?.message ?? error}`,
       );
       throw error;
     }

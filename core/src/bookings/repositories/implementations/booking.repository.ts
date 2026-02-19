@@ -7,7 +7,11 @@ import {
   PaginatedBookingsResult,
   PropertyBookingOptions,
 } from '../../dto/booking-options.dto';
-import { BookingDetailsEntity, BookingEntity } from '../../entities';
+import {
+  BookingEntity,
+  BookingPriceItemEntity,
+  BookingSnapshotEntity,
+} from '../../entities';
 import { BookingStatus } from '../../enums';
 import { IBookingRepository } from '../interfaces/booking.repository.interface';
 
@@ -16,8 +20,10 @@ export class BookingRepository implements IBookingRepository {
   constructor(
     @InjectRepository(BookingEntity)
     private readonly repository: Repository<BookingEntity>,
-    @InjectRepository(BookingDetailsEntity)
-    private readonly bookingDetailsRepository: Repository<BookingDetailsEntity>,
+    @InjectRepository(BookingSnapshotEntity)
+    private readonly snapshotRepository: Repository<BookingSnapshotEntity>,
+    @InjectRepository(BookingPriceItemEntity)
+    private readonly priceItemRepository: Repository<BookingPriceItemEntity>,
   ) {}
 
   async create(booking: Partial<BookingEntity>): Promise<BookingEntity> {
@@ -371,11 +377,20 @@ export class BookingRepository implements IBookingRepository {
     };
   }
 
-  async findBookingDetailsByBookingId(
+  async findSnapshotByBookingId(
     bookingId: string,
-  ): Promise<BookingDetailsEntity | null> {
-    return await this.bookingDetailsRepository.findOne({
+  ): Promise<BookingSnapshotEntity | null> {
+    return await this.snapshotRepository.findOne({
       where: { bookingId },
+    });
+  }
+
+  async findPriceItemsByBookingId(
+    bookingId: string,
+  ): Promise<BookingPriceItemEntity[]> {
+    return await this.priceItemRepository.find({
+      where: { bookingId },
+      order: { type: 'ASC' },
     });
   }
 }

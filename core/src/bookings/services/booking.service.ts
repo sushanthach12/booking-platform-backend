@@ -36,6 +36,7 @@ import {
 } from '../booking-jobs/constants';
 import { BookingEntity } from '../entities';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
+import { BookingPriceItemType } from '../enums/booking-price-item.enum';
 import {
   AvailabilityResult,
   BookingQueryOptions,
@@ -187,6 +188,7 @@ export class BookingService {
         }
 
         const bookingId = randomUUID();
+        const expectedTotal = createBookingRequest.expectedTotalPrice ?? 0;
         const bookingData: Partial<BookingEntity> = {
           id: bookingId,
           propertyId: createBookingRequest.propertyId,
@@ -196,13 +198,17 @@ export class BookingService {
           checkInDate: createBookingRequest.checkInDate,
           checkOutDate: createBookingRequest.checkOutDate,
           numberOfNights,
-          totalPrice: createBookingRequest.expectedTotalPrice || 0,
+          guestCount: createBookingRequest.guestCount,
+          subtotal: expectedTotal,
+          totalFees: 0,
+          taxAmount: 0,
+          totalDiscount: 0,
+          grandTotal: expectedTotal,
           currency: ECurrency.INR,
           status: BookingStatus.PENDING,
           paymentStatus: BookingPaymentStatus.PENDING,
           idempotencyKey: createBookingRequest.idempotencyKey,
           specialRequests: createBookingRequest.specialRequests,
-          guestCount: createBookingRequest.guestCount,
         };
 
         const entity = manager.create(BookingEntity, bookingData);
@@ -406,22 +412,30 @@ export class BookingService {
       );
     }
 
-    // Fetch booking details snapshot (property details at time of booking)
-    const bookingDetails =
-      await this.bookingRepository.findBookingDetailsByBookingId(booking.id);
+    const [snapshot, priceItems, hostProfile, guestProfile] = await Promise.all(
+      [
+        this.bookingRepository.findSnapshotByBookingId(booking.id),
+        this.bookingRepository.findPriceItemsByBookingId(booking.id),
+        this.userService.getProfile(booking.hostId),
+        this.userService.getProfile(booking.guestId),
+      ],
+    );
 
-    // Fetch host and guest details
-    const [hostProfile, guestProfile] = await Promise.all([
-      this.userService.getProfile(booking.hostId),
-      this.userService.getProfile(booking.guestId),
-    ]);
-
-    // Map booking data (excluding payment links/IDs)
     const paymentStatus = booking.paymentStatus as BookingPaymentStatus;
     const status = booking.status as BookingStatus;
     const requiresHostConfirmation =
       paymentStatus === BookingPaymentStatus.SUCCEEDED &&
       status === BookingStatus.PENDING;
+
+    const totalPrice = Number(booking.grandTotal ?? 0);
+    const basePrice =
+      priceItems.find((i) => i.type === BookingPriceItemType.BASE_PRICE)
+        ?.amount ??
+      (booking.subtotal != null ? Number(booking.subtotal) : totalPrice);
+    const cleaningFee = 0;
+    const serviceFee =
+      priceItems.find((i) => i.type === BookingPriceItemType.SERVICE_FEE)
+        ?.amount ?? Number(booking.totalFees);
 
     const response: IGetBookingDetailsResponse = {
       booking: {
@@ -430,7 +444,7 @@ export class BookingService {
         checkInDate: booking.checkInDate,
         checkOutDate: booking.checkOutDate,
         numberOfNights: booking.numberOfNights,
-        totalPrice: booking.totalPrice,
+        totalPrice,
         currency: booking.currency,
         status,
         paymentStatus,
@@ -444,69 +458,53 @@ export class BookingService {
         updatedAt: booking.updatedAt,
         requiresHostConfirmation,
       },
-      property: bookingDetails
-        ? {
-            id: booking.propertyId,
-            title: bookingDetails.propertyTitle,
-            description: bookingDetails.propertyDescription || null,
-            location: bookingDetails.propertyAddress
-              ? {
-                  addressLine1: bookingDetails.propertyAddress.addressLine1,
-                  addressLine2: bookingDetails.propertyAddress.addressLine2,
-                  city: bookingDetails.propertyAddress.city,
-                  state: bookingDetails.propertyAddress.state,
-                  country: bookingDetails.propertyAddress.country,
-                  postalCode: bookingDetails.propertyAddress.postalCode,
-                  latitude: bookingDetails.propertyAddress.latitude,
-                  longitude: bookingDetails.propertyAddress.longitude,
-                }
-              : undefined,
-            pricing: {
-              basePrice: Number(bookingDetails.basePrice),
-              currency: bookingDetails.currency,
-              cleaningFee: bookingDetails.cleaningFee
-                ? Number(bookingDetails.cleaningFee)
-                : 0,
-              serviceFee: bookingDetails.serviceFee
-                ? Number(bookingDetails.serviceFee)
-                : 0,
-            },
-            images: bookingDetails.propertyImages?.map((url, index) => ({
-              url,
-              displayOrder: index,
-              isPrimary: index === 0,
-            })),
-            amenities: bookingDetails.propertyAmenities,
-            room: bookingDetails.roomDetails
-              ? {
-                  name: bookingDetails.roomDetails.name,
-                  description: bookingDetails.roomDetails.description,
-                  roomType: bookingDetails.roomDetails.roomType,
-                  beds: bookingDetails.roomDetails.beds,
-                  bedType: bookingDetails.roomDetails.bedType,
-                  maxGuests: bookingDetails.roomDetails.maxGuests,
-                  basePrice: bookingDetails.roomDetails.basePrice,
-                  isPrivate: bookingDetails.roomDetails.isPrivate,
-                  hasBathroom: bookingDetails.roomDetails.hasBathroom,
-                  hasBalcony: bookingDetails.roomDetails.hasBalcony,
-                  floorNumber: bookingDetails.roomDetails.floorNumber,
-                  squareMeters: bookingDetails.roomDetails.squareMeters,
-                }
-              : undefined,
-            cancellationPolicy: bookingDetails.cancellationPolicy,
-            houseRules: bookingDetails.houseRules,
-          }
-        : {
-            id: booking.propertyId,
-            title: 'Property',
-            description: null,
-            pricing: {
-              basePrice: Number(booking.totalPrice),
-              currency: booking.currency,
-              cleaningFee: 0,
-              serviceFee: 0,
-            },
-          },
+      property: {
+        id: booking.propertyId,
+        title: snapshot?.propertyTitle ?? 'Property',
+        description: null,
+        location: snapshot?.propertyAddress
+          ? {
+              addressLine1: snapshot.propertyAddress.addressLine1,
+              addressLine2: snapshot.propertyAddress.addressLine2,
+              city: snapshot.propertyAddress.city,
+              state: snapshot.propertyAddress.state,
+              country: snapshot.propertyAddress.country,
+              postalCode: snapshot.propertyAddress.postalCode,
+              latitude: snapshot.propertyAddress.latitude,
+              longitude: snapshot.propertyAddress.longitude,
+            }
+          : undefined,
+        pricing: {
+          basePrice: Number(basePrice),
+          currency: booking.currency,
+          cleaningFee,
+          serviceFee: Number(serviceFee),
+        },
+        images:
+          snapshot?.propertyImage != null
+            ? [
+                {
+                  url: snapshot.propertyImage,
+                  displayOrder: 0,
+                  isPrimary: true,
+                },
+              ]
+            : undefined,
+        amenities: undefined,
+        room: snapshot?.roomName
+          ? {
+              name: snapshot.roomName,
+              roomType: '',
+              beds: 0,
+              maxGuests: 0,
+              isPrivate: false,
+              hasBathroom: false,
+              hasBalcony: false,
+            }
+          : undefined,
+        cancellationPolicy: snapshot?.cancellationPolicy,
+        houseRules: snapshot?.houseRules,
+      },
       host: {
         id: hostProfile.id,
         name: hostProfile.name,
@@ -824,12 +822,10 @@ export class BookingService {
       checkInDate: booking.checkInDate,
       checkOutDate: booking.checkOutDate,
       numberOfNights: booking.numberOfNights,
-      totalPrice: booking.totalPrice,
+      totalPrice: Number(booking.grandTotal ?? 0),
       currency: booking.currency,
       status,
       paymentStatus,
-      paymentIntentId: booking.paymentIntentId,
-      paymentTransactionId: booking.paymentTransactionId,
       bookingNumber: booking.bookingNumber,
       specialRequests: booking.specialRequests,
       guestCount: booking.guestCount,

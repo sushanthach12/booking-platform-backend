@@ -5,7 +5,11 @@ import {
   PaginatedBookingsResult,
   PropertyBookingOptions,
 } from '../../dto/booking-options.dto';
-import { BookingDetailsEntity, BookingEntity } from '../../entities';
+import {
+  BookingEntity,
+  BookingPriceItemEntity,
+  BookingSnapshotEntity,
+} from '../../entities';
 import { BookingStatus } from '../../enums';
 
 export interface IBookingRepository {
@@ -79,8 +83,11 @@ export interface IBookingRepository {
     options: FindBookingsOptions,
   ): Promise<PaginatedBookingsResult>;
 
-  // Booking details
-  findBookingDetailsByBookingId(
+  findSnapshotByBookingId(
     bookingId: string,
-  ): Promise<BookingDetailsEntity | null>;
+  ): Promise<BookingSnapshotEntity | null>;
+
+  findPriceItemsByBookingId(
+    bookingId: string,
+  ): Promise<BookingPriceItemEntity[]>;
 }

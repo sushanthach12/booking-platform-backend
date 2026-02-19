@@ -7,15 +7,16 @@ import { QueuesModule } from '../queues/queues.module';
 import { UserModule } from '../users/user.module';
 import { BookingController } from './controllers';
 import {
-  BookingDetailsEntity,
   BookingEntity,
   BookingInvitationEntity,
+  BookingPriceItemEntity,
+  BookingSnapshotEntity,
   PriceAlertEntity,
   SlotReservationEntity,
   WaitlistEntity,
 } from './entities';
 import { BookingRepository } from './repositories';
-import { BookingDetailsService, BookingService } from './services';
+import { BookingService, BookingSnapshotService } from './services';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { BookingDetailsService, BookingService } from './services';
     UserModule,
     TypeOrmModule.forFeature([
       BookingEntity,
-      BookingDetailsEntity,
+      BookingSnapshotEntity,
+      BookingPriceItemEntity,
       WaitlistEntity,
       SlotReservationEntity,
       BookingInvitationEntity,
@@ -35,12 +37,12 @@ import { BookingDetailsService, BookingService } from './services';
   controllers: [BookingController],
   providers: [
     BookingService,
-    BookingDetailsService,
+    BookingSnapshotService,
     {
       provide: BOOKING_REPOSITORY,
       useClass: BookingRepository,
     },
   ],
-  exports: [BookingService, BookingDetailsService],
+  exports: [BookingService, BookingSnapshotService],
 })
 export class BookingModule {}
