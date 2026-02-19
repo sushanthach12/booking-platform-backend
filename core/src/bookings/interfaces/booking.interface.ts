@@ -27,6 +27,18 @@ export interface CreateBookingApiResponse {
   paymentSessionId: string;
 }
 
+export interface CheckBookingAvailabilityRequest {
+  propertyId: string;
+  checkInDate: Date;
+  checkOutDate: Date;
+  roomId?: string;
+}
+
+export interface CheckBookingAvailabilityResponse {
+  available: boolean;
+  conflictingBookings: string[];
+}
+
 export interface BookingResponse {
   id: string;
   propertyId: string;

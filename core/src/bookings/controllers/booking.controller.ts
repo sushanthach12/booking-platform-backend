@@ -18,6 +18,7 @@ import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { PropertyService } from '../../properties/services/property.service';
 import {
+  CheckBookingAvailabilityDto,
   CreateBookingDto,
   CreatePriceAlertDto,
   GetBookingQueryDto,
@@ -259,20 +260,12 @@ export class BookingController {
   async checkAvailability(
     @Res() res: Response,
     @Body()
-    body: {
-      propertyId: string;
-      checkInDate: Date;
-      checkOutDate: Date;
-    },
+    body: CheckBookingAvailabilityDto,
   ) {
     try {
       this.logger.log(`Check availability request received for property`);
 
-      const response = await this.bookingService.checkAvailability(
-        body.propertyId,
-        body.checkInDate,
-        body.checkOutDate,
-      );
+      const response = await this.bookingService.checkAvailability(body);
 
       return res.status(HttpStatus.OK).json({ data: response });
     } catch (error) {

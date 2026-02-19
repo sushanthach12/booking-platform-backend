@@ -105,3 +105,43 @@ export class CreateBookingDto {
   @IsOptional()
   customerPhone?: string;
 }
+
+export class CheckBookingAvailabilityDto {
+  @ApiProperty({
+    type: String,
+    description: 'Property ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsString()
+  @IsNotEmpty()
+  propertyId: string;
+
+  @ApiProperty({
+    type: Date,
+    description: 'Check-in date',
+    example: '2026-02-01',
+  })
+  @IsDate()
+  @Type(() => Date)
+  @IsNotEmpty()
+  checkInDate: Date;
+
+  @ApiProperty({
+    type: Date,
+    description: 'Check-out date',
+    example: '2026-02-03',
+  })
+  @IsDate()
+  @Type(() => Date)
+  @IsNotEmpty()
+  checkOutDate: Date;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Room ID (optional for multi-room properties)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsString()
+  @IsOptional()
+  roomId?: string;
+}

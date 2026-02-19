@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
+import moment from 'moment';
 import { DataSource } from 'typeorm';
 import { ECurrency } from '../../common/enums/currency.enum';
 import { AvailabilityCache, IRedisService } from '../../common/redis';
@@ -24,6 +25,7 @@ import {
   PaymentStatus,
 } from '../../payments/interfaces/payment.interface';
 import { IAvailabilityCalendarRepository } from '../../properties/repositories/interfaces/availability-calendar.repository.interface';
+import { PropertyService } from '../../properties/services/property.service';
 import {
   QUEUE_BOOKING_DETAILS,
   QUEUE_BOOKING_PAYMENT_TIMEOUT,
@@ -41,6 +43,8 @@ import {
   AvailabilityResult,
   BookingQueryOptions,
   BookingResponse,
+  CheckBookingAvailabilityRequest,
+  CheckBookingAvailabilityResponse,
   CreateBookingApiResponse,
   CreateBookingRequest,
   IConfirmBookingParams,
@@ -52,6 +56,16 @@ import { IBookingRepository } from '../repositories';
 
 const PAYMENT_CREATE_TIMEOUT_MS = 15000;
 const AVAILABILITY_CACHE_TTL_MS = 300_000; // 5 minutes
+const TAX_RATE_PERCENT = 18;
+
+export interface BookingSummary {
+  subtotal: number;
+  totalFees: number;
+  totalDiscount: number;
+  taxRate: number;
+  taxAmount: number;
+  grandTotal: number;
+}
 
 @Injectable()
 export class BookingService {
@@ -72,6 +86,7 @@ export class BookingService {
     @Inject(AVAILABILITY_CALENDAR_REPOSITORY)
     private readonly availabilityCalendarRepository: IAvailabilityCalendarRepository,
     private readonly userService: UserService,
+    private readonly propertyService: PropertyService,
   ) {}
 
   async createBooking(
@@ -105,6 +120,12 @@ export class BookingService {
     const numberOfNights = this.calculateNights(
       createBookingRequest.checkInDate,
       createBookingRequest.checkOutDate,
+    );
+
+    const summary = await this.calculateBookingSummary(
+      createBookingRequest.propertyId,
+      createBookingRequest.roomId,
+      numberOfNights,
     );
 
     // Step 1: Check availability in Redis cache for full date range (fast path)
@@ -188,7 +209,6 @@ export class BookingService {
         }
 
         const bookingId = randomUUID();
-        const expectedTotal = createBookingRequest.expectedTotalPrice ?? 0;
         const bookingData: Partial<BookingEntity> = {
           id: bookingId,
           propertyId: createBookingRequest.propertyId,
@@ -199,11 +219,12 @@ export class BookingService {
           checkOutDate: createBookingRequest.checkOutDate,
           numberOfNights,
           guestCount: createBookingRequest.guestCount,
-          subtotal: expectedTotal,
-          totalFees: 0,
-          taxAmount: 0,
-          totalDiscount: 0,
-          grandTotal: expectedTotal,
+          subtotal: summary.subtotal,
+          totalFees: summary.totalFees,
+          taxRate: summary.taxRate,
+          taxAmount: summary.taxAmount,
+          totalDiscount: summary.totalDiscount,
+          grandTotal: summary.grandTotal,
           currency: ECurrency.INR,
           status: BookingStatus.PENDING,
           paymentStatus: BookingPaymentStatus.PENDING,
@@ -242,7 +263,7 @@ export class BookingService {
       };
 
       const paymentOptions = {
-        amount: createBookingRequest.expectedTotalPrice || 0,
+        amount: summary.grandTotal,
         currency: ECurrency.INR,
         bookingId: booking.id,
         guestId: userId,
@@ -739,24 +760,40 @@ export class BookingService {
   }
 
   async checkAvailability(
-    propertyId: string,
-    checkInDate: Date,
-    checkOutDate: Date,
-    roomId?: string | null,
-  ): Promise<AvailabilityResult> {
-    const datesInRange = this.getDatesInRange(checkInDate, checkOutDate);
+    data: CheckBookingAvailabilityRequest,
+  ): Promise<CheckBookingAvailabilityResponse> {
+    // validate the check out date to be greater than the check in date
+    const checkInDate = moment(data.checkInDate)
+      .startOf('day')
+      .toDate()
+      .getDate();
+    const checkOutDate = moment(data.checkOutDate)
+      .startOf('day')
+      .toDate()
+      .getDate();
+
+    if (checkOutDate <= checkInDate) {
+      throw new BadRequestException(
+        'Check out date must be greater than check in date',
+      );
+    }
+
+    const datesInRange = this.getDatesInRange(
+      data.checkInDate,
+      data.checkOutDate,
+    );
 
     const [overlappingBookings, calendarRows] = await Promise.all([
       this.bookingRepository.findOverlappingBookings(
-        propertyId,
-        checkInDate,
-        checkOutDate,
+        data.propertyId,
+        data.checkInDate,
+        data.checkOutDate,
       ),
       this.availabilityCalendarRepository.findByRange({
-        propertyId,
-        roomId: roomId ?? null,
-        startDate: checkInDate,
-        endDate: checkOutDate,
+        propertyId: data.propertyId,
+        roomId: data.roomId ?? null,
+        startDate: data.checkInDate,
+        endDate: data.checkOutDate,
       }),
     ]);
 
@@ -782,9 +819,9 @@ export class BookingService {
     };
 
     await this.setAvailabilityCache(
-      propertyId,
-      checkInDate,
-      checkOutDate,
+      data.propertyId,
+      data.checkInDate,
+      data.checkOutDate,
       available,
     );
 
@@ -817,6 +854,46 @@ export class BookingService {
   private calculateNights(checkInDate: Date, checkOutDate: Date): number {
     const timeDiff = checkOutDate.getTime() - checkInDate.getTime();
     return Math.ceil(timeDiff / (1000 * 3600 * 24));
+  }
+
+  /**
+   * Calculates booking financial summary from property pricing.
+   * Tax (18%) is applied after all discounts.
+   */
+  private async calculateBookingSummary(
+    propertyId: string,
+    roomId: string | undefined,
+    numberOfNights: number,
+  ): Promise<BookingSummary> {
+    const propertyDetails = await this.propertyService.getPropertyDetails({
+      params: { propertyId, includeRelations: true },
+    });
+
+    let basePricePerNight: number;
+    if (roomId && propertyDetails.rooms?.length) {
+      const room = propertyDetails.rooms.find((r) => r.id === roomId);
+      basePricePerNight =
+        room?.basePrice ?? Number(propertyDetails.pricing?.basePrice ?? 0);
+    } else {
+      basePricePerNight = Number(propertyDetails.pricing?.basePrice ?? 0);
+    }
+
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const subtotal = round2(basePricePerNight * numberOfNights);
+    const totalFees = 0;
+    const totalDiscount = 0;
+    const amountAfterDiscount = round2(subtotal - totalDiscount);
+    const taxAmount = round2(amountAfterDiscount * (TAX_RATE_PERCENT / 100));
+    const grandTotal = round2(amountAfterDiscount + taxAmount);
+
+    return {
+      subtotal,
+      totalFees,
+      totalDiscount,
+      taxRate: TAX_RATE_PERCENT,
+      taxAmount,
+      grandTotal,
+    };
   }
 
   private toCreateBookingApiResponse(
