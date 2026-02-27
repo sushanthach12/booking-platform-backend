@@ -1,3 +1,68 @@
+import type { BookingPaymentStatus } from '../enums';
+import type {
+  BookingQueryOptions,
+  BookingResponse,
+  CheckBookingAvailabilityRequest,
+  CheckBookingAvailabilityResponse,
+  CreateBookingApiResponse,
+  CreateBookingRequest,
+  IConfirmBookingParams,
+  IGetBookingDetailsParams,
+  IGetBookingDetailsResponse,
+  PaginatedBookings,
+} from './booking.interface';
+
+/**
+ * Abstraction for the booking domain service.
+ * Enables testing with mocks and swapping implementations without changing consumers.
+ */
+export interface IBookingService {
+  createBooking(
+    createBookingRequest: CreateBookingRequest,
+    userId: string,
+    hostId: string,
+  ): Promise<CreateBookingApiResponse>;
+
+  getBookingDetails(
+    data: IGetBookingDetailsParams,
+  ): Promise<IGetBookingDetailsResponse>;
+
+  getBookings(
+    userId: string,
+    query: BookingQueryOptions,
+    isHost?: boolean,
+  ): Promise<PaginatedBookings>;
+
+  cancelBooking(
+    bookingId: string,
+    userId: string,
+    reason?: string,
+    isHost?: boolean,
+  ): Promise<BookingResponse>;
+
+  confirmBooking(data: IConfirmBookingParams): Promise<BookingResponse>;
+
+  updatePaymentStatus(
+    bookingId: string,
+    paymentStatus: BookingPaymentStatus,
+    paymentIntentId?: string,
+  ): Promise<BookingResponse>;
+
+  expireUnpaidBookingIfStillPending(
+    bookingId: string,
+    paymentTransactionId: string,
+  ): Promise<boolean>;
+
+  syncPaymentStatusFromTransaction(
+    transactionId: string,
+    paymentStatus: string,
+  ): Promise<void>;
+
+  checkAvailability(
+    data: CheckBookingAvailabilityRequest,
+  ): Promise<CheckBookingAvailabilityResponse>;
+}
+
 /**
  * Financial summary for a booking (subtotal, tax, grand total).
  * Used by pricing calculator and booking creation.

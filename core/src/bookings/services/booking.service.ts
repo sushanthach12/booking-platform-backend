@@ -42,6 +42,7 @@ import { BookingPaymentStatus, BookingStatus } from '../enums';
 import type {
   IAvailabilityChecker,
   IBookingPriceCalculator,
+  IBookingService,
 } from '../interfaces/booking-service.interface';
 import {
   AvailabilityResult,
@@ -63,7 +64,7 @@ const PAYMENT_CREATE_TIMEOUT_MS = 15000;
 export type { BookingSummary } from '../interfaces/booking-service.interface';
 
 @Injectable()
-export class BookingService {
+export class BookingService implements IBookingService {
   private readonly logger = new Logger(BookingService.name);
 
   constructor(

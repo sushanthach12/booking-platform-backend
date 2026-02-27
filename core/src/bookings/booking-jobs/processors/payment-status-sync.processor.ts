@@ -1,8 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { BOOKING_SERVICE } from '../../../database';
 import { QUEUE_PAYMENT_STATUS_SYNC } from '../../../queues/queues.module';
-import { BookingService } from '../../services/booking.service';
+import type { IBookingService } from '../../interfaces/booking-service.interface';
 import { JOB_SYNC_PAYMENT_STATUS } from '../constants';
 
 export interface PaymentStatusSyncPayload {
@@ -15,7 +16,10 @@ export interface PaymentStatusSyncPayload {
 export class PaymentStatusSyncProcessor extends WorkerHost {
   private readonly logger = new Logger(PaymentStatusSyncProcessor.name);
 
-  constructor(private readonly bookingService: BookingService) {
+  constructor(
+    @Inject(BOOKING_SERVICE)
+    private readonly bookingService: IBookingService,
+  ) {
     super();
   }
 

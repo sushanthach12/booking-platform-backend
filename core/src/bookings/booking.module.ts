@@ -4,6 +4,7 @@ import {
   AVAILABILITY_CHECKER,
   BOOKING_PRICE_CALCULATOR,
   BOOKING_REPOSITORY,
+  BOOKING_SERVICE,
 } from '../database';
 import { PaymentModule } from '../payments/payment.module';
 import { PropertyModule } from '../properties/property.module';
@@ -45,7 +46,10 @@ import {
   ],
   controllers: [BookingController],
   providers: [
-    BookingService,
+    {
+      provide: BOOKING_SERVICE,
+      useClass: BookingService,
+    },
     BookingSnapshotService,
     {
       provide: BOOKING_REPOSITORY,
@@ -60,6 +64,6 @@ import {
       useClass: AvailabilityCheckerService,
     },
   ],
-  exports: [BookingService, BookingSnapshotService],
+  exports: [BOOKING_SERVICE, BookingSnapshotService],
 })
 export class BookingModule {}

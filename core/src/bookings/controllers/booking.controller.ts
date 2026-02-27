@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Logger,
   NotFoundException,
   Param,
@@ -14,7 +15,9 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
+import { BOOKING_SERVICE } from '../../database';
 import { PropertyService } from '../../properties/services/property.service';
+import type { IBookingService } from '../interfaces/booking-service.interface';
 import {
   CheckBookingAvailabilityDto,
   CreateBookingDto,
@@ -23,7 +26,6 @@ import {
   GetBookingsQueryDto,
   JoinWaitlistDto,
 } from '../dto';
-import { BookingService } from '../services/booking.service';
 
 @ApiTags('bookings')
 @Controller('bookings')
@@ -31,7 +33,8 @@ export class BookingController {
   private readonly logger = new Logger(BookingController.name);
 
   constructor(
-    private readonly bookingService: BookingService,
+    @Inject(BOOKING_SERVICE)
+    private readonly bookingService: IBookingService,
     private readonly propertyService: PropertyService,
   ) {}
 
