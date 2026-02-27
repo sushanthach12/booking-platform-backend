@@ -13,9 +13,11 @@ import { randomUUID } from 'crypto';
 import moment from 'moment';
 import { DataSource } from 'typeorm';
 import { ECurrency } from '../../common/enums/currency.enum';
-import { AvailabilityCache, IRedisService } from '../../common/redis';
+import { IRedisService } from '../../common/redis';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,
+  AVAILABILITY_CHECKER,
+  BOOKING_PRICE_CALCULATOR,
   BOOKING_REPOSITORY,
 } from '../../database';
 import {
@@ -25,7 +27,6 @@ import {
   PaymentStatus,
 } from '../../payments/interfaces/payment.interface';
 import { IAvailabilityCalendarRepository } from '../../properties/repositories/interfaces/availability-calendar.repository.interface';
-import { PropertyService } from '../../properties/services/property.service';
 import {
   QUEUE_BOOKING_DETAILS,
   QUEUE_BOOKING_PAYMENT_TIMEOUT,
@@ -38,6 +39,10 @@ import {
 } from '../booking-jobs/constants';
 import { BookingEntity } from '../entities';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
+import type {
+  IAvailabilityChecker,
+  IBookingPriceCalculator,
+} from '../interfaces/booking-service.interface';
 import {
   AvailabilityResult,
   BookingQueryOptions,
@@ -54,17 +59,8 @@ import {
 import { IBookingRepository } from '../repositories';
 
 const PAYMENT_CREATE_TIMEOUT_MS = 15000;
-const AVAILABILITY_CACHE_TTL_MS = 300_000; // 5 minutes
-const TAX_RATE_PERCENT = 18;
 
-export interface BookingSummary {
-  subtotal: number;
-  totalFees: number;
-  totalDiscount: number;
-  taxRate: number;
-  taxAmount: number;
-  grandTotal: number;
-}
+export type { BookingSummary } from '../interfaces/booking-service.interface';
 
 @Injectable()
 export class BookingService {
@@ -84,8 +80,11 @@ export class BookingService {
     private readonly bookingDetailsQueue: Queue,
     @Inject(AVAILABILITY_CALENDAR_REPOSITORY)
     private readonly availabilityCalendarRepository: IAvailabilityCalendarRepository,
+    @Inject(BOOKING_PRICE_CALCULATOR)
+    private readonly priceCalculator: IBookingPriceCalculator,
+    @Inject(AVAILABILITY_CHECKER)
+    private readonly availabilityChecker: IAvailabilityChecker,
     private readonly userService: UserService,
-    private readonly propertyService: PropertyService,
   ) {}
 
   async createBooking(
@@ -121,61 +120,24 @@ export class BookingService {
       createBookingRequest.checkOutDate,
     );
 
-    const summary = await this.calculateBookingSummary(
+    const summary = await this.priceCalculator.calculate(
       createBookingRequest.propertyId,
       createBookingRequest.roomId,
       numberOfNights,
     );
 
-    // Step 1: Check availability in Redis cache for full date range (fast path)
-    const datesInRange = this.getDatesInRange(
+    // Step 1: Check availability (cache + calendar) via checker
+    await this.availabilityChecker.checkAvailable({
+      propertyId: createBookingRequest.propertyId,
+      roomId: createBookingRequest.roomId ?? null,
+      checkInDate: createBookingRequest.checkInDate,
+      checkOutDate: createBookingRequest.checkOutDate,
+    });
+
+    const datesInRange = this.availabilityChecker.getDatesInRange(
       createBookingRequest.checkInDate,
       createBookingRequest.checkOutDate,
     );
-
-    const availabilityCacheKeys = datesInRange.map(
-      (d) =>
-        `property:${createBookingRequest.propertyId}:availability:${d.toISOString().split('T')[0]}`,
-    );
-
-    const cachedValues = await this.redisService.getMany(availabilityCacheKeys);
-
-    for (let i = 0; i < cachedValues.length; i++) {
-      const raw = cachedValues[i];
-      if (raw) {
-        const availability: AvailabilityCache = JSON.parse(raw);
-        if (!availability.available) {
-          throw new ConflictException(
-            'Property is not available for the selected dates',
-          );
-        }
-      }
-    }
-
-    // Check availability calendar: reject if any date in range is explicitly blocked
-    const calendarRows = await this.availabilityCalendarRepository.findByRange({
-      propertyId: createBookingRequest.propertyId,
-      roomId: createBookingRequest.roomId ?? null,
-      startDate: createBookingRequest.checkInDate,
-      endDate: createBookingRequest.checkOutDate,
-    });
-    const calendarByDate = new Map<string, { available: boolean }>(
-      calendarRows.map((r) => [
-        r.date instanceof Date
-          ? r.date.toISOString().split('T')[0]
-          : String(r.date).split('T')[0],
-        { available: r.available },
-      ]),
-    );
-    for (const d of datesInRange) {
-      const key = d.toISOString().split('T')[0];
-      const row = calendarByDate.get(key);
-      if (row && !row.available) {
-        throw new ConflictException(
-          'Property is not available for the selected dates',
-        );
-      }
-    }
 
     // Step 2: Acquire distributed lock (short hold: overlap check + insert only)
     const lockKey = `lock:property:${createBookingRequest.propertyId}:${createBookingRequest.checkInDate.toISOString().split('T')[0]}:${createBookingRequest.checkOutDate.toISOString().split('T')[0]}`;
@@ -283,10 +245,12 @@ export class BookingService {
           paymentOptions,
         );
       } catch (error) {
-        this.logger.error(`Failed to create payment: ${error.message}`);
-        throw new BadRequestException(
-          error.message ?? 'Unable to process payment. Please try again.',
-        );
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Unable to process payment. Please try again.';
+        this.logger.error(`Failed to create payment: ${message}`);
+        throw new BadRequestException(message);
       }
 
       if (!paymentResponse) {
@@ -350,7 +314,7 @@ export class BookingService {
           );
         } catch (cancelError) {
           this.logger.error(
-            `Failed to cancel payment intent: ${cancelError.message}`,
+            `Failed to cancel payment intent: ${cancelError instanceof Error ? cancelError.message : String(cancelError)}`,
           );
         }
       }
@@ -363,7 +327,7 @@ export class BookingService {
           });
         } catch (updateError) {
           this.logger.error(
-            `Failed to mark booking ${createdBookingId} as cancelled: ${updateError.message}`,
+            `Failed to mark booking ${createdBookingId} as cancelled: ${updateError instanceof Error ? updateError.message : String(updateError)}`,
           );
         }
       }
@@ -371,7 +335,7 @@ export class BookingService {
       throw error;
     } finally {
       await this.redisService.releaseLock(lockKey, lockValue);
-      await this.invalidateAvailabilityCache(
+      await this.availabilityChecker.invalidateAvailabilityCache(
         createBookingRequest.propertyId,
         createBookingRequest.checkInDate,
         createBookingRequest.checkOutDate,
@@ -762,7 +726,7 @@ export class BookingService {
       );
     }
 
-    const datesInRange = this.getDatesInRange(
+    const datesInRange = this.availabilityChecker.getDatesInRange(
       data.checkInDate,
       data.checkOutDate,
     );
@@ -802,7 +766,7 @@ export class BookingService {
       conflictingBookings: overlappingBookings.map((booking) => booking.id),
     };
 
-    await this.setAvailabilityCache(
+    await this.availabilityChecker.setAvailabilityCache(
       data.propertyId,
       data.checkInDate,
       data.checkOutDate,
@@ -812,72 +776,9 @@ export class BookingService {
     return result;
   }
 
-  private async setAvailabilityCache(
-    propertyId: string,
-    checkInDate: Date,
-    checkOutDate: Date,
-    available: boolean,
-    price: number = 0,
-  ): Promise<void> {
-    const dates = this.getDatesInRange(checkInDate, checkOutDate);
-    const value: AvailabilityCache = { available, price };
-    const serialized = JSON.stringify(value);
-
-    await Promise.all(
-      dates.map((d) => {
-        const key = `property:${propertyId}:availability:${d.toISOString().split('T')[0]}`;
-        return this.redisService.set(
-          key,
-          serialized,
-          AVAILABILITY_CACHE_TTL_MS,
-        );
-      }),
-    );
-  }
-
   private calculateNights(checkInDate: Date, checkOutDate: Date): number {
     const timeDiff = checkOutDate.getTime() - checkInDate.getTime();
     return Math.ceil(timeDiff / (1000 * 3600 * 24));
-  }
-
-  /**
-   * Calculates booking financial summary from property pricing.
-   * Tax (18%) is applied after all discounts.
-   */
-  private async calculateBookingSummary(
-    propertyId: string,
-    roomId: string | undefined,
-    numberOfNights: number,
-  ): Promise<BookingSummary> {
-    const propertyDetails = await this.propertyService.getPropertyDetails({
-      params: { propertyId, includeRelations: true },
-    });
-
-    let basePricePerNight: number;
-    if (roomId && propertyDetails.rooms?.length) {
-      const room = propertyDetails.rooms.find((r) => r.id === roomId);
-      basePricePerNight =
-        room?.basePrice ?? Number(propertyDetails.pricing?.basePrice ?? 0);
-    } else {
-      basePricePerNight = Number(propertyDetails.pricing?.basePrice ?? 0);
-    }
-
-    const round2 = (n: number) => Math.round(n * 100) / 100;
-    const subtotal = round2(basePricePerNight * numberOfNights);
-    const totalFees = 0;
-    const totalDiscount = 0;
-    const amountAfterDiscount = round2(subtotal - totalDiscount);
-    const taxAmount = round2(amountAfterDiscount * (TAX_RATE_PERCENT / 100));
-    const grandTotal = round2(amountAfterDiscount + taxAmount);
-
-    return {
-      subtotal,
-      totalFees,
-      totalDiscount,
-      taxRate: TAX_RATE_PERCENT,
-      taxAmount,
-      grandTotal,
-    };
   }
 
   private toCreateBookingApiResponse(
@@ -923,30 +824,5 @@ export class BookingService {
       updatedAt: booking.updatedAt,
       requiresHostConfirmation,
     };
-  }
-
-  private async invalidateAvailabilityCache(
-    propertyId: string,
-    checkInDate: Date,
-    checkOutDate: Date,
-  ): Promise<void> {
-    const dates = this.getDatesInRange(checkInDate, checkOutDate);
-    const keys = dates.map(
-      (d) =>
-        `property:${propertyId}:availability:${d.toISOString().split('T')[0]}`,
-    );
-    await this.redisService.delMany(keys);
-  }
-
-  private getDatesInRange(startDate: Date, endDate: Date): Date[] {
-    const dates: Date[] = [];
-    const currentDate = new Date(startDate);
-
-    while (currentDate < endDate) {
-      dates.push(new Date(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    return dates;
   }
 }

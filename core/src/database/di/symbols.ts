@@ -9,3 +9,5 @@ export const PAYMENT_TRANSACTION_REPOSITORY = Symbol(
 export const AVAILABILITY_CALENDAR_REPOSITORY = Symbol(
   'IAvailabilityCalendarRepository',
 );
+export const BOOKING_PRICE_CALCULATOR = Symbol('IBookingPriceCalculator');
+export const AVAILABILITY_CHECKER = Symbol('IAvailabilityChecker');
