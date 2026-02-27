@@ -1,5 +1,10 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { JOB_SYNC_PAYMENT_STATUS } from '../../bookings/booking-jobs/constants';
@@ -74,7 +79,9 @@ export class PaymentService implements IPaymentService {
           PaymentStatus.FAILED,
           paymentResponse.error,
         );
-        throw new Error(`Payment creation failed: ${paymentResponse.error}`);
+        throw new BadRequestException(
+          `Payment creation failed: ${paymentResponse.error}`,
+        );
       }
 
       // Update transaction with gateway response
@@ -137,7 +144,7 @@ export class PaymentService implements IPaymentService {
       await this.paymentTransactionService.findById(transactionId);
 
     if (!transaction) {
-      throw new Error(`Transaction not found: ${transactionId}`);
+      throw new NotFoundException(`Transaction not found: ${transactionId}`);
     }
 
     // If transaction is already in final state, return cached status

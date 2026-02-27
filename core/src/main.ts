@@ -20,10 +20,12 @@ async function bootstrap() {
     prefix: 'v',
   });
 
-  // Enable global validation pipe
+  // Enable global validation pipe (align with gateway: reject extra props, transform types)
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip properties that don't have decorators
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
     }),
   );
 

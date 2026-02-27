@@ -1,4 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
@@ -106,7 +113,7 @@ export class PropertyRepository implements IPropertyRepository {
     private readonly dataSource: DataSource,
   ) {}
   getAllPropertySlugs(): Promise<string[]> {
-    throw new Error('Method not implemented.');
+    throw new InternalServerErrorException('Method not implemented.');
   }
 
   /**
@@ -121,46 +128,47 @@ export class PropertyRepository implements IPropertyRepository {
     this.logger.error(`Database error in ${operation} for ${entity}:`, error);
 
     if (error instanceof QueryFailedError) {
-      const pgError = error as any;
+      const pgError = error as { code?: string; constraint?: string };
 
-      // Handle unique constraint violations
       if (pgError.code === '23505') {
         const constraint = pgError.constraint || 'unknown';
-        throw new Error(`Duplicate entry: ${constraint} already exists`);
+        throw new ConflictException(
+          `Duplicate entry: ${constraint} already exists`,
+        );
       }
 
-      // Handle foreign key constraint violations
       if (pgError.code === '23503') {
-        throw new Error(`Referenced record does not exist`);
+        throw new BadRequestException(`Referenced record does not exist`);
       }
 
-      // Handle not null constraint violations
       if (pgError.code === '23502') {
-        throw new Error(`Required field is missing`);
+        throw new BadRequestException(`Required field is missing`);
       }
 
-      // Handle check constraint violations
       if (pgError.code === '23514') {
-        throw new Error(`Invalid data: constraint violation`);
+        throw new BadRequestException(`Invalid data: constraint violation`);
       }
 
-      // Generic query failed error
-      throw new Error(
-        `Database operation failed: ${pgError.message || 'Unknown error'}`,
+      throw new InternalServerErrorException(
+        'Database operation failed. Please try again.',
       );
     }
 
     if (error instanceof EntityNotFoundError) {
-      throw new Error(`Record not found`);
+      throw new NotFoundException('Record not found');
     }
 
-    // Re-throw if it's already a known error
-    if (error instanceof Error) {
+    if (
+      error instanceof BadRequestException ||
+      error instanceof NotFoundException ||
+      error instanceof ConflictException
+    ) {
       throw error;
     }
 
-    // Unknown error
-    throw new Error(`Unexpected database error occurred`);
+    throw new InternalServerErrorException(
+      'An unexpected database error occurred. Please try again.',
+    );
   }
 
   // ==================== Property CRUD ====================
@@ -355,7 +363,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const property = await this.findPropertyById({ id: params.id });
       if (!property) {
-        throw new Error('Property not found');
+        throw new NotFoundException('Property not found');
       }
 
       Object.assign(property, {
@@ -441,7 +449,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const amenity = await this.findAmenityById({ id: params.id });
       if (!amenity) {
-        throw new Error('Amenity not found');
+        throw new NotFoundException('Amenity not found');
       }
 
       Object.assign(amenity, {
@@ -527,7 +535,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const location = await this.findPropertyLocationById({ id: params.id });
       if (!location) {
-        throw new Error('Property location not found');
+        throw new NotFoundException('Property location not found');
       }
 
       Object.assign(location, {
@@ -712,7 +720,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const rating = await this.findPropertyRatingById({ id: params.id });
       if (!rating) {
-        throw new Error('Property rating not found');
+        throw new NotFoundException('Property rating not found');
       }
 
       Object.assign(rating, {
@@ -947,7 +955,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const room = await this.findRoomById({ id: params.id });
       if (!room) {
-        throw new Error('Room not found');
+        throw new NotFoundException('Room not found');
       }
 
       Object.assign(room, {
@@ -1067,7 +1075,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const houseRule = await this.findHouseRuleById({ id: params.id });
       if (!houseRule) {
-        throw new Error('House rule not found');
+        throw new NotFoundException('House rule not found');
       }
 
       Object.assign(houseRule, {
@@ -1148,7 +1156,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const details = await this.findPropertyDetailsById({ id: params.id });
       if (!details) {
-        throw new Error('Property details not found');
+        throw new NotFoundException('Property details not found');
       }
 
       Object.assign(details, {
@@ -1232,7 +1240,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const policy = await this.findPropertyPolicyById({ id: params.id });
       if (!policy) {
-        throw new Error('Property policy not found');
+        throw new NotFoundException('Property policy not found');
       }
 
       Object.assign(policy, {
@@ -1323,7 +1331,7 @@ export class PropertyRepository implements IPropertyRepository {
     try {
       const pricing = await this.findPropertyPricingById({ id: params.id });
       if (!pricing) {
-        throw new Error('Property pricing not found');
+        throw new NotFoundException('Property pricing not found');
       }
 
       Object.assign(pricing, {

@@ -8,6 +8,12 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
+/** Nest/class-validator exception response shapes */
+interface ExceptionResponseBody {
+  message?: string | string[];
+  errors?: { field: string; message: string }[];
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -25,20 +31,33 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let errors: { field: string; message: string }[] = [];
     let message = 'Internal server error';
 
+    if (exception instanceof Error && !(exception instanceof HttpException)) {
+      message = exception.message;
+    }
+
     if (exception instanceof HttpException) {
       const res = exception.getResponse();
 
       // 🔹 class-validator
-      if (typeof res === 'object' && Array.isArray((res as any).message)) {
-        errors = (res as any).message.map((msg: string) => ({
-          field: extractField(msg),
-          message: normalizeMessage(msg),
-        }));
+      if (
+        typeof res === 'object' &&
+        Array.isArray((res as ExceptionResponseBody).message)
+      ) {
+        const messages = (res as ExceptionResponseBody).message;
+        if (Array.isArray(messages)) {
+          errors = messages.map((msg: string) => ({
+            field: extractField(msg),
+            message: normalizeMessage(msg),
+          }));
+        }
       }
 
       // 🔹 Zod / custom validation
-      else if (typeof res === 'object' && Array.isArray((res as any).errors)) {
-        errors = (res as any).errors;
+      else if (
+        typeof res === 'object' &&
+        Array.isArray((res as ExceptionResponseBody).errors)
+      ) {
+        errors = (res as ExceptionResponseBody).errors ?? [];
       }
 
       // 🔹 simple string
@@ -47,8 +66,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
 
       // 🔹 fallback object
-      else if (typeof res === 'object' && (res as any).message) {
-        message = (res as any).message;
+      else if (
+        typeof res === 'object' &&
+        (res as ExceptionResponseBody).message
+      ) {
+        const msg = (res as ExceptionResponseBody).message;
+        message = Array.isArray(msg) ? msg.join(', ') : (msg ?? '');
       }
     }
 

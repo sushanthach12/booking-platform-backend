@@ -25,27 +25,38 @@ export class PaymentController {
   @Post('webhook/cashfree')
   @HttpCode(HttpStatus.OK)
   async handleCashfreeWebhook(
-    @Body() payload: any,
+    @Body() payload: Record<string, unknown>,
     @Headers('x-cashfree-signature') signature: string,
   ) {
     this.logger.log('Received Cashfree webhook');
 
-    const result = await this.paymentService.handleWebhook(
-      PaymentGatewayType.CASHFREE,
-      payload,
-      signature,
-    );
+    try {
+      const result = await this.paymentService.handleWebhook(
+        PaymentGatewayType.CASHFREE,
+        payload,
+        signature,
+      );
 
-    if (result.success) {
-      return {
-        success: true,
-        message: 'Webhook processed successfully',
-        transactionId: result.transactionId,
-      };
-    } else {
+      if (result.success) {
+        return {
+          success: true,
+          message: 'Webhook processed successfully',
+          transactionId: result.transactionId,
+        };
+      }
+
       return {
         success: false,
         error: result.error,
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Webhook processing failed';
+      this.logger.error(`Cashfree webhook error: ${message}`);
+
+      return {
+        success: false,
+        error: message,
       };
     }
   }
@@ -53,27 +64,38 @@ export class PaymentController {
   @Post('webhook/razorpay')
   @HttpCode(HttpStatus.OK)
   async handleRazorpayWebhook(
-    @Body() payload: any,
+    @Body() payload: Record<string, unknown>,
     @Headers('x-razorpay-signature') signature: string,
   ) {
     this.logger.log('Received Razorpay webhook');
 
-    const result = await this.paymentService.handleWebhook(
-      PaymentGatewayType.RAZORPAY,
-      payload,
-      signature,
-    );
+    try {
+      const result = await this.paymentService.handleWebhook(
+        PaymentGatewayType.RAZORPAY,
+        payload,
+        signature,
+      );
 
-    if (result.success) {
-      return {
-        success: true,
-        message: 'Webhook processed successfully',
-        transactionId: result.transactionId,
-      };
-    } else {
+      if (result.success) {
+        return {
+          success: true,
+          message: 'Webhook processed successfully',
+          transactionId: result.transactionId,
+        };
+      }
+
       return {
         success: false,
         error: result.error,
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Webhook processing failed';
+      this.logger.error(`Razorpay webhook error: ${message}`);
+
+      return {
+        success: false,
+        error: message,
       };
     }
   }
@@ -81,27 +103,38 @@ export class PaymentController {
   @Post('webhook/stripe')
   @HttpCode(HttpStatus.OK)
   async handleStripeWebhook(
-    @Body() payload: any,
+    @Body() payload: Record<string, unknown>,
     @Headers('stripe-signature') signature: string,
   ) {
     this.logger.log('Received Stripe webhook');
 
-    const result = await this.paymentService.handleWebhook(
-      PaymentGatewayType.STRIPE,
-      payload,
-      signature,
-    );
+    try {
+      const result = await this.paymentService.handleWebhook(
+        PaymentGatewayType.STRIPE,
+        payload,
+        signature,
+      );
 
-    if (result.success) {
-      return {
-        success: true,
-        message: 'Webhook processed successfully',
-        transactionId: result.transactionId,
-      };
-    } else {
+      if (result.success) {
+        return {
+          success: true,
+          message: 'Webhook processed successfully',
+          transactionId: result.transactionId,
+        };
+      }
+
       return {
         success: false,
         error: result.error,
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Webhook processing failed';
+      this.logger.error(`Stripe webhook error: ${message}`);
+
+      return {
+        success: false,
+        error: message,
       };
     }
   }

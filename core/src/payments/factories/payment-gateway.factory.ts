@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CashfreeGateway } from '../gateways/cashfree.gateway';
 import {
@@ -21,14 +21,14 @@ export class PaymentGatewayFactory {
 
       case PaymentGatewayType.RAZORPAY:
         // TODO: Implement Razorpay gateway
-        throw new Error('Razorpay gateway not implemented yet');
+        throw new BadRequestException('Razorpay gateway not implemented yet');
 
       case PaymentGatewayType.STRIPE:
         // TODO: Implement Stripe gateway
-        throw new Error('Stripe gateway not implemented yet');
+        throw new BadRequestException('Stripe gateway not implemented yet');
 
       default:
-        throw new Error(`Unsupported payment gateway`);
+        throw new BadRequestException('Unsupported payment gateway');
     }
   }
 

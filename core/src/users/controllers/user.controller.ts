@@ -1,5 +1,4 @@
-import { Controller, Get, HttpStatus, Logger, Res } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Logger } from '@nestjs/common';
 import { RequestUserId } from '../../common/decorators/request-user.decorator';
 import { UserService } from '../services/user.service';
 
@@ -10,14 +9,11 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('profile')
-  async getProfile(
-    @Res() res: Response,
-    @RequestUserId() requestUserId: string,
-  ) {
+  async getProfile(@RequestUserId() requestUserId: string) {
     this.logger.log(`Getting profile for user`);
 
     const response = await this.userService.getProfile(requestUserId);
 
-    return res.status(HttpStatus.OK).json({ data: response });
+    return { data: response };
   }
 }

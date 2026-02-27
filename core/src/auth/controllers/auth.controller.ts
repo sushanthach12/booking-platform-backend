@@ -5,9 +5,7 @@ import {
   HttpStatus,
   Logger,
   Post,
-  Res,
 } from '@nestjs/common';
-import { Response } from 'express';
 import { LoginDto, RegisterDto } from '../dto/auth.dto';
 import { AuthService } from '../services/auth.service';
 
@@ -23,7 +21,7 @@ export class AuthController {
    */
   @Post('register')
   @HttpCode(HttpStatus.OK)
-  async register(@Res() res: Response, @Body() registerDto: RegisterDto) {
+  async register(@Body() registerDto: RegisterDto) {
     this.logger.log(`Register request received for email`);
 
     const response = await this.authService.register({
@@ -35,7 +33,7 @@ export class AuthController {
       },
     });
 
-    return res.status(HttpStatus.OK).json({ data: response });
+    return { data: response };
   }
 
   /**
@@ -44,12 +42,12 @@ export class AuthController {
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Res() res: Response, @Body() loginDto: LoginDto) {
+  async login(@Body() loginDto: LoginDto) {
     this.logger.log(`Login request received for email`);
 
     const response = await this.authService.login(loginDto);
 
-    return res.status(HttpStatus.OK).json({ data: response });
+    return { data: response };
   }
 
   /**
@@ -58,13 +56,12 @@ export class AuthController {
    */
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  async forgotPassword(
-    @Body()
-    forgotPasswordDto: {
-      email: string;
-    },
-  ) {
-    return this.authService.forgotPassword(forgotPasswordDto.email);
+  async forgotPassword(@Body() forgotPasswordDto: { email: string }) {
+    const response = await this.authService.forgotPassword(
+      forgotPasswordDto.email,
+    );
+
+    return { data: response };
   }
 
   /**
@@ -74,16 +71,13 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(
-    @Res() res: Response,
-    @Body()
-    resetPasswordDto: {
-      token: string;
-      newPassword: string;
-    },
+    @Body() resetPasswordDto: { token: string; newPassword: string },
   ) {
-    return this.authService.resetPassword(
+    const response = await this.authService.resetPassword(
       resetPasswordDto.token,
       resetPasswordDto.newPassword,
     );
+
+    return { data: response };
   }
 }

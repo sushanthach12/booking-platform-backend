@@ -1,3 +1,4 @@
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { UserEntity } from '../../entities/user.entity';
@@ -44,10 +45,16 @@ export class UserRepositoryImpl implements IUserRepository {
   }
   update(user: IUser): Promise<IUser> {
     console.log(`Updating user:`, user);
-    throw new Error('Method not implemented.');
+    throw new HttpException(
+      'Method not implemented.',
+      HttpStatus.NOT_IMPLEMENTED,
+    );
   }
   delete(id: string): Promise<void> {
     console.log(`Deleting user by ID: ${id}`);
-    throw new Error('Method not implemented.');
+    throw new HttpException(
+      'Method not implemented.',
+      HttpStatus.NOT_IMPLEMENTED,
+    );
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import {
@@ -50,7 +50,7 @@ export class BookingRepository implements IBookingRepository {
     await this.repository.update(id, data);
     const updated = await this.findById(id);
     if (!updated) {
-      throw new Error(`Booking with id ${id} not found`);
+      throw new NotFoundException(`Booking with id ${id} not found`);
     }
     return updated;
   }

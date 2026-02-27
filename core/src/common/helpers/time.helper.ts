@@ -1,3 +1,5 @@
+import { BadRequestException } from '@nestjs/common';
+
 export function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
 
@@ -9,7 +11,7 @@ export function timeToMinutes(time: string): number {
     m < 0 ||
     m > 59
   ) {
-    throw new Error('Invalid time format, expected HH:mm');
+    throw new BadRequestException('Invalid time format, expected HH:mm');
   }
 
   return h * 60 + m;

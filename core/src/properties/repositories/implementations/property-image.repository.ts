@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryFailedError } from 'typeorm';
 import { PropertyImageEntity } from '../../entities/property-image.entity';
@@ -100,7 +105,7 @@ export class PropertyImageRepository implements IPropertyImageRepository {
     try {
       const image = await this.findPropertyImageById({ id: params.id });
       if (!image) {
-        throw new Error('Property image not found');
+        throw new NotFoundException('Property image not found');
       }
 
       Object.assign(image, {
@@ -174,13 +179,18 @@ export class PropertyImageRepository implements IPropertyImageRepository {
     }
   }
 
-  private handleDbError(error: any, method: string, entity: string): never {
-    this.logger.error(`Error in ${method}: ${error.message}`, error.stack);
+  private handleDbError(error: unknown, method: string, entity: string): never {
+    const message = error instanceof Error ? error.message : String(error);
+    this.logger.error(`Error in ${method}: ${message}`);
 
     if (error instanceof QueryFailedError) {
-      throw new Error(`Database error in ${method}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Database error in ${method}. Please try again.`,
+      );
     }
 
-    throw new Error(`Failed to ${method} ${entity}: ${error.message}`);
+    throw new InternalServerErrorException(
+      `Failed to ${method} ${entity}. Please try again.`,
+    );
   }
 }
