@@ -753,16 +753,10 @@ export class BookingService {
     data: CheckBookingAvailabilityRequest,
   ): Promise<CheckBookingAvailabilityResponse> {
     // validate the check out date to be greater than the check in date
-    const checkInDate = moment(data.checkInDate)
-      .startOf('day')
-      .toDate()
-      .getDate();
-    const checkOutDate = moment(data.checkOutDate)
-      .startOf('day')
-      .toDate()
-      .getDate();
+    const checkInDate = moment(data.checkInDate).startOf('day');
+    const checkOutDate = moment(data.checkOutDate).startOf('day');
 
-    if (checkOutDate <= checkInDate) {
+    if (checkOutDate.isBefore(checkInDate)) {
       throw new BadRequestException(
         'Check out date must be greater than check in date',
       );

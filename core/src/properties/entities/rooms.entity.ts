@@ -9,7 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { EBedType, ERoomStatus, ERoomType } from '../enums/rooms.enum';
-import { AvailabilityCalenderEntity } from './availablity-calender.entity';
+import { AvailabilityCalenderEntity } from './availability-calendar.entity';
 import { PropertyImageEntity } from './property-image.entity';
 import { PropertyEntity } from './property.entity';
 

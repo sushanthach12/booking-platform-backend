@@ -8,7 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { EPropertyStatus } from '../enums/property.enum';
-import { AvailabilityCalenderEntity } from './availablity-calender.entity';
+import { AvailabilityCalenderEntity } from './availability-calendar.entity';
 import { HouseRuleEntity } from './house-rules.entity';
 import { PropertyAmenityEntity } from './property-amenity.entity';
 import { PropertyDetailsEntity } from './property-details.entity';
@@ -30,11 +30,11 @@ export class PropertyEntity {
   @Column({ type: 'varchar', length: 255 })
   title: string;
 
-  @Column({ 
-    type: 'varchar', 
-    length: 255, 
+  @Column({
+    type: 'varchar',
+    length: 255,
     unique: true,
-    name: 'slug'
+    name: 'slug',
   })
   slug: string;
 

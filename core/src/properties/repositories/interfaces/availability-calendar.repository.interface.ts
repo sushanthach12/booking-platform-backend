@@ -1,5 +1,5 @@
 import { EntityManager } from 'typeorm';
-import { AvailabilityCalenderEntity } from '../../entities/availablity-calender.entity';
+import { AvailabilityCalenderEntity } from '../../entities/availability-calendar.entity';
 
 export interface IFindAvailabilityByRangeParams {
   propertyId: string;
