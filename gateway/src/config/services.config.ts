@@ -23,6 +23,7 @@ export type ServiceConfig = {
 
 export const servicesEnv = {
   core: {
+    baseUrl: 'CORE_BASE_URL',
     timeout: 'USER_SERVICE_TIMEOUT',
     retries: 'USER_SERVICE_RETRIES',
     rateLimitTtl: 'USER_SERVICE_RATE_LIMIT_TTL',
@@ -169,8 +170,9 @@ export const getServiceConfig = (
   const defaults = servicesDefaults[service];
   const env = servicesEnv[service];
 
+  const baseUrl = configService.get<string>(env.baseUrl) ?? defaults.baseUrl;
   return {
-    baseUrl: defaults.baseUrl,
+    baseUrl,
     timeout: parseNumber(
       configService.get<string>(env.timeout),
       defaults.timeout,
