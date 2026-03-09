@@ -17,9 +17,14 @@ export const getTypeOrmConfig = (
   ssl:
     configService.get<string>('POSTGRES_SSL') === 'true'
       ? {
-          ca: configService.getOrThrow<string>('POSTGRES_CA_CERTIFICATE'),
+          ca: configService
+            .getOrThrow<string>('POSTGRES_CA_CERTIFICATE')
+            .replace(/\\n/g, '\n'),
+          rejectUnauthorized: true,
         }
-      : false,
+      : {
+          rejectUnauthorized: false,
+        },
 });
 
 export default getTypeOrmConfig;
