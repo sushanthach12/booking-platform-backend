@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { QUEUE_BOOKING_DETAILS } from '../../../queues/queues.module';
 import { BookingSnapshotService } from '../../services/booking-snapshot.service';
@@ -9,7 +9,7 @@ export interface CreateBookingDetailsPayload {
   bookingId: string;
 }
 
-@Processor(QUEUE_BOOKING_DETAILS)
+@Processor(QUEUE_BOOKING_DETAILS, { concurrency: 1 })
 @Injectable()
 export class CreateBookingDetailsProcessor extends WorkerHost {
   private readonly logger = new Logger(CreateBookingDetailsProcessor.name);

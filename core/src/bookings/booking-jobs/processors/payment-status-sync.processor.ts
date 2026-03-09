@@ -11,7 +11,7 @@ export interface PaymentStatusSyncPayload {
   status: string;
 }
 
-@Processor(QUEUE_PAYMENT_STATUS_SYNC)
+@Processor(QUEUE_PAYMENT_STATUS_SYNC, { concurrency: 1 })
 @Injectable()
 export class PaymentStatusSyncProcessor extends WorkerHost {
   private readonly logger = new Logger(PaymentStatusSyncProcessor.name);

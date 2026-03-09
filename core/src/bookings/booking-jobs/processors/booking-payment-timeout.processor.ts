@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { BOOKING_SERVICE } from '../../../database';
 import { QUEUE_BOOKING_PAYMENT_TIMEOUT } from '../../../queues/queues.module';
@@ -11,7 +11,7 @@ export interface ExpireUnpaidBookingPayload {
   paymentTransactionId: string;
 }
 
-@Processor(QUEUE_BOOKING_PAYMENT_TIMEOUT)
+@Processor(QUEUE_BOOKING_PAYMENT_TIMEOUT, { concurrency: 1 })
 @Injectable()
 export class BookingPaymentTimeoutProcessor extends WorkerHost {
   private readonly logger = new Logger(BookingPaymentTimeoutProcessor.name);
