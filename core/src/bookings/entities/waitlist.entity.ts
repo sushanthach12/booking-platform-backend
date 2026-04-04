@@ -11,9 +11,13 @@ import {
 import { WaitlistState } from '../enums/waitlist-state.enum';
 
 @Entity('waitlist')
-@Index(['propertyId', 'checkInDate', 'checkOutDate', 'priority'], { where: "state = 'waitlisted'" })
+@Index(['propertyId', 'checkInDate', 'checkOutDate', 'priority'], {
+  where: "state = 'waitlisted'",
+})
 @Index(['userId', 'state'])
-@Index(['state', 'expiresAt'], { where: "state IN ('invited', 'booking_in_progress')" })
+@Index(['state', 'expiresAt'], {
+  where: "state IN ('invited', 'booking_in_progress')",
+})
 export class WaitlistEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;

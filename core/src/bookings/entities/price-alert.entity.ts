@@ -27,7 +27,13 @@ export class PriceAlertEntity {
   @Column({ name: 'target_price', type: 'decimal', precision: 10, scale: 2 })
   targetPrice: number;
 
-  @Column({ name: 'current_price', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'current_price',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   currentPrice?: number;
 
   @Column({ name: 'auto_book', type: 'boolean', default: false })

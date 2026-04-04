@@ -20,8 +20,11 @@ export class CashfreeGateway implements IPaymentGateway {
 
   constructor(private configService: ConfigService) {
     this.apiKey = this.configService.get<string>('CASHFREE_API_KEY') || '';
-    this.apiSecret = this.configService.get<string>('CASHFREE_API_SECRET') || '';
-    this.baseUrl = this.configService.get<string>('CASHFREE_API_URL') || 'https://api.cashfree.com/pg';
+    this.apiSecret =
+      this.configService.get<string>('CASHFREE_API_SECRET') || '';
+    this.baseUrl =
+      this.configService.get<string>('CASHFREE_API_URL') ||
+      'https://api.cashfree.com/pg';
   }
 
   async createPayment(
@@ -32,10 +35,10 @@ export class CashfreeGateway implements IPaymentGateway {
     options?: PaymentOptions,
   ): Promise<GatewayPaymentResponse> {
     this.logger.log(`Creating Cashfree payment for order: ${orderId}`);
-    
+
     // TODO: Implement actual Cashfree API integration
     // This is a placeholder implementation
-    
+
     try {
       // Placeholder response - replace with actual Cashfree API call
       return {
@@ -57,10 +60,10 @@ export class CashfreeGateway implements IPaymentGateway {
 
   async getPaymentStatus(orderId: string): Promise<GatewayStatusResponse> {
     this.logger.log(`Getting payment status for order: ${orderId}`);
-    
+
     // TODO: Implement actual Cashfree API integration
     // This is a placeholder implementation
-    
+
     try {
       // Placeholder response - replace with actual Cashfree API call
       return {
@@ -79,16 +82,19 @@ export class CashfreeGateway implements IPaymentGateway {
     }
   }
 
-  async verifyWebhook(payload: any, signature: string): Promise<WebhookVerificationResult> {
+  async verifyWebhook(
+    payload: any,
+    signature: string,
+  ): Promise<WebhookVerificationResult> {
     this.logger.log('Verifying Cashfree webhook');
-    
+
     // TODO: Implement actual Cashfree webhook verification
     // This is a placeholder implementation
-    
+
     try {
       // Placeholder verification - replace with actual signature verification
       const isValid = signature && payload;
-      
+
       return {
         valid: isValid,
         webhookData: isValid ? payload : undefined,
@@ -103,12 +109,17 @@ export class CashfreeGateway implements IPaymentGateway {
     }
   }
 
-  async refundPayment(orderId: string, amount?: number): Promise<RefundResponse> {
-    this.logger.log(`Processing refund for order: ${orderId}, amount: ${amount}`);
-    
+  async refundPayment(
+    orderId: string,
+    amount?: number,
+  ): Promise<RefundResponse> {
+    this.logger.log(
+      `Processing refund for order: ${orderId}, amount: ${amount}`,
+    );
+
     // TODO: Implement actual Cashfree API integration
     // This is a placeholder implementation
-    
+
     try {
       // Placeholder response - replace with actual Cashfree API call
       return {
@@ -131,10 +142,10 @@ export class CashfreeGateway implements IPaymentGateway {
 
   async terminatePayment(orderId: string): Promise<boolean> {
     this.logger.log(`Terminating payment for order: ${orderId}`);
-    
+
     // TODO: Implement actual Cashfree API integration
     // This is a placeholder implementation
-    
+
     try {
       // Placeholder implementation - replace with actual Cashfree API call
       // In real implementation, this would call Cashfree's cancel/refund API

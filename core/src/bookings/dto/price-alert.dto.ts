@@ -21,7 +21,7 @@ export class CreatePriceAlertDto {
   @ApiProperty({
     type: Number,
     description: 'Target price for alert',
-    example: 150.00,
+    example: 150.0,
   })
   @IsNumber()
   @IsNotEmpty()

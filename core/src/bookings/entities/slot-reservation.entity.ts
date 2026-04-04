@@ -10,7 +10,9 @@ import {
 } from 'typeorm';
 
 @Entity('slot_reservations')
-@Index(['propertyId', 'checkInDate', 'checkOutDate'], { where: "status IN ('reserved', 'booked')" })
+@Index(['propertyId', 'checkInDate', 'checkOutDate'], {
+  where: "status IN ('reserved', 'booked')",
+})
 @Index(['reservedUntil'], { where: "status = 'reserved'" })
 export class SlotReservationEntity {
   @PrimaryGeneratedColumn('uuid')

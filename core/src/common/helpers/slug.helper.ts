@@ -24,20 +24,22 @@ export class SlugHelper {
    * @param location The property location (city, state, country)
    * @returns A unique slug based on name and location
    */
-  static generatePropertySlug(name: string, location: {
-    city?: string;
-    state?: string;
-    country?: string;
-  }): string {
+  static generatePropertySlug(
+    name: string,
+    location: {
+      city?: string;
+      state?: string;
+      country?: string;
+    },
+  ): string {
     const locationParts = [
       location?.city,
       location?.state,
-      location?.country
+      location?.country,
     ].filter(Boolean);
 
-    const combinedText = locationParts.length > 0 
-      ? `${name} ${locationParts.join(' ')}`
-      : name;
+    const combinedText =
+      locationParts.length > 0 ? `${name} ${locationParts.join(' ')}` : name;
 
     return this.generateSlug(combinedText);
   }
@@ -50,11 +52,11 @@ export class SlugHelper {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
     const length = Math.random() > 0.5 ? 4 : 5; // Random length between 4-5 characters
-    
+
     for (let i = 0; i < length; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
+
     return result;
   }
 

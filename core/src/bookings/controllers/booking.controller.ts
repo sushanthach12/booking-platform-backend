@@ -207,7 +207,10 @@ export class BookingController {
 
   @Post('checkout/preview')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get a price breakdown and quote token before confirming a booking' })
+  @ApiOperation({
+    summary:
+      'Get a price breakdown and quote token before confirming a booking',
+  })
   @ApiResponse({
     status: 200,
     description:

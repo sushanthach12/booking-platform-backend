@@ -33,9 +33,7 @@ export class HostOnboardingController {
     @CurrentUser() user: RequestUser,
     @Body() body: HostOnboardingDto,
   ) {
-    this.logger.log(
-      `Host onboarding request received for user id=${user.id}`,
-    );
+    this.logger.log(`Host onboarding request received for user id=${user.id}`);
 
     const rules = body.amenitiesAndRules.rules ?? [];
 
