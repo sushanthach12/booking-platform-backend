@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  IsUrl,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -423,4 +424,14 @@ export class CreatePropertyDto {
   @Type(() => PropertyAmenitiesDto)
   @IsNotEmpty()
   amenities: PropertyAmenitiesDto[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Optional public image URLs to attach on create (same as host onboarding media)',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUrl({}, { each: true })
+  imageUrls?: string[];
 }

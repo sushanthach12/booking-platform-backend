@@ -20,7 +20,7 @@ export interface ICreatePropertyRequestParams {
     };
     address: {
       addressLine1: string;
-      addressLine2: string;
+      addressLine2?: string | null;
       city: string;
       state: string;
       country: string;
@@ -33,7 +33,7 @@ export interface ICreatePropertyRequestParams {
       currency: string;
       charges: {
         type: EPropertyChargeTypes;
-        chargeFee: {
+        chargeFee?: {
           type: EPropertyChargeFeeTypes;
           value: number;
         };
@@ -51,15 +51,15 @@ export interface ICreatePropertyRequestParams {
     rules: {
       ruleType: EPropertyRuleType;
       allowed: boolean;
-      description: string;
+      description?: string | null;
     }[];
     amenities: {
       name: string;
-      description: string;
-      icon: string;
+      description?: string | null;
+      icon?: string | null;
       category: EPropertyAmenityCategory;
     }[];
-    imageUrls: string[];
+    imageUrls?: string[];
   };
 }
 

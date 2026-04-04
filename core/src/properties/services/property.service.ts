@@ -166,7 +166,7 @@ export class PropertyService {
   ): Promise<ICreatePropertyResponse> {
     // if zod schema validations are needed, use parseWithZod
     const validatedParams = parseWithZod(CreatePropertyRequestSchema, params);
-    this.validateCreatePropertyPayload(params.payload);
+    this.validateCreatePropertyPayload(validatedParams.payload);
 
     // check if the user is a host
     if (validatedParams.user.role !== EUserRole.HOST) {

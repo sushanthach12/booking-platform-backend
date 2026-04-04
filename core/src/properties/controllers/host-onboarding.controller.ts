@@ -10,7 +10,6 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { HostOnboardingDto } from '../dto/host-onboarding.dto';
-import { PropertyImageService } from '../services/property-image.service';
 import { PropertyService } from '../services/property.service';
 
 /**
@@ -23,10 +22,7 @@ import { PropertyService } from '../services/property.service';
 export class HostOnboardingController {
   private readonly logger = new Logger(HostOnboardingController.name);
 
-  constructor(
-    private readonly propertyService: PropertyService,
-    private readonly propertyImageService: PropertyImageService,
-  ) {}
+  constructor(private readonly propertyService: PropertyService) {}
 
   @Post('onboard')
   @HttpCode(HttpStatus.CREATED)
@@ -37,9 +33,12 @@ export class HostOnboardingController {
     @CurrentUser() user: RequestUser,
     @Body() body: HostOnboardingDto,
   ) {
-    this.logger.log(`Host onboarding request received from user`);
+    this.logger.log(
+      `Host onboarding request received for user id=${user.id}`,
+    );
 
-    // Create the core property record (details, address, pricing, policies, amenities, rules)
+    const rules = body.amenitiesAndRules.rules ?? [];
+
     const property = await this.propertyService.createProperty({
       user,
       payload: {
@@ -47,7 +46,7 @@ export class HostOnboardingController {
         address: body.location,
         pricing: body.pricingAndPolicies,
         policies: body.pricingAndPolicies,
-        rules: body.amenitiesAndRules.rules,
+        rules,
         amenities: body.amenitiesAndRules.amenities,
         imageUrls: body.media.imageUrls,
       },

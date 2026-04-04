@@ -15,8 +15,8 @@ import {
   Repository,
 } from 'typeorm';
 import { ECurrency } from '../../../common/enums/currency.enum';
-import { Amenity } from '../../entities/amenity.entity';
-import { HouseRuleEntity } from '../../entities/house-rules.entity';
+import { Amenity, AmenityCategory } from '../../entities/amenity.entity';
+import { HouseRuleEntity, RuleType } from '../../entities/house-rules.entity';
 import { PropertyAmenityEntity } from '../../entities/property-amenity.entity';
 import { PropertyDetailsEntity } from '../../entities/property-details.entity';
 import { PropertyImageEntity } from '../../entities/property-image.entity';
@@ -27,7 +27,9 @@ import { PropertyRatingEntity } from '../../entities/property-rating.entity';
 import { PropertyEntity } from '../../entities/property.entity';
 import { RoomEntity } from '../../entities/rooms.entity';
 import {
+  EPropertyAmenityCategory,
   EPropertyCancellationPolicy,
+  EPropertyRuleType,
   EPropertyStatus,
   EPropertyType,
 } from '../../enums/property.enum';
@@ -187,18 +189,67 @@ export class PropertyRepository implements IPropertyRepository {
     }
   }
 
+  private mapHostRuleTypeToEntity(ruleType: EPropertyRuleType): RuleType {
+    if (ruleType === EPropertyRuleType.NO_SMOKING) {
+      return RuleType.SMOKING;
+    }
+    const value = ruleType as string;
+    const values = Object.values(RuleType) as string[];
+    if (values.includes(value)) {
+      return value as RuleType;
+    }
+    return RuleType.OTHER;
+  }
+
+  private mapHostAmenityCategory(
+    category: EPropertyAmenityCategory,
+  ): AmenityCategory {
+    switch (category) {
+      case EPropertyAmenityCategory.GENERAL:
+        return AmenityCategory.ESSENTIALS;
+      case EPropertyAmenityCategory.ESSENTIALS:
+        return AmenityCategory.ESSENTIALS;
+      case EPropertyAmenityCategory.FEATURES:
+        return AmenityCategory.FEATURES;
+      case EPropertyAmenityCategory.LOCATION:
+        return AmenityCategory.LOCATION;
+      case EPropertyAmenityCategory.SAFETY:
+        return AmenityCategory.SAFETY;
+      default:
+        return AmenityCategory.ESSENTIALS;
+    }
+  }
+
   async createProperty(
     params: ICreatePropertyImplParams,
   ): Promise<ICreatePropertyImplResponse> {
     try {
-      const { hostId, payload } = params;
+      const { hostId, payload, slug } = params;
+      const imageUrls = payload.imageUrls ?? [];
 
       const result = await this.dataSource.transaction(async (manager) => {
+        const images = imageUrls.map((url, index) =>
+          manager.create(PropertyImageEntity, {
+            url,
+            displayOrder: index,
+            isPrimary: index === 0,
+            thumbnailUrl: null,
+            caption: null,
+            altText: null,
+            roomId: null,
+            width: null,
+            height: null,
+            fileSize: null,
+            mimeType: null,
+          }),
+        );
+
         /* ----------------------------------
          * 1. Create Property (root entity)
          * ---------------------------------- */
         const property: PropertyEntity = manager.create(PropertyEntity, {
           hostId: hostId,
+          slug,
           title: payload.details.title,
           description: payload.details.description ?? null,
           propertyType: payload.details.propertyType,
@@ -228,7 +279,7 @@ export class PropertyRepository implements IPropertyRepository {
           },
           rooms: [],
           amenities: [],
-          images: [],
+          images,
           houseRules: [],
           location: {
             addressLine1: payload.address.addressLine1,
@@ -243,6 +294,55 @@ export class PropertyRepository implements IPropertyRepository {
         } as DeepPartial<PropertyEntity>);
 
         const savedProperty = await manager.save(property);
+
+        const rules = payload.rules ?? [];
+        const seenHouseRuleTypes = new Set<RuleType>();
+        for (const r of rules) {
+          const entityRuleType = this.mapHostRuleTypeToEntity(r.ruleType);
+          if (seenHouseRuleTypes.has(entityRuleType)) {
+            continue;
+          }
+          seenHouseRuleTypes.add(entityRuleType);
+          const allowed =
+            r.ruleType === EPropertyRuleType.NO_SMOKING ? false : r.allowed;
+          await manager.save(
+            manager.create(HouseRuleEntity, {
+              propertyId: savedProperty.id,
+              ruleType: entityRuleType,
+              allowed,
+              description: r.description ?? null,
+            }),
+          );
+        }
+
+        const amenityRepo = manager.getRepository(Amenity);
+        const linkedAmenityIds = new Set<string>();
+        for (const a of payload.amenities ?? []) {
+          let amenity = await amenityRepo.findOne({
+            where: { name: a.name },
+          });
+          if (!amenity) {
+            amenity = await amenityRepo.save(
+              amenityRepo.create({
+                name: a.name,
+                category: this.mapHostAmenityCategory(a.category),
+                icon: a.icon ?? null,
+                description: a.description ?? null,
+              }),
+            );
+          }
+          if (linkedAmenityIds.has(amenity.id)) {
+            continue;
+          }
+          linkedAmenityIds.add(amenity.id);
+          await manager.save(
+            manager.create(PropertyAmenityEntity, {
+              propertyId: savedProperty.id,
+              amenityId: amenity.id,
+              notes: null,
+            }),
+          );
+        }
 
         return {
           id: savedProperty.id,

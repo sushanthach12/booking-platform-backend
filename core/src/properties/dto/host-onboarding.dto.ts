@@ -1,15 +1,26 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
+  IsLatitude,
+  IsLongitude,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsPositive,
   IsString,
   IsUrl,
+  Length,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -41,6 +52,8 @@ export class HostOnboardingBasicInfoDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MinLength(3)
+  @MaxLength(255)
   title: string;
 
   @ApiProperty({
@@ -50,6 +63,8 @@ export class HostOnboardingBasicInfoDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MinLength(10)
+  @MaxLength(8000)
   description: string;
 }
 
@@ -120,8 +135,9 @@ export class HostOnboardingLocationDto {
     example: 25.7617,
     required: true,
   })
+  @Type(() => Number)
   @IsNumber()
-  @IsNotEmpty()
+  @IsLatitude()
   latitude: number;
 
   @ApiProperty({
@@ -130,8 +146,9 @@ export class HostOnboardingLocationDto {
     example: -80.1918,
     required: true,
   })
+  @Type(() => Number)
   @IsNumber()
-  @IsNotEmpty()
+  @IsLongitude()
   longitude: number;
 }
 
@@ -153,8 +170,9 @@ class PricingChargeFeeDto {
     description: 'Value of the charge fee',
     example: 10,
   })
+  @Type(() => Number)
   @IsNumber()
-  @IsNotEmpty()
+  @IsPositive()
   value: number;
 }
 
@@ -190,18 +208,23 @@ export class HostOnboardingPricingPoliciesDto {
     example: 120,
     required: true,
   })
+  @Type(() => Number)
   @IsNumber()
-  @IsNotEmpty()
+  @IsPositive()
   basePrice: number;
 
   @ApiProperty({
     type: String,
-    description: 'Currency code',
+    description: 'ISO 4217 currency code',
     example: 'INR',
     required: true,
   })
   @IsString()
   @IsNotEmpty()
+  @Length(3, 3)
+  @Matches(/^[A-Za-z]{3}$/, {
+    message: 'currency must be a 3-letter ISO 4217 code',
+  })
   currency: string;
 
   @ApiPropertyOptional({
@@ -220,8 +243,9 @@ export class HostOnboardingPricingPoliciesDto {
     example: 1,
     required: true,
   })
-  @IsNumber()
-  @IsNotEmpty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   minNights: number;
 
   @ApiProperty({
@@ -230,8 +254,10 @@ export class HostOnboardingPricingPoliciesDto {
     example: 30,
     required: true,
   })
-  @IsNumber()
-  @IsNotEmpty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
   maxNights: number;
 
   @ApiProperty({
@@ -240,29 +266,35 @@ export class HostOnboardingPricingPoliciesDto {
     example: 4,
     required: true,
   })
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
   @IsPositive()
-  @IsNotEmpty()
   maxGuests: number;
 
   @ApiProperty({
     type: String,
-    description: 'Check in time',
+    description: 'Check in time (24h HH:mm)',
     example: '14:00',
     required: true,
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: 'checkInTime must be HH:mm in 24-hour format',
+  })
   checkInTime: string;
 
   @ApiProperty({
     type: String,
-    description: 'Check out time',
+    description: 'Check out time (24h HH:mm)',
     example: '11:00',
     required: true,
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: 'checkOutTime must be HH:mm in 24-hour format',
+  })
   checkOutTime: string;
 
   @ApiProperty({
@@ -368,6 +400,8 @@ export class HostOnboardingAmenitiesRulesDto {
     description: 'Amenities for the property',
   })
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => HostOnboardingAmenityDto)
   @IsNotEmpty()
@@ -378,6 +412,7 @@ export class HostOnboardingAmenitiesRulesDto {
     description: 'Rules for the property',
   })
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => HostOnboardingRuleDto)
   @IsOptional()
@@ -395,6 +430,8 @@ export class HostOnboardingMediaDto {
     required: true,
   })
   @IsArray()
+  @ArrayMinSize(1, { message: 'At least one property image URL is required' })
+  @ArrayMaxSize(50)
   @IsUrl({}, { each: true })
   @IsNotEmpty()
   imageUrls: string[];

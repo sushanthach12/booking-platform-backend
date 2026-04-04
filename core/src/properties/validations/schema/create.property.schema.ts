@@ -32,10 +32,12 @@ const PropertyDetailsSchema = z.object({
 const PropertyAddressSchema = z.object({
   addressLine1: z.string().min(3),
   addressLine2: z.string().optional(),
-  city: z.string(),
-  state: z.string(),
-  country: z.string(),
-  postalCode: z.string(),
+  city: z.string().min(1),
+  state: z.string().min(1),
+  country: z.string().min(1),
+  postalCode: z.string().min(1),
+  latitude: z.number().gte(-90).lte(90),
+  longitude: z.number().gte(-180).lte(180),
 });
 
 const PropertyChargeFeeSchema = z.object({
@@ -45,7 +47,7 @@ const PropertyChargeFeeSchema = z.object({
 
 const PropertyChargeSchema = z.object({
   type: EPropertyChargeTypesSchema,
-  chargeFee: PropertyChargeFeeSchema,
+  chargeFee: PropertyChargeFeeSchema.optional(),
 });
 
 const PropertyPricingSchema = z.object({
@@ -82,11 +84,14 @@ const PropertyRuleSchema = z.object({
 });
 
 const PropertyAmenitySchema = z.object({
-  name: z.string(),
-  description: z.string().optional(),
-  icon: z.string(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(2000).optional(),
+  icon: z.string().max(100).optional(),
   category: EPropertyAmenityCategorySchema,
 });
+
+/** Host onboarding requires ≥1 URL via HostOnboardingMediaDto; generic create may omit and default to []. */
+const ImageUrlsSchema = z.array(z.string().url()).max(50).default([]);
 
 export const CreatePropertyRequestSchema = z.object({
   user: RequestUserSchema,
@@ -95,7 +100,8 @@ export const CreatePropertyRequestSchema = z.object({
     address: PropertyAddressSchema,
     pricing: PropertyPricingSchema,
     policies: PropertyPoliciesSchema,
-    rules: z.array(PropertyRuleSchema),
+    rules: z.array(PropertyRuleSchema).default([]),
     amenities: z.array(PropertyAmenitySchema),
+    imageUrls: ImageUrlsSchema,
   }),
 });

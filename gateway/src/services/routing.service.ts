@@ -46,6 +46,8 @@ export class RoutingService {
     this.addRoute('/api/core/v1/auth/*', 'core', 'ALL', [
       '/api/core/v1/auth/login',
       '/api/core/v1/auth/register',
+      '/api/core/v1/auth/forgot-password',
+      '/api/core/v1/auth/reset-password',
       '/api/core/v1/auth/refresh',
       '/api/core/v1/auth/verify',
     ]);
@@ -64,6 +66,8 @@ export class RoutingService {
 
     // Host onboarding — all routes require authentication
     this.addRoute('/api/core/v1/host/*', 'core', 'ALL');
+
+    this.addRoute('/api/core/v1/users/*', 'core', 'ALL');
   }
 
   private addRoute(
