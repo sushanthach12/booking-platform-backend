@@ -61,6 +61,9 @@ export class RoutingService {
       // bookings
       '/api/core/v1/bookings/check-availability',
     ]);
+
+    // Host onboarding — all routes require authentication
+    this.addRoute('/api/core/v1/host/*', 'core', 'ALL');
   }
 
   private addRoute(

@@ -59,6 +59,7 @@ export interface ICreatePropertyRequestParams {
       icon: string;
       category: EPropertyAmenityCategory;
     }[];
+    imageUrls: string[];
   };
 }
 

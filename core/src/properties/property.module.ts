@@ -6,12 +6,13 @@ import {
   PROPERTY_IMAGE_REPOSITORY,
   PROPERTY_REPOSITORY,
 } from '../database';
+import { HostOnboardingController } from './controllers/host-onboarding.controller';
 import { PropertyAmenityController } from './controllers/property-amenity.controller';
 import { PropertyImageController } from './controllers/property-image.controller';
 import { PropertyController } from './controllers/property.controller';
 import {
-  AvailabilityCalenderEntity,
   Amenity,
+  AvailabilityCalenderEntity,
   HouseRuleEntity,
   PropertyAmenityEntity,
   PropertyDetailsEntity,
@@ -23,7 +24,10 @@ import {
   PropertyRatingEntity,
   RoomEntity,
 } from './entities';
-import { AvailabilityCalendarRepository, PropertyRepository } from './repositories';
+import {
+  AvailabilityCalendarRepository,
+  PropertyRepository,
+} from './repositories';
 import { PropertyAmenityRepository } from './repositories/implementations/property-amenity.repository';
 import { PropertyImageRepository } from './repositories/implementations/property-image.repository';
 import { PropertyAmenityService } from './services/property-amenity.service';
@@ -49,6 +53,7 @@ import { PropertyService } from './services/property.service';
   ],
   controllers: [
     PropertyController,
+    HostOnboardingController,
     PropertyImageController,
     PropertyAmenityController,
   ],
