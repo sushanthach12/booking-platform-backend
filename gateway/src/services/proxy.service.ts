@@ -43,7 +43,8 @@ export class ProxyService {
       this.configService,
       route.service as ServiceName,
     );
-    const targetUrl = `${serviceUrl}${path}`;
+    const targetPath = this.routingService.resolveTargetPath(path, route);
+    const targetUrl = `${serviceUrl}${targetPath}`;
 
     const cleanHeaders: Record<string, string> = {
       ...headers,

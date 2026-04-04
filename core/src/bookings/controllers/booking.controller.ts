@@ -26,6 +26,7 @@ import {
   GetBookingsQueryDto,
   JoinWaitlistDto,
 } from '../dto';
+import { CheckoutPreviewDto } from '../dto/checkout.dto';
 
 @ApiTags('bookings')
 @Controller('bookings')
@@ -80,7 +81,11 @@ export class BookingController {
     }
 
     const response = await this.bookingService.createBooking(
-      body,
+      {
+        ...body,
+        paymentMethod: body.paymentMethod,
+        quoteToken: body.quoteToken,
+      },
       user.id,
       hostId,
     );
@@ -196,6 +201,27 @@ export class BookingController {
       query: params,
       user,
     });
+
+    return { data: response };
+  }
+
+  @Post('checkout/preview')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get a price breakdown and quote token before confirming a booking' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Price preview returned. Use the quoteToken in POST /bookings to validate the quoted price.',
+  })
+  async checkoutPreview(
+    @CurrentUser() user: RequestUser,
+    @Body() body: CheckoutPreviewDto,
+  ) {
+    this.logger.log(
+      `Checkout preview request received from user ${user.id} for property ${body.propertyId}`,
+    );
+
+    const response = await this.bookingService.previewCheckout(body, user.id);
 
     return { data: response };
   }

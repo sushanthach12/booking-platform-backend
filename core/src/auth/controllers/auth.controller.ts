@@ -37,6 +37,16 @@ export class AuthController {
   }
 
   /**
+   * Register user alias (signup)
+   * POST /auth/signup
+   */
+  @Post('signup')
+  @HttpCode(HttpStatus.OK)
+  async signup(@Body() registerDto: RegisterDto) {
+    return this.register(registerDto);
+  }
+
+  /**
    * Login user
    * POST /auth/login
    */

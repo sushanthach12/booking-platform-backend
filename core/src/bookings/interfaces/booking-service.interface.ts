@@ -4,6 +4,8 @@ import type {
   BookingResponse,
   CheckBookingAvailabilityRequest,
   CheckBookingAvailabilityResponse,
+  CheckoutPreviewRequest,
+  CheckoutPreviewResponse,
   CreateBookingApiResponse,
   CreateBookingRequest,
   IConfirmBookingParams,
@@ -61,6 +63,11 @@ export interface IBookingService {
   checkAvailability(
     data: CheckBookingAvailabilityRequest,
   ): Promise<CheckBookingAvailabilityResponse>;
+
+  previewCheckout(
+    request: CheckoutPreviewRequest,
+    userId: string,
+  ): Promise<CheckoutPreviewResponse>;
 }
 
 /**
@@ -68,7 +75,10 @@ export interface IBookingService {
  * Used by pricing calculator and booking creation.
  */
 export interface BookingSummary {
+  basePricePerNight: number;
   subtotal: number;
+  cleaningFee: number;
+  serviceFee: number;
   totalFees: number;
   totalDiscount: number;
   taxRate: number;

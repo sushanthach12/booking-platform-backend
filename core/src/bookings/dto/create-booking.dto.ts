@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsDate,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -10,6 +11,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { PaymentMethod } from '../enums/payment-method.enum';
 
 export class CreateBookingDto {
   @ApiProperty({
@@ -104,6 +106,26 @@ export class CreateBookingDto {
   @IsString()
   @IsOptional()
   customerPhone?: string;
+
+  @ApiProperty({
+    enum: PaymentMethod,
+    description: 'Payment method selected by the guest',
+    example: PaymentMethod.ONLINE,
+    default: PaymentMethod.ONLINE,
+  })
+  @IsEnum(PaymentMethod)
+  @IsNotEmpty()
+  paymentMethod: PaymentMethod;
+
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Signed quote token from POST /bookings/checkout/preview (10-min TTL). ' +
+      'Providing this validates the expected price; if expired, returns 400.',
+  })
+  @IsString()
+  @IsOptional()
+  quoteToken?: string;
 }
 
 export class CheckBookingAvailabilityDto {

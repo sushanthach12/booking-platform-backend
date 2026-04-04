@@ -16,4 +16,11 @@ export class UserController {
 
     return { data: response };
   }
+
+  /** Alias: GET /users/me → same as GET /users/profile */
+  @Get('me')
+  async getMe(@RequestUserId() requestUserId: string) {
+    const response = await this.userService.getProfile(requestUserId);
+    return { data: response };
+  }
 }

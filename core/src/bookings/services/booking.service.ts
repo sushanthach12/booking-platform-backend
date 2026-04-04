@@ -8,6 +8,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import moment from 'moment';
@@ -50,6 +51,8 @@ import {
   BookingResponse,
   CheckBookingAvailabilityRequest,
   CheckBookingAvailabilityResponse,
+  CheckoutPreviewRequest,
+  CheckoutPreviewResponse,
   CreateBookingApiResponse,
   CreateBookingRequest,
   IConfirmBookingParams,
@@ -57,6 +60,7 @@ import {
   IGetBookingDetailsResponse,
   PaginatedBookings,
 } from '../interfaces/booking.interface';
+import { PaymentMethod } from '../enums/payment-method.enum';
 import { IBookingRepository } from '../repositories';
 
 const PAYMENT_CREATE_TIMEOUT_MS = 15000;
@@ -86,6 +90,7 @@ export class BookingService implements IBookingService {
     @Inject(AVAILABILITY_CHECKER)
     private readonly availabilityChecker: IAvailabilityChecker,
     private readonly userService: UserService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async createBooking(
@@ -96,6 +101,29 @@ export class BookingService implements IBookingService {
     this.logger.log(
       `Creating booking for property ${createBookingRequest.propertyId} by user ${userId}`,
     );
+
+    // ── Quote token validation (optional — if provided, verify it hasn't expired) ──
+    if (createBookingRequest.quoteToken) {
+      try {
+        await this.jwtService.verifyAsync(createBookingRequest.quoteToken);
+        this.logger.debug(
+          `Quote token verified for booking of property ${createBookingRequest.propertyId}`,
+        );
+      } catch {
+        throw new BadRequestException(
+          'Price quote has expired. Please go back and refresh the price.',
+        );
+      }
+    }
+
+    // ── Pay at check-in: skip Cashfree entirely, confirm immediately ──────────
+    if (createBookingRequest.paymentMethod === PaymentMethod.PAY_AT_CHECKIN) {
+      return this.createPayAtCheckinBooking(
+        createBookingRequest,
+        userId,
+        hostId,
+      );
+    }
 
     // Check for idempotency first
     const existingBooking = await this.bookingRepository.findByIdempotencyKey(
@@ -334,6 +362,163 @@ export class BookingService implements IBookingService {
       }
 
       throw error;
+    } finally {
+      await this.redisService.releaseLock(lockKey, lockValue);
+      await this.availabilityChecker.invalidateAvailabilityCache(
+        createBookingRequest.propertyId,
+        createBookingRequest.checkInDate,
+        createBookingRequest.checkOutDate,
+      );
+    }
+  }
+
+  /**
+   * Creates a booking where the guest pays at the property on check-in.
+   * Skips Cashfree entirely and immediately confirms the booking.
+   * Uses the same availability locking and calendar-blocking logic as online bookings.
+   */
+  private async createPayAtCheckinBooking(
+    createBookingRequest: CreateBookingRequest,
+    userId: string,
+    hostId: string,
+  ): Promise<CreateBookingApiResponse> {
+    this.logger.log(
+      `Creating pay-at-checkin booking for property ${createBookingRequest.propertyId}`,
+    );
+
+    // Idempotency
+    const existingBooking = await this.bookingRepository.findByIdempotencyKey(
+      createBookingRequest.idempotencyKey,
+    );
+    if (existingBooking) {
+      return this.toCreateBookingApiResponse(existingBooking, '', '');
+    }
+
+    if (createBookingRequest.checkInDate >= createBookingRequest.checkOutDate) {
+      throw new BadRequestException(
+        'Check-out date must be after check-in date',
+      );
+    }
+
+    const numberOfNights = this.calculateNights(
+      createBookingRequest.checkInDate,
+      createBookingRequest.checkOutDate,
+    );
+
+    const summary = await this.priceCalculator.calculate(
+      createBookingRequest.propertyId,
+      createBookingRequest.roomId,
+      numberOfNights,
+    );
+
+    await this.availabilityChecker.checkAvailable({
+      propertyId: createBookingRequest.propertyId,
+      roomId: createBookingRequest.roomId ?? null,
+      checkInDate: createBookingRequest.checkInDate,
+      checkOutDate: createBookingRequest.checkOutDate,
+    });
+
+    const datesInRange = this.availabilityChecker.getDatesInRange(
+      createBookingRequest.checkInDate,
+      createBookingRequest.checkOutDate,
+    );
+
+    const lockKey = `lock:property:${createBookingRequest.propertyId}:${createBookingRequest.checkInDate.toISOString().split('T')[0]}:${createBookingRequest.checkOutDate.toISOString().split('T')[0]}`;
+    const lockValue = await this.redisService.acquireLock(lockKey, 30000);
+
+    if (!lockValue) {
+      throw new ConflictException(
+        'Property is currently being booked by another user. Please try again.',
+      );
+    }
+
+    try {
+      const now = new Date();
+      const booking = await this.dataSource.transaction(async (manager) => {
+        const overlappingBookings =
+          await this.bookingRepository.findOverlappingBookingsWithLock(
+            manager,
+            createBookingRequest.propertyId,
+            createBookingRequest.checkInDate,
+            createBookingRequest.checkOutDate,
+          );
+
+        if (overlappingBookings.length > 0) {
+          throw new ConflictException(
+            'Property is not available for the selected dates',
+          );
+        }
+
+        const bookingId = randomUUID();
+        const entity = manager.create(BookingEntity, {
+          id: bookingId,
+          propertyId: createBookingRequest.propertyId,
+          guestId: userId,
+          hostId,
+          roomId: createBookingRequest.roomId,
+          checkInDate: createBookingRequest.checkInDate,
+          checkOutDate: createBookingRequest.checkOutDate,
+          numberOfNights,
+          guestCount: createBookingRequest.guestCount,
+          subtotal: summary.subtotal,
+          totalFees: summary.totalFees,
+          taxRate: summary.taxRate,
+          taxAmount: summary.taxAmount,
+          totalDiscount: summary.totalDiscount,
+          grandTotal: summary.grandTotal,
+          currency: ECurrency.INR,
+          // Immediately confirmed — no payment gateway required
+          status: BookingStatus.CONFIRMED,
+          paymentStatus: BookingPaymentStatus.PENDING,
+          confirmedAt: now,
+          idempotencyKey: createBookingRequest.idempotencyKey,
+          specialRequests: createBookingRequest.specialRequests,
+        } satisfies Partial<BookingEntity>);
+
+        await manager.save(entity);
+
+        const availabilityRows = datesInRange.map((date) => ({
+          propertyId: createBookingRequest.propertyId,
+          roomId: createBookingRequest.roomId ?? null,
+          date: new Date(date),
+          available: false,
+          bookingId: entity.id,
+        }));
+        await this.availabilityCalendarRepository.upsertMany(
+          availabilityRows,
+          manager,
+        );
+
+        return entity;
+      });
+
+      // Generate booking number
+      const created = new Date(booking.createdAt);
+      const year = created.getFullYear();
+      const month = created.getMonth() + 1;
+      const count = await this.bookingRepository.countBookingsCreatedInMonth(
+        year,
+        month,
+      );
+      const bookingNumber = `BK${year}${String(month).padStart(2, '0')}-${String(count).padStart(4, '0')}`;
+      const updatedBooking = await this.bookingRepository.update(booking.id, {
+        bookingNumber,
+      });
+
+      // Snapshot job (no timeout job — booking is already confirmed)
+      this.bookingDetailsQueue
+        .add(JOB_CREATE_BOOKING_DETAILS, { bookingId: updatedBooking.id })
+        .catch((err) =>
+          this.logger.warn(
+            `Failed to enqueue booking details job: ${err?.message ?? err}`,
+          ),
+        );
+
+      this.logger.log(
+        `Pay-at-checkin booking created and confirmed: ${updatedBooking.id}`,
+      );
+
+      return this.toCreateBookingApiResponse(updatedBooking, '', '');
     } finally {
       await this.redisService.releaseLock(lockKey, lockValue);
       await this.availabilityChecker.invalidateAvailabilityCache(
@@ -792,6 +977,81 @@ export class BookingService implements IBookingService {
       bookingNumber: booking.bookingNumber ?? '',
       paymentLink,
       paymentSessionId,
+    };
+  }
+
+  /**
+   * Lightweight read-only price preview. Does NOT create a booking or lock any slot.
+   * Returns a signed quoteToken (10-min TTL) that can be passed to createBooking
+   * to validate the quoted price.
+   */
+  async previewCheckout(
+    request: CheckoutPreviewRequest,
+    _userId: string,
+  ): Promise<CheckoutPreviewResponse> {
+    if (request.checkInDate >= request.checkOutDate) {
+      throw new BadRequestException(
+        'Check-out date must be after check-in date',
+      );
+    }
+
+    const numberOfNights = this.calculateNights(
+      request.checkInDate,
+      request.checkOutDate,
+    );
+
+    // Availability check (cache only — no DB lock, no side effects)
+    let available = true;
+    try {
+      await this.availabilityChecker.checkAvailable({
+        propertyId: request.propertyId,
+        roomId: request.roomId ?? null,
+        checkInDate: request.checkInDate,
+        checkOutDate: request.checkOutDate,
+      });
+    } catch {
+      available = false;
+    }
+
+    const summary = await this.priceCalculator.calculate(
+      request.propertyId,
+      request.roomId,
+      numberOfNights,
+    );
+
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const quoteToken = await this.jwtService.signAsync(
+      {
+        propertyId: request.propertyId,
+        roomId: request.roomId,
+        checkInDate: request.checkInDate.toISOString().split('T')[0],
+        checkOutDate: request.checkOutDate.toISOString().split('T')[0],
+        guestCount: request.guestCount,
+        grandTotal: summary.grandTotal,
+      },
+      { expiresIn: '10m' },
+    );
+
+    return {
+      quoteToken,
+      propertyId: request.propertyId,
+      checkInDate: request.checkInDate.toISOString().split('T')[0],
+      checkOutDate: request.checkOutDate.toISOString().split('T')[0],
+      numberOfNights,
+      guestCount: request.guestCount,
+      breakdown: {
+        basePricePerNight: summary.basePricePerNight,
+        subtotal: summary.subtotal,
+        cleaningFee: summary.cleaningFee,
+        serviceFee: summary.serviceFee,
+        taxRate: summary.taxRate,
+        taxAmount: summary.taxAmount,
+        totalDiscount: summary.totalDiscount,
+        grandTotal: summary.grandTotal,
+        currency: ECurrency.INR,
+      },
+      expiresAt: expiresAt.toISOString(),
+      availability: { available },
     };
   }
 

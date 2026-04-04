@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Param,
   Patch,
   Post,
   Query,
@@ -154,6 +155,19 @@ export class PropertyController {
     return { data: response };
   }
 
+  /** GET /properties/search — alias for POST /properties/search with query params */
+  @Get('search')
+  @HttpCode(HttpStatus.OK)
+  async searchPropertiesGet(@Query() query: SearchPropertiesDto) {
+    this.logger.log(`Search properties (GET) request received`);
+
+    const response = await this.propertyService.searchProperties({
+      payload: query,
+    });
+
+    return { data: response };
+  }
+
   @Get('host/me')
   @HttpCode(HttpStatus.OK)
   async getHostProperties(
@@ -242,6 +256,22 @@ export class PropertyController {
         maxNights: body.maxNights,
         note: body.note,
         blockReason: body.blockReason,
+      },
+    });
+
+    return { data: response };
+  }
+
+  /** GET /properties/:id — alias for GET /properties/details?propertyId=:id */
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  async getPropertyById(@Param('id') id: string) {
+    this.logger.log(`Get property by id request received`);
+
+    const response = await this.propertyService.getPropertyDetails({
+      params: {
+        propertyId: id,
+        includeRelations: true,
       },
     });
 

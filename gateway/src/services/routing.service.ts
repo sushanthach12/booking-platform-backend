@@ -7,6 +7,8 @@ export interface RouteConfig {
   service: string;
   method: string;
   excludeFromAuth?: string[];
+  /** Optional prefix to prepend when forwarding to the downstream service. */
+  targetPrefix?: string;
   rateLimit?: {
     ttl: number;
     limit: number;
@@ -42,10 +44,11 @@ export class RoutingService {
     // Booking routes - all require auth
     // this.addRoute('/api/bookings/*', 'booking', 'ALL');
 
-    // User routes - exclude auth routes like login, register, etc.
+    // ── Prefixed routes (legacy / direct core access) ────────────────────
     this.addRoute('/api/core/v1/auth/*', 'core', 'ALL', [
       '/api/core/v1/auth/login',
       '/api/core/v1/auth/register',
+      '/api/core/v1/auth/signup',
       '/api/core/v1/auth/forgot-password',
       '/api/core/v1/auth/reset-password',
       '/api/core/v1/auth/refresh',
@@ -53,21 +56,64 @@ export class RoutingService {
     ]);
 
     this.addRoute('/api/core/v1/properties/*', 'core', 'ALL', [
-      // properties
       '/api/core/v1/properties/listing',
       '/api/core/v1/properties/search',
       '/api/core/v1/properties/details',
     ]);
 
     this.addRoute('/api/core/v1/bookings/*', 'core', 'ALL', [
-      // bookings
       '/api/core/v1/bookings/check-availability',
     ]);
 
-    // Host onboarding — all routes require authentication
     this.addRoute('/api/core/v1/host/*', 'core', 'ALL');
-
     this.addRoute('/api/core/v1/users/*', 'core', 'ALL');
+    this.addRoute('/api/core/v1/payments/*', 'core', 'ALL', [
+      '/api/core/v1/payments/webhook/*',
+    ]);
+
+    // ── Bare-path aliases (frontend calls without /api/core/v1 prefix) ───
+    // targetPrefix rewrites the path before forwarding to the core service
+    this.addRoute(
+      '/auth/*',
+      'core',
+      'ALL',
+      [
+        '/auth/login',
+        '/auth/register',
+        '/auth/signup',
+        '/auth/forgot-password',
+        '/auth/reset-password',
+        '/auth/refresh',
+        '/auth/verify',
+      ],
+      '/api/core/v1',
+    );
+
+    this.addRoute(
+      '/properties/*',
+      'core',
+      'ALL',
+      ['/properties/listing', '/properties/search', '/properties/details'],
+      '/api/core/v1',
+    );
+
+    this.addRoute(
+      '/bookings/*',
+      'core',
+      'ALL',
+      ['/bookings/check-availability'],
+      '/api/core/v1',
+    );
+
+    this.addRoute('/host/*', 'core', 'ALL', [], '/api/core/v1');
+    this.addRoute('/users/*', 'core', 'ALL', [], '/api/core/v1');
+    this.addRoute(
+      '/payments/*',
+      'core',
+      'ALL',
+      ['/payments/webhook/*'],
+      '/api/core/v1',
+    );
   }
 
   private addRoute(
@@ -75,6 +121,7 @@ export class RoutingService {
     service: string,
     method: string,
     excludeFromAuth?: string[],
+    targetPrefix?: string,
   ): void {
     const routeKey = `${method}:${path}`;
     const serviceConfig = getServiceConfig(
@@ -87,6 +134,7 @@ export class RoutingService {
       service,
       method,
       excludeFromAuth,
+      targetPrefix,
       rateLimit: serviceConfig.rateLimit,
     });
   }
@@ -124,6 +172,17 @@ export class RoutingService {
       .replace(/\//g, '\\/')
       .replace(/\\\.\*/g, '.*');
     return new RegExp(`^${pattern}$`);
+  }
+
+  /**
+   * Returns the downstream path for the given incoming path and matched route.
+   * If the route has a targetPrefix, prepends it to the incoming path.
+   */
+  resolveTargetPath(incomingPath: string, route: RouteConfig): string {
+    if (route.targetPrefix) {
+      return `${route.targetPrefix}${incomingPath}`;
+    }
+    return incomingPath;
   }
 
   getServiceUrl(serviceName: string): string {

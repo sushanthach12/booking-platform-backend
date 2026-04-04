@@ -17,6 +17,10 @@ export interface CreateBookingRequest {
   customerEmail?: string;
   customerName?: string;
   customerPhone?: string;
+  /** Payment method selected by guest. Defaults to 'online' if not provided. */
+  paymentMethod?: 'online' | 'pay_at_checkin';
+  /** Signed quote token from previewCheckout (10-min TTL). Optional — validated if present. */
+  quoteToken?: string;
 }
 
 /** Response shape for POST /bookings (create) only */
@@ -226,6 +230,40 @@ export interface IBookingPriceItem {
   calculationMode: BookingPriceItemCalculationMode;
   value: number;
   amount: number;
+}
+
+/** Request body for POST /bookings/checkout/preview */
+export interface CheckoutPreviewRequest {
+  propertyId: string;
+  roomId?: string;
+  checkInDate: Date;
+  checkOutDate: Date;
+  guestCount: number;
+}
+
+/** Response for POST /bookings/checkout/preview */
+export interface CheckoutPreviewResponse {
+  /** Signed JWT (10-min TTL) containing the quoted price. Pass to POST /bookings to skip re-pricing. */
+  quoteToken: string;
+  propertyId: string;
+  checkInDate: string;
+  checkOutDate: string;
+  numberOfNights: number;
+  guestCount: number;
+  breakdown: {
+    basePricePerNight: number;
+    subtotal: number;
+    cleaningFee: number;
+    serviceFee: number;
+    taxRate: number;
+    taxAmount: number;
+    totalDiscount: number;
+    grandTotal: number;
+    currency: string;
+  };
+  /** ISO timestamp — when quoteToken expires */
+  expiresAt: string;
+  availability: { available: boolean };
 }
 
 /** Minimal booking shape used when building price items (no entity dependency). */

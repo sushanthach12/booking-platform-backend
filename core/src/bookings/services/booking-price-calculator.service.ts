@@ -30,15 +30,25 @@ export class DefaultBookingPriceCalculator implements IBookingPriceCalculator {
     }
 
     const round2 = (n: number) => Math.round(n * 100) / 100;
+    const cleaningFee = round2(
+      Number(propertyDetails.pricing?.cleaningFee ?? 0),
+    );
+    const serviceFeePercentage = Number(
+      propertyDetails.pricing?.serviceFeePercentage ?? 0,
+    );
     const subtotal = round2(basePricePerNight * numberOfNights);
-    const totalFees = 0;
+    const serviceFee = round2(subtotal * (serviceFeePercentage / 100));
+    const totalFees = round2(cleaningFee + serviceFee);
     const totalDiscount = 0;
-    const amountAfterDiscount = round2(subtotal - totalDiscount);
+    const amountAfterDiscount = round2(subtotal + totalFees - totalDiscount);
     const taxAmount = round2(amountAfterDiscount * (TAX_RATE_PERCENT / 100));
     const grandTotal = round2(amountAfterDiscount + taxAmount);
 
     return {
+      basePricePerNight,
       subtotal,
+      cleaningFee,
+      serviceFee,
       totalFees,
       totalDiscount,
       taxRate: TAX_RATE_PERCENT,
