@@ -17,6 +17,7 @@ import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { BOOKING_SERVICE } from '../../database';
 import { PropertyService } from '../../properties/services/property.service';
+import { UserService } from '../../users/services/user.service';
 import type { IBookingService } from '../interfaces/booking-service.interface';
 import {
   CheckBookingAvailabilityDto,
@@ -37,6 +38,7 @@ export class BookingController {
     @Inject(BOOKING_SERVICE)
     private readonly bookingService: IBookingService,
     private readonly propertyService: PropertyService,
+    private readonly userService: UserService,
   ) {}
 
   @Post()
@@ -80,11 +82,16 @@ export class BookingController {
       throw new NotFoundException('Property not found');
     }
 
+    const userProfile = await this.userService.getProfile(user.id);
+
     const response = await this.bookingService.createBooking(
       {
         ...body,
         paymentMethod: body.paymentMethod,
         quoteToken: body.quoteToken,
+        customerEmail: userProfile.email,
+        customerName: userProfile.name,
+        customerPhone: userProfile.phone,
       },
       user.id,
       hostId,

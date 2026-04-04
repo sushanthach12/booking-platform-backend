@@ -13,7 +13,7 @@ export interface CreateBookingRequest {
   guestCount: number;
   specialRequests?: string;
   idempotencyKey: string;
-  /** Pass from controller/auth when available to avoid extra user lookup */
+  /** Populated server-side from the authenticated user's profile — never from client input */
   customerEmail?: string;
   customerName?: string;
   customerPhone?: string;

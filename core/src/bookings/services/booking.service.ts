@@ -40,6 +40,7 @@ import {
 } from '../booking-jobs/constants';
 import { BookingEntity } from '../entities';
 import { BookingPaymentStatus, BookingStatus } from '../enums';
+import { PaymentMethod } from '../enums/payment-method.enum';
 import type {
   IAvailabilityChecker,
   IBookingPriceCalculator,
@@ -60,7 +61,6 @@ import {
   IGetBookingDetailsResponse,
   PaginatedBookings,
 } from '../interfaces/booking.interface';
-import { PaymentMethod } from '../enums/payment-method.enum';
 import { IBookingRepository } from '../repositories';
 
 const PAYMENT_CREATE_TIMEOUT_MS = 15000;
@@ -102,12 +102,16 @@ export class BookingService implements IBookingService {
       `Creating booking for property ${createBookingRequest.propertyId} by user ${userId}`,
     );
 
-    // ── Quote token validation (optional — if provided, verify it hasn't expired) ──
+    // ── Quote token validation (optional — if provided, verify expiry and lock in grandTotal) ──
+    let quotedGrandTotal: number | null = null;
     if (createBookingRequest.quoteToken) {
       try {
-        await this.jwtService.verifyAsync(createBookingRequest.quoteToken);
+        const decoded = await this.jwtService.verifyAsync<{
+          grandTotal: number;
+        }>(createBookingRequest.quoteToken);
+        quotedGrandTotal = decoded.grandTotal;
         this.logger.debug(
-          `Quote token verified for booking of property ${createBookingRequest.propertyId}`,
+          `Quote token verified for booking of property ${createBookingRequest.propertyId}, quoted grandTotal: ${quotedGrandTotal}`,
         );
       } catch {
         throw new BadRequestException(
@@ -155,6 +159,16 @@ export class BookingService implements IBookingService {
       numberOfNights,
     );
 
+    // Validate that the quoted price matches the current price (within ₹1 tolerance for floating point)
+    if (
+      quotedGrandTotal !== null &&
+      Math.abs(quotedGrandTotal - summary.grandTotal) > 1
+    ) {
+      throw new ConflictException(
+        'The price has changed since your quote. Please go back and refresh to get the updated price.',
+      );
+    }
+
     // Step 1: Check availability (cache + calendar) via checker
     await this.availabilityChecker.checkAvailable({
       propertyId: createBookingRequest.propertyId,
@@ -169,7 +183,7 @@ export class BookingService implements IBookingService {
     );
 
     // Step 2: Acquire distributed lock (short hold: overlap check + insert only)
-    const lockKey = `lock:property:${createBookingRequest.propertyId}:${createBookingRequest.checkInDate.toISOString().split('T')[0]}:${createBookingRequest.checkOutDate.toISOString().split('T')[0]}`;
+    const lockKey = `lock:property:${createBookingRequest.propertyId}`;
     const lockValue = await this.redisService.acquireLock(lockKey, 30000);
 
     if (!lockValue) {
@@ -293,15 +307,14 @@ export class BookingService implements IBookingService {
         paymentTransactionId: paymentResponse.transactionId,
       });
 
-      // Step 6: Generate booking number (BKYYYYMM-NNNN)
+      // Step 6: Generate booking number (BKYYYYMM-NNNN) using a DB sequence to avoid race conditions
       const created = new Date(updatedBooking.createdAt);
       const year = created.getFullYear();
       const month = created.getMonth() + 1;
-      const count = await this.bookingRepository.countBookingsCreatedInMonth(
-        year,
-        month,
+      const [{ nextval }] = await this.dataSource.query<[{ nextval: string }]>(
+        `SELECT nextval('booking_number_seq')`,
       );
-      const bookingNumber = `BK${year}${String(month).padStart(2, '0')}-${String(count).padStart(4, '0')}`;
+      const bookingNumber = `BK${year}${String(month).padStart(2, '0')}-${String(nextval).padStart(4, '0')}`;
       updatedBooking = await this.bookingRepository.update(updatedBooking.id, {
         bookingNumber,
       });
@@ -354,6 +367,11 @@ export class BookingService implements IBookingService {
             status: BookingStatus.CANCELLED,
             cancellationReason: 'Payment failed',
           });
+          await this.restoreAvailabilityCalendar(
+            createBookingRequest.propertyId,
+            createBookingRequest.roomId ?? null,
+            datesInRange,
+          );
         } catch (updateError) {
           this.logger.error(
             `Failed to mark booking ${createdBookingId} as cancelled: ${updateError instanceof Error ? updateError.message : String(updateError)}`,
@@ -423,7 +441,7 @@ export class BookingService implements IBookingService {
       createBookingRequest.checkOutDate,
     );
 
-    const lockKey = `lock:property:${createBookingRequest.propertyId}:${createBookingRequest.checkInDate.toISOString().split('T')[0]}:${createBookingRequest.checkOutDate.toISOString().split('T')[0]}`;
+    const lockKey = `lock:property:${createBookingRequest.propertyId}`;
     const lockValue = await this.redisService.acquireLock(lockKey, 30000);
 
     if (!lockValue) {
@@ -492,15 +510,14 @@ export class BookingService implements IBookingService {
         return entity;
       });
 
-      // Generate booking number
+      // Generate booking number using a DB sequence to avoid race conditions
       const created = new Date(booking.createdAt);
       const year = created.getFullYear();
       const month = created.getMonth() + 1;
-      const count = await this.bookingRepository.countBookingsCreatedInMonth(
-        year,
-        month,
+      const [{ nextval }] = await this.dataSource.query<[{ nextval: string }]>(
+        `SELECT nextval('booking_number_seq')`,
       );
-      const bookingNumber = `BK${year}${String(month).padStart(2, '0')}-${String(count).padStart(4, '0')}`;
+      const bookingNumber = `BK${year}${String(month).padStart(2, '0')}-${String(nextval).padStart(4, '0')}`;
       const updatedBooking = await this.bookingRepository.update(booking.id, {
         bookingNumber,
       });
@@ -722,66 +739,122 @@ export class BookingService implements IBookingService {
   ): Promise<BookingResponse> {
     this.logger.log(`Cancelling booking ${bookingId} by user ${userId}`);
 
-    const booking = await this.bookingRepository.findByIdWithLock(bookingId);
-    if (!booking) {
-      throw new NotFoundException(`Booking with ID ${bookingId} not found`);
-    }
+    const updatedBooking = await this.dataSource.transaction(
+      async (manager) => {
+        const booking = await manager
+          .getRepository(BookingEntity)
+          .createQueryBuilder('booking')
+          .setLock('pessimistic_write')
+          .where('booking.id = :id', { id: bookingId })
+          .getOne();
 
-    // Check permissions
-    if (isHost && booking.hostId !== userId) {
-      throw new BadRequestException(
-        'You can only cancel bookings for your properties',
+        if (!booking) {
+          throw new NotFoundException(`Booking with ID ${bookingId} not found`);
+        }
+
+        // Check permissions
+        if (isHost && booking.hostId !== userId) {
+          throw new BadRequestException(
+            'You can only cancel bookings for your properties',
+          );
+        }
+        if (!isHost && booking.guestId !== userId) {
+          throw new BadRequestException(
+            'You can only cancel your own bookings',
+          );
+        }
+
+        // Check if booking can be cancelled
+        if (booking.status === BookingStatus.CANCELLED) {
+          throw new BadRequestException('Booking is already cancelled');
+        }
+        if (booking.status === BookingStatus.COMPLETED) {
+          throw new BadRequestException('Cannot cancel a completed booking');
+        }
+
+        const now = new Date();
+        await manager.update(BookingEntity, bookingId, {
+          status: BookingStatus.CANCELLED,
+          cancellationReason: reason,
+          cancelledAt: now,
+        });
+
+        return {
+          ...booking,
+          status: BookingStatus.CANCELLED,
+          cancellationReason: reason,
+          cancelledAt: now,
+          _needsRefund:
+            booking.status === BookingStatus.CONFIRMED &&
+            booking.paymentStatus === BookingPaymentStatus.SUCCEEDED &&
+            !!booking.paymentTransactionId,
+        } as BookingEntity & { _needsRefund: boolean };
+      },
+    );
+
+    // Initiate refund for confirmed, paid bookings that are now cancelled
+    const { _needsRefund, ...cancelledBooking } =
+      updatedBooking as BookingEntity & {
+        _needsRefund: boolean;
+      };
+    if (_needsRefund && cancelledBooking.paymentTransactionId) {
+      this.logger.warn(
+        `Booking ${bookingId} was paid and confirmed — initiating refund for transaction ${cancelledBooking.paymentTransactionId}`,
       );
+      try {
+        await this.paymentService.terminatePayment(
+          cancelledBooking.paymentTransactionId,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to initiate refund for booking ${bookingId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
-    if (!isHost && booking.guestId !== userId) {
-      throw new BadRequestException('You can only cancel your own bookings');
-    }
-
-    // Check if booking can be cancelled
-    if (booking.status === BookingStatus.CANCELLED) {
-      throw new BadRequestException('Booking is already cancelled');
-    }
-    if (booking.status === BookingStatus.COMPLETED) {
-      throw new BadRequestException('Cannot cancel a completed booking');
-    }
-
-    // Update booking
-    const updatedBooking = await this.bookingRepository.update(bookingId, {
-      status: BookingStatus.CANCELLED,
-      cancellationReason: reason,
-      cancelledAt: new Date(),
-    });
 
     this.logger.log(`Booking ${bookingId} cancelled successfully`);
-    return this.mapToResponse(updatedBooking);
+    return this.mapToResponse(cancelledBooking as BookingEntity);
   }
 
   async confirmBooking(data: IConfirmBookingParams): Promise<BookingResponse> {
     const { query, user } = data;
 
-    const booking = await this.bookingRepository.findByIdWithLock(
-      query.bookingId,
-    );
+    const updatedBooking = await this.dataSource.transaction(
+      async (manager) => {
+        const booking = await manager
+          .getRepository(BookingEntity)
+          .createQueryBuilder('booking')
+          .setLock('pessimistic_write')
+          .where('booking.id = :id', { id: query.bookingId })
+          .getOne();
 
-    if (!booking) {
-      throw new NotFoundException(`Booking not found`);
-    }
+        if (!booking) {
+          throw new NotFoundException(`Booking not found`);
+        }
 
-    if (booking.hostId !== user.id) {
-      throw new ForbiddenException(
-        'You are not authorized to confirm this booking',
-      );
-    }
+        if (booking.hostId !== user.id) {
+          throw new ForbiddenException(
+            'You are not authorized to confirm this booking',
+          );
+        }
 
-    if (booking.status !== BookingStatus.PENDING) {
-      throw new BadRequestException('Only pending bookings can be confirmed');
-    }
+        if (booking.status !== BookingStatus.PENDING) {
+          throw new BadRequestException(
+            'Only pending bookings can be confirmed',
+          );
+        }
 
-    const updatedBooking = await this.bookingRepository.update(
-      query.bookingId,
-      {
-        status: BookingStatus.CONFIRMED,
-        confirmedAt: new Date(),
+        const now = new Date();
+        await manager.update(BookingEntity, query.bookingId, {
+          status: BookingStatus.CONFIRMED,
+          confirmedAt: now,
+        });
+
+        return {
+          ...booking,
+          status: BookingStatus.CONFIRMED,
+          confirmedAt: now,
+        } as BookingEntity;
       },
     );
 
@@ -861,6 +934,16 @@ export class BookingService implements IBookingService {
       cancellationReason: 'Payment window expired',
       cancelledAt: new Date(),
     });
+    // Restore availability calendar so the dates can be rebooked
+    const datesInRange = this.availabilityChecker.getDatesInRange(
+      booking.checkInDate,
+      booking.checkOutDate,
+    );
+    await this.restoreAvailabilityCalendar(
+      booking.propertyId,
+      booking.roomId ?? null,
+      datesInRange,
+    );
     this.logger.log(`Expired unpaid booking ${bookingId}`);
     return true;
   }
@@ -874,6 +957,18 @@ export class BookingService implements IBookingService {
     if (!booking) {
       this.logger.debug(
         `No booking found for payment transaction ${transactionId}, skipping sync`,
+      );
+      return;
+    }
+    // Do not apply payment status updates to bookings that are already in a terminal state.
+    // A late webhook (e.g. user paid after the 15-min timeout) must not revive a cancelled booking.
+    const terminalStatuses: BookingStatus[] = [
+      BookingStatus.CANCELLED,
+      BookingStatus.EXPIRED,
+    ];
+    if (terminalStatuses.includes(booking.status as BookingStatus)) {
+      this.logger.warn(
+        `Ignoring payment sync for booking ${booking.id} — already in terminal status: ${booking.status}`,
       );
       return;
     }
@@ -960,6 +1055,32 @@ export class BookingService implements IBookingService {
     );
 
     return result;
+  }
+
+  /**
+   * Restores availability_calendar rows to available after a booking is cancelled.
+   * Must be called whenever a PENDING booking transitions to CANCELLED or EXPIRED.
+   */
+  private async restoreAvailabilityCalendar(
+    propertyId: string,
+    roomId: string | null,
+    datesInRange: Date[],
+  ): Promise<void> {
+    try {
+      await this.availabilityCalendarRepository.upsertMany(
+        datesInRange.map((date) => ({
+          propertyId,
+          roomId,
+          date: new Date(date),
+          available: true,
+          bookingId: null,
+        })),
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to restore availability calendar: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   private calculateNights(checkInDate: Date, checkOutDate: Date): number {

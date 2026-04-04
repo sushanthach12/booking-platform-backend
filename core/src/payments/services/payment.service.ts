@@ -269,15 +269,26 @@ export class PaymentService implements IPaymentService {
         return false;
       }
 
+      // Attempt gateway-level cancellation so the payment link is invalidated
+      if (transaction.gatewayOrderId) {
+        try {
+          const gateway = this.paymentGatewayFactory.createGateway(
+            transaction.gatewayType as PaymentGatewayType,
+          );
+          await gateway.terminatePayment(transaction.gatewayOrderId);
+        } catch (gatewayErr) {
+          // Log and continue — we still mark the transaction cancelled locally
+          this.logger.warn(
+            `Gateway cancellation failed for transaction ${transactionId}: ${gatewayErr instanceof Error ? gatewayErr.message : String(gatewayErr)}`,
+          );
+        }
+      }
+
       // Update transaction status to cancelled
       await this.paymentTransactionService.updateStatus(
         transactionId,
         PaymentStatus.CANCELLED,
       );
-
-      // TODO: Call gateway to cancel payment if needed
-      // const gateway = this.paymentGatewayFactory.createGateway(transaction.gatewayType);
-      // await gateway.cancelPayment(transaction.gatewayOrderId!);
 
       this.logger.log(`Payment terminated successfully for transaction`);
       return true;
