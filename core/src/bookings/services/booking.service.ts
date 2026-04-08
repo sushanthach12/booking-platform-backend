@@ -20,6 +20,7 @@ import {
   AVAILABILITY_CHECKER,
   BOOKING_PRICE_CALCULATOR,
   BOOKING_REPOSITORY,
+  REDIS_SERVICE,
 } from '../../database';
 import {
   IPaymentService,
@@ -75,7 +76,7 @@ export class BookingService implements IBookingService {
     @Inject(BOOKING_REPOSITORY)
     private readonly bookingRepository: IBookingRepository,
     private readonly dataSource: DataSource,
-    @Inject('IRedisService')
+    @Inject(REDIS_SERVICE)
     private readonly redisService: IRedisService,
     @Inject('IPaymentService')
     private readonly paymentService: IPaymentService,
@@ -1110,6 +1111,7 @@ export class BookingService implements IBookingService {
     request: CheckoutPreviewRequest,
     _userId: string,
   ): Promise<CheckoutPreviewResponse> {
+    void _userId; // for future personalization logic
     if (request.checkInDate >= request.checkOutDate) {
       throw new BadRequestException(
         'Check-out date must be after check-in date',

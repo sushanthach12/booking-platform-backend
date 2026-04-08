@@ -12,3 +12,4 @@ export const AVAILABILITY_CALENDAR_REPOSITORY = Symbol(
 export const BOOKING_PRICE_CALCULATOR = Symbol('IBookingPriceCalculator');
 export const AVAILABILITY_CHECKER = Symbol('IAvailabilityChecker');
 export const BOOKING_SERVICE = Symbol('IBookingService');
+export const REDIS_SERVICE = Symbol('IRedisService');

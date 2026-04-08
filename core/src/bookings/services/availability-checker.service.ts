@@ -1,6 +1,9 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { AvailabilityCache, IRedisService } from '../../common/redis';
-import { AVAILABILITY_CALENDAR_REPOSITORY } from '../../database';
+import {
+  AVAILABILITY_CALENDAR_REPOSITORY,
+  REDIS_SERVICE,
+} from '../../database';
 import { IAvailabilityCalendarRepository } from '../../properties/repositories/interfaces/availability-calendar.repository.interface';
 import type {
   IAvailabilityCheckParams,
@@ -13,7 +16,7 @@ const UNAVAILABLE_MESSAGE = 'Property is not available for the selected dates';
 @Injectable()
 export class AvailabilityCheckerService implements IAvailabilityChecker {
   constructor(
-    @Inject('IRedisService')
+    @Inject(REDIS_SERVICE)
     private readonly redisService: IRedisService,
     @Inject(AVAILABILITY_CALENDAR_REPOSITORY)
     private readonly availabilityCalendarRepository: IAvailabilityCalendarRepository,

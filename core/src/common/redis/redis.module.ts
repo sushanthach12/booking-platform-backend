@@ -1,16 +1,19 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { REDIS_SERVICE } from '../../database/di/symbols';
+import { RedisClient } from './redis.client';
 import { RedisService } from './redis.service';
 
 @Global()
 @Module({
   imports: [ConfigModule],
   providers: [
+    RedisClient,
     {
-      provide: 'IRedisService',
+      provide: REDIS_SERVICE,
       useClass: RedisService,
     },
   ],
-  exports: ['IRedisService'],
+  exports: [REDIS_SERVICE],
 })
 export class RedisModule {}
