@@ -42,6 +42,17 @@ Production: set directly in Vercel dashboard or CI secrets.
 | `SESSION_SECRET` | — | Session encryption secret |
 | `SESSION_EXPIRY` | — | Session expiry in milliseconds |
 
+## Cloudflare R2 Storage
+
+| Variable | Required | Notes |
+|---|---|---|
+| `R2_ACCOUNT_ID` | ✅ | Cloudflare account ID (from R2 dashboard) |
+| `R2_ACCESS_KEY_ID` | ✅ | R2 API token access key |
+| `R2_SECRET_ACCESS_KEY` | ✅ | R2 API token secret |
+| `R2_BUCKET_NAME` | ✅ | Target R2 bucket name |
+| `R2_PUBLIC_BASE_URL` | ✅ | Public bucket URL, e.g. `https://pub-<hash>.r2.dev` or custom domain |
+| `R2_PRESIGN_EXPIRY_SECONDS` | — | Presigned URL TTL in seconds. Default: `300` |
+
 ## Email (placeholder — not yet wired)
 
 | Variable |

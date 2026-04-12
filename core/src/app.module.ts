@@ -15,6 +15,7 @@ import { PaymentModule } from './payments/payment.module';
 import { PropertyModule } from './properties/property.module';
 import { QueuesModule } from './queues/queues.module';
 import { BookingJobsModule } from './bookings/booking-jobs/booking-jobs.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { BookingJobsModule } from './bookings/booking-jobs/booking-jobs.module';
     BookingModule,
     PaymentModule,
     BookingJobsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [
