@@ -86,7 +86,7 @@ export class UpdatePropertyDto {
 
   @ApiProperty({
     enum: EPropertyStatus,
-    description: 'Property status',
+    description: 'Property status (includes draft)',
     example: 'active',
     required: false,
   })

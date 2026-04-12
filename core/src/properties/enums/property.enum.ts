@@ -11,6 +11,7 @@ export enum EPropertyType {
 }
 
 export enum EPropertyStatus {
+  DRAFT = 'draft',
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   DELETED = 'deleted',

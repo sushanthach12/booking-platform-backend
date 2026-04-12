@@ -16,6 +16,7 @@ import {
 } from 'typeorm';
 import { ECurrency } from '../../../common/enums/currency.enum';
 import { Amenity, AmenityCategory } from '../../entities/amenity.entity';
+import { AvailabilityCalenderEntity } from '../../entities/availability-calendar.entity';
 import { HouseRuleEntity, RuleType } from '../../entities/house-rules.entity';
 import { PropertyAmenityEntity } from '../../entities/property-amenity.entity';
 import { PropertyDetailsEntity } from '../../entities/property-details.entity';
@@ -38,6 +39,7 @@ import {
   ICheckPropertyExistsImplParams,
   ICountPropertiesImplParams,
   ICreateAmenityImplParams,
+  ICreateDraftPropertyImplParams,
   ICreateHouseRuleImplParams,
   // ICreatePropertyAmenityImplParams,
   ICreatePropertyDetailsImplParams,
@@ -51,6 +53,7 @@ import {
   ICreateRoomImplParams,
   IFindAmenitiesImplParams,
   IFindAmenityByIdImplParams,
+  IFindDraftPropertyByHostIdImplParams,
   IFindHouseRuleByIdImplParams,
   IFindHouseRulesImplParams,
   IFindPropertiesImplParams,
@@ -69,9 +72,13 @@ import {
   IFindPropertyPricingByPropertyIdImplParams,
   IFindPropertyRatingByIdImplParams,
   IFindPropertyRatingByPropertyIdImplParams,
+  IFindPropertyWithStepRelationsImplParams,
   IFindRoomByIdImplParams,
   IFindRoomsImplParams,
   IPropertyRepository,
+  IPropertyStepRelations,
+  IReplacePropertyAmenitiesImplParams,
+  IReplacePropertyImagesImplParams,
   IUpdateAmenityImplParams,
   IUpdateHouseRuleImplParams,
   // IUpdatePropertyAmenityImplParams,
@@ -83,6 +90,10 @@ import {
   IUpdatePropertyPricingImplParams,
   IUpdatePropertyRatingImplParams,
   IUpdateRoomImplParams,
+  IUpsertPropertyDetailsImplParams,
+  IUpsertPropertyLocationImplParams,
+  IUpsertPropertyPolicyImplParams,
+  IUpsertPropertyPricingImplParams,
 } from '../interfaces/property-repository.interfaces';
 
 @Injectable()
@@ -112,6 +123,8 @@ export class PropertyRepository implements IPropertyRepository {
     private readonly propertyPolicyRepository: Repository<PropertyPolicyEntity>,
     @InjectRepository(PropertyPricingEntity)
     private readonly propertyPricingRepository: Repository<PropertyPricingEntity>,
+    @InjectRepository(AvailabilityCalenderEntity)
+    private readonly availabilityCalendarRepository: Repository<AvailabilityCalenderEntity>,
     private readonly dataSource: DataSource,
   ) {}
   getAllPropertySlugs(): Promise<string[]> {
@@ -1459,6 +1472,395 @@ export class PropertyRepository implements IPropertyRepository {
       return (result.affected ?? 0) > 0;
     } catch (error) {
       this.handleDbError(error, 'deletePropertyPricing', 'PropertyPricing');
+    }
+  }
+
+  // ==================== Draft Onboarding Methods ====================
+
+  async createDraftProperty(
+    params: ICreateDraftPropertyImplParams,
+  ): Promise<PropertyEntity> {
+    try {
+      const property = this.propertyRepository.create({
+        hostId: params.hostId,
+        slug: params.slug,
+        title: params.title,
+        description: params.description ?? null,
+        propertyType: params.propertyType,
+        status: EPropertyStatus.DRAFT,
+      });
+      const savedProperty = await this.propertyRepository.save(property);
+
+      // Create rating placeholder (same side-effect as createProperty)
+      const rating = this.propertyRatingRepository.create({
+        propertyId: savedProperty.id,
+        averageRating: 0,
+        totalReviews: 0,
+      });
+      await this.propertyRatingRepository.save(rating);
+
+      return savedProperty;
+    } catch (error) {
+      this.handleDbError(error, 'createDraftProperty', 'Property');
+    }
+  }
+
+  async upsertPropertyLocation(
+    params: IUpsertPropertyLocationImplParams,
+  ): Promise<PropertyLocationEntity> {
+    try {
+      const existing = await this.propertyLocationRepository.findOne({
+        where: { propertyId: params.propertyId },
+      });
+
+      if (existing) {
+        Object.assign(existing, {
+          addressLine1: params.addressLine1,
+          addressLine2: params.addressLine2 ?? null,
+          city: params.city,
+          state: params.state ?? null,
+          country: params.country,
+          postalCode: params.postalCode ?? null,
+          latitude: params.latitude ?? null,
+          longitude: params.longitude ?? null,
+        });
+        return await this.propertyLocationRepository.save(existing);
+      }
+
+      const location = this.propertyLocationRepository.create({
+        propertyId: params.propertyId,
+        addressLine1: params.addressLine1,
+        addressLine2: params.addressLine2 ?? null,
+        city: params.city,
+        state: params.state ?? null,
+        country: params.country,
+        postalCode: params.postalCode ?? null,
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+      });
+      return await this.propertyLocationRepository.save(location);
+    } catch (error) {
+      this.handleDbError(error, 'upsertPropertyLocation', 'PropertyLocation');
+    }
+  }
+
+  async upsertPropertyPricing(
+    params: IUpsertPropertyPricingImplParams,
+  ): Promise<PropertyPricingEntity> {
+    try {
+      const existing = await this.propertyPricingRepository.findOne({
+        where: { propertyId: params.propertyId },
+      });
+
+      if (existing) {
+        Object.assign(existing, {
+          basePrice: params.basePrice,
+          currency: params.currency,
+          ...(params.cleaningFee !== undefined && {
+            cleaningFee: params.cleaningFee,
+          }),
+          ...(params.serviceFeePercentage !== undefined && {
+            serviceFeePercentage: params.serviceFeePercentage,
+          }),
+        });
+        return await this.propertyPricingRepository.save(existing);
+      }
+
+      const pricing = this.propertyPricingRepository.create({
+        propertyId: params.propertyId,
+        basePrice: params.basePrice,
+        currency: params.currency,
+        cleaningFee: params.cleaningFee ?? 0,
+        serviceFeePercentage: params.serviceFeePercentage ?? 10.0,
+      });
+      return await this.propertyPricingRepository.save(pricing);
+    } catch (error) {
+      this.handleDbError(error, 'upsertPropertyPricing', 'PropertyPricing');
+    }
+  }
+
+  async upsertPropertyPolicy(
+    params: IUpsertPropertyPolicyImplParams,
+  ): Promise<PropertyPolicyEntity> {
+    try {
+      const existing = await this.propertyPolicyRepository.findOne({
+        where: { propertyId: params.propertyId },
+      });
+
+      if (existing) {
+        Object.assign(existing, {
+          minNights: params.minNights,
+          maxNights: params.maxNights,
+          checkInTime: params.checkInTime,
+          checkOutTime: params.checkOutTime,
+          cancellationPolicy: params.cancellationPolicy,
+          ...(params.instantBook !== undefined && {
+            instantBook: params.instantBook,
+          }),
+        });
+        return await this.propertyPolicyRepository.save(existing);
+      }
+
+      const policy = this.propertyPolicyRepository.create({
+        propertyId: params.propertyId,
+        minNights: params.minNights,
+        maxNights: params.maxNights,
+        checkInTime: params.checkInTime,
+        checkOutTime: params.checkOutTime,
+        cancellationPolicy: params.cancellationPolicy,
+        instantBook: params.instantBook ?? false,
+      });
+      return await this.propertyPolicyRepository.save(policy);
+    } catch (error) {
+      this.handleDbError(error, 'upsertPropertyPolicy', 'PropertyPolicy');
+    }
+  }
+
+  async upsertPropertyDetails(
+    params: IUpsertPropertyDetailsImplParams,
+  ): Promise<PropertyDetailsEntity> {
+    try {
+      const existing = await this.propertyDetailsRepository.findOne({
+        where: { propertyId: params.propertyId },
+      });
+
+      if (existing) {
+        Object.assign(existing, {
+          maxGuests: params.maxGuests,
+          ...(params.bedrooms !== undefined && { bedrooms: params.bedrooms }),
+          ...(params.beds !== undefined && { beds: params.beds }),
+          ...(params.bathrooms !== undefined && {
+            bathrooms: params.bathrooms,
+          }),
+        });
+        return await this.propertyDetailsRepository.save(existing);
+      }
+
+      const details = this.propertyDetailsRepository.create({
+        propertyId: params.propertyId,
+        maxGuests: params.maxGuests,
+        bedrooms: params.bedrooms ?? 1,
+        beds: params.beds ?? 1,
+        bathrooms: params.bathrooms ?? 1.0,
+      });
+      return await this.propertyDetailsRepository.save(details);
+    } catch (error) {
+      this.handleDbError(error, 'upsertPropertyDetails', 'PropertyDetails');
+    }
+  }
+
+  async replacePropertyAmenities(
+    params: IReplacePropertyAmenitiesImplParams,
+  ): Promise<void> {
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        // Delete existing amenities and rules for this property
+        await manager.delete(PropertyAmenityEntity, {
+          propertyId: params.propertyId,
+        });
+        await manager.delete(HouseRuleEntity, {
+          propertyId: params.propertyId,
+        });
+
+        // Insert new amenities (upsert the master Amenity record, then link)
+        const amenityRepo = manager.getRepository(Amenity);
+        const linkedAmenityIds = new Set<string>();
+
+        for (const a of params.amenities ?? []) {
+          let amenity = await amenityRepo.findOne({ where: { name: a.name } });
+          if (!amenity) {
+            amenity = await amenityRepo.save(
+              amenityRepo.create({
+                name: a.name,
+                category: this.mapHostAmenityCategory(a.category),
+                icon: a.icon ?? null,
+                description: a.description ?? null,
+              }),
+            );
+          }
+          if (linkedAmenityIds.has(amenity.id)) continue;
+          linkedAmenityIds.add(amenity.id);
+
+          await manager.save(
+            manager.create(PropertyAmenityEntity, {
+              propertyId: params.propertyId,
+              amenityId: amenity.id,
+              notes: null,
+            }),
+          );
+        }
+
+        // Insert new rules
+        const seenRuleTypes = new Set<RuleType>();
+        for (const r of params.rules ?? []) {
+          const entityRuleType = this.mapHostRuleTypeToEntity(r.ruleType);
+          if (seenRuleTypes.has(entityRuleType)) continue;
+          seenRuleTypes.add(entityRuleType);
+
+          const allowed =
+            r.ruleType === EPropertyRuleType.NO_SMOKING ? false : r.allowed;
+          await manager.save(
+            manager.create(HouseRuleEntity, {
+              propertyId: params.propertyId,
+              ruleType: entityRuleType,
+              allowed,
+              description: r.description ?? null,
+            }),
+          );
+        }
+      });
+    } catch (error) {
+      this.handleDbError(
+        error,
+        'replacePropertyAmenities',
+        'PropertyAmenity/HouseRule',
+      );
+    }
+  }
+
+  async replacePropertyImages(
+    params: IReplacePropertyImagesImplParams,
+  ): Promise<void> {
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.delete(PropertyImageEntity, {
+          propertyId: params.propertyId,
+        });
+
+        for (let i = 0; i < params.images.length; i++) {
+          const img = params.images[i];
+          await manager.save(
+            manager.create(PropertyImageEntity, {
+              propertyId: params.propertyId,
+              url: img.url,
+              thumbnailUrl: img.thumbnailUrl ?? null,
+              caption: img.caption ?? null,
+              altText: img.altText ?? null,
+              displayOrder: img.displayOrder ?? i,
+              isPrimary: img.isPrimary ?? i === 0,
+              width: img.width ?? null,
+              height: img.height ?? null,
+              fileSize: img.fileSize ?? null,
+              mimeType: img.mimeType ?? null,
+              roomId: null,
+            }),
+          );
+        }
+      });
+    } catch (error) {
+      this.handleDbError(error, 'replacePropertyImages', 'PropertyImage');
+    }
+  }
+
+  async findDraftPropertyByHostId(
+    params: IFindDraftPropertyByHostIdImplParams,
+  ): Promise<PropertyEntity | null> {
+    try {
+      return await this.propertyRepository.findOne({
+        where: { hostId: params.hostId, status: EPropertyStatus.DRAFT },
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      this.handleDbError(error, 'findDraftPropertyByHostId', 'Property');
+    }
+  }
+
+  async findPropertyWithStepRelations(
+    params: IFindPropertyWithStepRelationsImplParams,
+  ): Promise<IPropertyStepRelations> {
+    try {
+      const { propertyId } = params;
+
+      const [location, pricing, policy, details, imageCount] =
+        await Promise.all([
+          this.propertyLocationRepository.findOne({
+            where: { propertyId },
+            select: { id: true },
+          }),
+          this.propertyPricingRepository.findOne({
+            where: { propertyId },
+            select: { id: true },
+          }),
+          this.propertyPolicyRepository.findOne({
+            where: { propertyId },
+            select: { id: true },
+          }),
+          this.propertyDetailsRepository.findOne({
+            where: { propertyId },
+            select: { id: true },
+          }),
+          this.propertyImageRepository.count({ where: { propertyId } }),
+        ]);
+
+      return {
+        hasLocation: location !== null,
+        hasPricing: pricing !== null,
+        hasPolicy: policy !== null,
+        hasDetails: details !== null,
+        hasImages: imageCount > 0,
+      };
+    } catch (error) {
+      this.handleDbError(error, 'findPropertyWithStepRelations', 'Property');
+    }
+  }
+
+  async publishDraftProperty(params: {
+    propertyId: string;
+    daysAhead?: number;
+  }): Promise<PropertyEntity> {
+    try {
+      const daysAhead = params.daysAhead ?? 365;
+
+      const property = await this.dataSource.transaction(async (manager) => {
+        // Transition status DRAFT → ACTIVE
+        await manager.update(
+          PropertyEntity,
+          { id: params.propertyId },
+          { status: EPropertyStatus.ACTIVE },
+        );
+
+        // Seed AvailabilityCalendar for the next N days
+        const today = new Date();
+        today.setUTCHours(0, 0, 0, 0);
+
+        const rows: Partial<AvailabilityCalenderEntity>[] = [];
+        for (let i = 0; i < daysAhead; i++) {
+          const date = new Date(today);
+          date.setUTCDate(today.getUTCDate() + i);
+          rows.push(
+            manager.create(AvailabilityCalenderEntity, {
+              propertyId: params.propertyId,
+              roomId: null,
+              date,
+              available: true,
+              price: null,
+              minNights: null,
+              maxNights: null,
+              note: null,
+              blockReason: null,
+            }),
+          );
+        }
+
+        // Use upsert to avoid conflicts on existing calendar rows
+        if (rows.length > 0) {
+          await manager
+            .createQueryBuilder()
+            .insert()
+            .into(AvailabilityCalenderEntity)
+            .values(rows)
+            .orIgnore()
+            .execute();
+        }
+
+        return await manager.findOne(PropertyEntity, {
+          where: { id: params.propertyId },
+        });
+      });
+
+      return property as PropertyEntity;
+    } catch (error) {
+      this.handleDbError(error, 'publishDraftProperty', 'Property');
     }
   }
 }

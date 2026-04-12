@@ -9,13 +9,24 @@ import {
 import moment from 'moment';
 import { SlugHelper } from '../../common/helpers/slug.helper';
 import { timeToMinutes } from '../../common/helpers/time.helper';
+import { RequestUser } from '../../common/types/users.types';
 import { parseWithZod } from '../../common/zod';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,
   PROPERTY_REPOSITORY,
 } from '../../database';
 import { EUserRole } from '../../users/enums/user.enum';
-import { EPropertyStatus, EPropertyType } from '../enums/property.enum';
+import {
+  OnboardingStep2Dto,
+  OnboardingStep3Dto,
+  OnboardingStep4Dto,
+  OnboardingStep5Dto,
+} from '../dto/host-onboarding-steps.dto';
+import {
+  EPropertyCancellationPolicy,
+  EPropertyStatus,
+  EPropertyType,
+} from '../enums/property.enum';
 import {
   IBulkUpdateAvailabilityRequestParams,
   ICreatePropertyAvailabilityRequestParams,
@@ -834,5 +845,301 @@ export class PropertyService {
       occupancyRate: 0,
       bookingTrends: [],
     };
+  }
+
+  // ─── Draft Onboarding Service Methods ────────────────────────────────────────
+
+  async createDraftProperty(params: {
+    user: RequestUser;
+    payload: {
+      title: string;
+      description: string;
+      propertyType: EPropertyType;
+    };
+  }): Promise<{ id: string; slug: string; status: EPropertyStatus }> {
+    if (params.user.role !== EUserRole.HOST) {
+      throw new ForbiddenException('Only hosts can create properties');
+    }
+
+    const exists = await this.propertyRepository.checkPropertyExists({
+      hostId: params.user.id,
+      title: params.payload.title,
+    });
+    if (exists) {
+      throw new ConflictException('Property with this name already exists');
+    }
+
+    const baseSlug = SlugHelper.generatePropertySlug(params.payload.title, {
+      city: '',
+      country: '',
+      state: '',
+    });
+    const slug = SlugHelper.ensureUniqueSlug(baseSlug);
+
+    const property = await this.propertyRepository.createDraftProperty({
+      hostId: params.user.id,
+      title: params.payload.title,
+      description: params.payload.description,
+      propertyType: params.payload.propertyType,
+      slug,
+    });
+
+    return {
+      id: property.id,
+      slug: property.slug,
+      status: property.status as EPropertyStatus,
+    };
+  }
+
+  async saveDraftLocation(params: {
+    user: RequestUser;
+    payload: OnboardingStep2Dto;
+  }): Promise<void> {
+    const property = await this.propertyRepository.findPropertyById({
+      id: params.payload.propertyId,
+    });
+    if (!property) throw new NotFoundException('Property not found');
+    if (property.hostId !== params.user.id) {
+      throw new ForbiddenException('Only property owner can update this draft');
+    }
+    if (property.status !== EPropertyStatus.DRAFT) {
+      throw new BadRequestException(
+        'Only DRAFT properties can be updated via onboarding steps',
+      );
+    }
+
+    await this.propertyRepository.upsertPropertyLocation({
+      propertyId: params.payload.propertyId,
+      addressLine1: params.payload.addressLine1,
+      addressLine2: params.payload.addressLine2 ?? null,
+      city: params.payload.city,
+      state: params.payload.state ?? null,
+      country: params.payload.country,
+      postalCode: params.payload.postalCode ?? null,
+      latitude: params.payload.latitude ?? null,
+      longitude: params.payload.longitude ?? null,
+    });
+  }
+
+  async saveDraftPricing(params: {
+    user: RequestUser;
+    payload: OnboardingStep3Dto;
+  }): Promise<void> {
+    const property = await this.propertyRepository.findPropertyById({
+      id: params.payload.propertyId,
+    });
+    if (!property) throw new NotFoundException('Property not found');
+    if (property.hostId !== params.user.id) {
+      throw new ForbiddenException('Only property owner can update this draft');
+    }
+    if (property.status !== EPropertyStatus.DRAFT) {
+      throw new BadRequestException(
+        'Only DRAFT properties can be updated via onboarding steps',
+      );
+    }
+
+    if (params.payload.minNights > params.payload.maxNights) {
+      throw new BadRequestException('minNights cannot exceed maxNights');
+    }
+    if (params.payload.maxGuests <= 0) {
+      throw new BadRequestException('Invalid maxGuests');
+    }
+    if (params.payload.checkInTime && params.payload.checkOutTime) {
+      const checkInMin = timeToMinutes(params.payload.checkInTime);
+      let checkOutMin = timeToMinutes(params.payload.checkOutTime);
+      if (checkOutMin <= checkInMin) checkOutMin += 24 * 60;
+      if (checkOutMin - checkInMin < 60) {
+        throw new BadRequestException('Stay duration is too short');
+      }
+    }
+
+    await Promise.all([
+      this.propertyRepository.upsertPropertyPricing({
+        propertyId: params.payload.propertyId,
+        basePrice: params.payload.basePrice,
+        currency: params.payload.currency,
+      }),
+      this.propertyRepository.upsertPropertyPolicy({
+        propertyId: params.payload.propertyId,
+        minNights: params.payload.minNights,
+        maxNights: params.payload.maxNights,
+        checkInTime: params.payload.checkInTime,
+        checkOutTime: params.payload.checkOutTime,
+        cancellationPolicy:
+          params.payload.cancellationPolicy ??
+          EPropertyCancellationPolicy.FLEXIBLE,
+        instantBook: params.payload.enableWaitlist ?? false,
+      }),
+      this.propertyRepository.upsertPropertyDetails({
+        propertyId: params.payload.propertyId,
+        maxGuests: params.payload.maxGuests,
+      }),
+    ]);
+  }
+
+  async saveDraftAmenities(params: {
+    user: RequestUser;
+    payload: OnboardingStep4Dto;
+  }): Promise<void> {
+    const property = await this.propertyRepository.findPropertyById({
+      id: params.payload.propertyId,
+    });
+    if (!property) throw new NotFoundException('Property not found');
+    if (property.hostId !== params.user.id) {
+      throw new ForbiddenException('Only property owner can update this draft');
+    }
+    if (property.status !== EPropertyStatus.DRAFT) {
+      throw new BadRequestException(
+        'Only DRAFT properties can be updated via onboarding steps',
+      );
+    }
+
+    await this.propertyRepository.replacePropertyAmenities({
+      propertyId: params.payload.propertyId,
+      amenities: params.payload.amenities,
+      rules: params.payload.rules ?? [],
+    });
+  }
+
+  async saveDraftPhotos(params: {
+    user: RequestUser;
+    payload: OnboardingStep5Dto;
+  }): Promise<void> {
+    const property = await this.propertyRepository.findPropertyById({
+      id: params.payload.propertyId,
+    });
+    if (!property) throw new NotFoundException('Property not found');
+    if (property.hostId !== params.user.id) {
+      throw new ForbiddenException('Only property owner can update this draft');
+    }
+    if (property.status !== EPropertyStatus.DRAFT) {
+      throw new BadRequestException(
+        'Only DRAFT properties can be updated via onboarding steps',
+      );
+    }
+
+    await this.propertyRepository.replacePropertyImages({
+      propertyId: params.payload.propertyId,
+      images: params.payload.images.map((img, i) => ({
+        url: img.url,
+        thumbnailUrl: img.thumbnailUrl ?? null,
+        caption: img.caption ?? null,
+        altText: img.altText ?? null,
+        displayOrder: img.displayOrder ?? i,
+        isPrimary: img.isPrimary ?? i === 0,
+        width: img.width ?? null,
+        height: img.height ?? null,
+        fileSize: img.fileSize ?? null,
+        mimeType: img.mimeType ?? null,
+      })),
+    });
+  }
+
+  async publishDraftProperty(params: {
+    user: RequestUser;
+    payload: { propertyId: string };
+  }): Promise<{ id: string; slug: string; status: EPropertyStatus }> {
+    const property = await this.propertyRepository.findPropertyById({
+      id: params.payload.propertyId,
+    });
+    if (!property) throw new NotFoundException('Property not found');
+    if (property.hostId !== params.user.id) {
+      throw new ForbiddenException(
+        'Only property owner can publish this listing',
+      );
+    }
+    if (property.status !== EPropertyStatus.DRAFT) {
+      throw new BadRequestException('Property is not in DRAFT status');
+    }
+
+    // Completeness gate
+    const stepRelations =
+      await this.propertyRepository.findPropertyWithStepRelations({
+        propertyId: params.payload.propertyId,
+      });
+    const missing: string[] = [];
+    if (!stepRelations.hasLocation) missing.push('location (step 2)');
+    if (!stepRelations.hasPricing) missing.push('pricing (step 3)');
+    if (!stepRelations.hasPolicy) missing.push('policies (step 3)');
+    if (!stepRelations.hasDetails) missing.push('details (step 3)');
+    if (!stepRelations.hasImages) missing.push('photos (step 5)');
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Cannot publish: missing ${missing.join(', ')}`,
+      );
+    }
+
+    const published = await this.propertyRepository.publishDraftProperty({
+      propertyId: params.payload.propertyId,
+    });
+
+    return {
+      id: published.id,
+      slug: published.slug,
+      status: published.status as EPropertyStatus,
+    };
+  }
+
+  async getDraftForResume(params: { user: RequestUser }): Promise<{
+    propertyId: string;
+    completedSteps: number[];
+    currentStep: number;
+  } | null> {
+    if (params.user.role !== EUserRole.HOST) {
+      return null;
+    }
+
+    const draft = await this.propertyRepository.findDraftPropertyByHostId({
+      hostId: params.user.id,
+    });
+    if (!draft) return null;
+
+    const stepRelations =
+      await this.propertyRepository.findPropertyWithStepRelations({
+        propertyId: draft.id,
+      });
+
+    const completedSteps: number[] = [1]; // Step 1 is done (property exists)
+    if (stepRelations.hasLocation) completedSteps.push(2);
+    if (
+      stepRelations.hasPricing &&
+      stepRelations.hasPolicy &&
+      stepRelations.hasDetails
+    ) {
+      completedSteps.push(3);
+    }
+    if (stepRelations.hasLocation && completedSteps.includes(3)) {
+      // Amenities step — we can't easily check without querying PropertyAmenityEntity
+      // so we optimistically skip; the wizard will show step 4 if step 3 is done
+    }
+    if (stepRelations.hasImages) completedSteps.push(5);
+
+    const currentStep = Math.min(Math.max(...completedSteps) + 1, 5);
+
+    return {
+      propertyId: draft.id,
+      completedSteps,
+      currentStep,
+    };
+  }
+
+  async getDraftDetails(params: {
+    user: RequestUser;
+    propertyId: string;
+  }): Promise<IGetPropertyDetailsResponse> {
+    const property = await this.propertyRepository.findPropertyById({
+      id: params.propertyId,
+    });
+    if (!property) throw new NotFoundException('Property not found');
+    if (property.hostId !== params.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+    if (property.status !== EPropertyStatus.DRAFT) {
+      throw new BadRequestException('Property is not a draft');
+    }
+
+    return this.getPropertyDetails({
+      params: { propertyId: params.propertyId, includeRelations: true },
+    });
   }
 }

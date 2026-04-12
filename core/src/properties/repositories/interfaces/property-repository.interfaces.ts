@@ -8,7 +8,9 @@ import { PropertyRatingEntity } from '../../entities/property-rating.entity';
 import { PropertyEntity } from '../../entities/property.entity';
 import { RoomEntity } from '../../entities/rooms.entity';
 import {
+  EPropertyAmenityCategory,
   EPropertyCancellationPolicy,
+  EPropertyRuleType,
   EPropertyStatus,
   EPropertyType,
 } from '../../enums/property.enum';
@@ -367,6 +369,107 @@ export interface IFindPropertyPricingByPropertyIdImplParams {
   propertyId: string;
 }
 
+// ─── Draft Onboarding Interfaces ─────────────────────────────────────────────
+
+export interface ICreateDraftPropertyImplParams {
+  hostId: string;
+  title: string;
+  description: string;
+  propertyType: EPropertyType;
+  slug: string;
+}
+
+export interface IUpsertPropertyLocationImplParams {
+  propertyId: string;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state?: string | null;
+  country: string;
+  postalCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface IUpsertPropertyPricingImplParams {
+  propertyId: string;
+  basePrice: number;
+  currency: string;
+  cleaningFee?: number;
+  serviceFeePercentage?: number;
+}
+
+export interface IUpsertPropertyPolicyImplParams {
+  propertyId: string;
+  minNights: number;
+  maxNights: number;
+  checkInTime: string;
+  checkOutTime: string;
+  cancellationPolicy: EPropertyCancellationPolicy;
+  instantBook?: boolean;
+}
+
+export interface IUpsertPropertyDetailsImplParams {
+  propertyId: string;
+  maxGuests: number;
+  bedrooms?: number;
+  beds?: number;
+  bathrooms?: number;
+}
+
+export interface IReplaceAmenityItem {
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+  category: EPropertyAmenityCategory;
+}
+
+export interface IReplaceRuleItem {
+  ruleType: EPropertyRuleType;
+  allowed: boolean;
+  description?: string | null;
+}
+
+export interface IReplacePropertyAmenitiesImplParams {
+  propertyId: string;
+  amenities: IReplaceAmenityItem[];
+  rules?: IReplaceRuleItem[];
+}
+
+export interface IReplaceImageItem {
+  url: string;
+  thumbnailUrl?: string | null;
+  caption?: string | null;
+  altText?: string | null;
+  displayOrder?: number;
+  isPrimary?: boolean;
+  width?: number | null;
+  height?: number | null;
+  fileSize?: number | null;
+  mimeType?: string | null;
+}
+
+export interface IReplacePropertyImagesImplParams {
+  propertyId: string;
+  images: IReplaceImageItem[];
+}
+
+export interface IFindDraftPropertyByHostIdImplParams {
+  hostId: string;
+}
+
+export interface IPropertyStepRelations {
+  hasLocation: boolean;
+  hasPricing: boolean;
+  hasPolicy: boolean;
+  hasDetails: boolean;
+  hasImages: boolean;
+}
+
+export interface IFindPropertyWithStepRelationsImplParams {
+  propertyId: string;
+}
+
 // Repository Interface Definitions
 export interface IPropertyRepository {
   checkPropertyExists(params: ICheckPropertyExistsImplParams): Promise<boolean>;
@@ -526,4 +629,63 @@ export interface IPropertyRepository {
   deletePropertyPricing(
     params: IFindPropertyPricingByIdImplParams,
   ): Promise<boolean>;
+
+  // ─── Draft Onboarding Methods ───────────────────────────────────────────────
+
+  /** Creates only the root PropertyEntity with DRAFT status (no child relations). */
+  createDraftProperty(
+    params: ICreateDraftPropertyImplParams,
+  ): Promise<PropertyEntity>;
+
+  /** Upserts PropertyLocationEntity — inserts if absent, updates if present. */
+  upsertPropertyLocation(
+    params: IUpsertPropertyLocationImplParams,
+  ): Promise<PropertyLocationEntity>;
+
+  /** Upserts PropertyPricingEntity. */
+  upsertPropertyPricing(
+    params: IUpsertPropertyPricingImplParams,
+  ): Promise<PropertyPricingEntity>;
+
+  /** Upserts PropertyPolicyEntity. */
+  upsertPropertyPolicy(
+    params: IUpsertPropertyPolicyImplParams,
+  ): Promise<PropertyPolicyEntity>;
+
+  /** Upserts PropertyDetailsEntity. */
+  upsertPropertyDetails(
+    params: IUpsertPropertyDetailsImplParams,
+  ): Promise<PropertyDetailsEntity>;
+
+  /**
+   * Replaces all PropertyAmenityEntity and HouseRuleEntity rows for the property.
+   * Runs inside a transaction: deletes existing, then bulk-inserts new ones.
+   */
+  replacePropertyAmenities(
+    params: IReplacePropertyAmenitiesImplParams,
+  ): Promise<void>;
+
+  /**
+   * Replaces all PropertyImageEntity rows for the property.
+   * Runs inside a transaction: deletes existing, then bulk-inserts new ones.
+   */
+  replacePropertyImages(
+    params: IReplacePropertyImagesImplParams,
+  ): Promise<void>;
+
+  /** Returns the most recently created DRAFT property for a given host. */
+  findDraftPropertyByHostId(
+    params: IFindDraftPropertyByHostIdImplParams,
+  ): Promise<PropertyEntity | null>;
+
+  /** Checks which step-related child entities exist for a draft property. */
+  findPropertyWithStepRelations(
+    params: IFindPropertyWithStepRelationsImplParams,
+  ): Promise<IPropertyStepRelations>;
+
+  /** Seeds AvailabilityCalendar for the next N days and transitions status to ACTIVE. */
+  publishDraftProperty(params: {
+    propertyId: string;
+    daysAhead?: number;
+  }): Promise<PropertyEntity>;
 }
