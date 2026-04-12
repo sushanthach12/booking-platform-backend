@@ -93,6 +93,7 @@ export class HostOnboardingController {
         title: body.title,
         description: body.description,
         propertyType: body.propertyType,
+        propertyId: body.propertyId,
       },
     });
     return { data: result };

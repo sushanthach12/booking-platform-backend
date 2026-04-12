@@ -855,12 +855,55 @@ export class PropertyService {
       title: string;
       description: string;
       propertyType: EPropertyType;
+      /** When provided, update the existing draft instead of creating a new one. */
+      propertyId?: string;
     };
   }): Promise<{ id: string; slug: string; status: EPropertyStatus }> {
     if (params.user.role !== EUserRole.HOST) {
       throw new ForbiddenException('Only hosts can create properties');
     }
 
+    // ── UPDATE existing draft ─────────────────────────────────────────────────
+    if (params.payload.propertyId) {
+      const existing = await this.propertyRepository.findPropertyById({
+        id: params.payload.propertyId,
+      });
+      if (!existing) throw new NotFoundException('Draft property not found');
+      if (existing.hostId !== params.user.id) {
+        throw new ForbiddenException(
+          'Only the property owner can update this draft',
+        );
+      }
+      if (existing.status !== EPropertyStatus.DRAFT) {
+        throw new ConflictException('PROPERTY_NOT_IN_DRAFT_STATUS');
+      }
+
+      const newBaseSlug = SlugHelper.generatePropertySlug(
+        params.payload.title,
+        {
+          city: '',
+          country: '',
+          state: '',
+        },
+      );
+      const newSlug = SlugHelper.ensureUniqueSlug(newBaseSlug);
+
+      const updated = await this.propertyRepository.updateProperty({
+        id: params.payload.propertyId,
+        title: params.payload.title,
+        description: params.payload.description,
+        propertyType: params.payload.propertyType,
+        slug: newSlug,
+      });
+
+      return {
+        id: updated.id,
+        slug: updated.slug,
+        status: updated.status as EPropertyStatus,
+      };
+    }
+
+    // ── CREATE new draft ──────────────────────────────────────────────────────
     const exists = await this.propertyRepository.checkPropertyExists({
       hostId: params.user.id,
       title: params.payload.title,

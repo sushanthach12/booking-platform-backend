@@ -1,10 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsNotEmpty,
+  IsOptional,
   IsUUID,
   ValidateNested,
 } from 'class-validator';
@@ -16,9 +17,21 @@ import {
 } from './host-onboarding.dto';
 import { CreatePropertyImageDto } from './property-crud.dto';
 
-// ─── Step 1: Create Draft ─────────────────────────────────────────────────────
-// Reuses existing BasicInfo DTO (propertyType, title, description)
-export class OnboardingStep1Dto extends HostOnboardingBasicInfoDto {}
+// ─── Step 1: Create or Update Draft ──────────────────────────────────────────
+// If propertyId is provided the service updates the existing draft instead of
+// creating a new one. If the property is not in DRAFT status the service throws
+// a 409 with code PROPERTY_NOT_IN_DRAFT_STATUS so the frontend can redirect.
+export class OnboardingStep1Dto extends HostOnboardingBasicInfoDto {
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Existing draft property ID — when provided the draft is updated instead of created',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID()
+  @IsOptional()
+  propertyId?: string;
+}
 
 // ─── Step 2: Location ─────────────────────────────────────────────────────────
 export class OnboardingStep2Dto extends HostOnboardingLocationDto {
