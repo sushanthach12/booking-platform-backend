@@ -9,6 +9,7 @@ import { S3_CLIENT } from '../providers/s3-client.provider';
 export interface PresignedUploadResult {
   uploadUrl: string;
   key: string;
+  publicUrl: string;
   expiresIn: number;
 }
 
@@ -54,7 +55,12 @@ export class StorageService {
 
     this.logger.log(`Presigned URL generated: key=${key}, userId=${userId}`);
 
-    return { uploadUrl, key, expiresIn: this.expiresIn };
+    return {
+      uploadUrl,
+      key,
+      publicUrl: this.getPublicUrl(key),
+      expiresIn: this.expiresIn,
+    };
   }
 
   /** Build the public URL for a stored object key. */

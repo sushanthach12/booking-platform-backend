@@ -114,6 +114,9 @@ export class RoutingService {
       ['/payments/webhook/*'],
       '/api/core/v1',
     );
+
+    // Storage routes
+    this.addRoute('/api/core/v1/storage/*', 'core', 'ALL');
   }
 
   private addRoute(

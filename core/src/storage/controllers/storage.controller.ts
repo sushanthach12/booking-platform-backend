@@ -2,7 +2,10 @@ import { Body, Controller, Post } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { GetPresignedUrlDto } from '../dto/presign.dto';
-import { PresignedUploadResult, StorageService } from '../services/storage.service';
+import {
+  PresignedUploadResult,
+  StorageService,
+} from '../services/storage.service';
 
 @Controller('storage')
 export class StorageController {
