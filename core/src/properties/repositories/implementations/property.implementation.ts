@@ -403,6 +403,12 @@ export class PropertyRepository implements IPropertyRepository {
       const queryBuilder =
         this.propertyRepository.createQueryBuilder('property');
 
+      queryBuilder.leftJoinAndSelect(
+        'property.images',
+        'image',
+        'image.isPrimary = true',
+      );
+
       if (params?.hostId) {
         queryBuilder.where('property.hostId = :hostId', {
           hostId: params.hostId,

@@ -88,6 +88,7 @@ export interface IGetPropertiesResult {
   description: string | null;
   propertyType: EPropertyType;
   status: EPropertyStatus;
+  coverImage: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
