@@ -1,27 +1,45 @@
 import { InjectRedis } from '@nestjs-modules/ioredis';
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import type { Redis } from 'ioredis';
 
 @Injectable()
-export class RedisService implements OnModuleDestroy {
+export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
 
-  constructor(@InjectRedis() private readonly client: Redis) {
-    this.client.on('connect', () => {
-      this.logger.log('Redis connection established');
-    });
-    this.client.on('ready', () => {
-      this.logger.log('Redis connection ready');
-    });
-    this.client.on('reconnecting', (delay) => {
-      this.logger.warn(`Redis reconnecting in ${delay}ms`);
-    });
-    this.client.on('error', (error) => {
-      this.logger.error(`Redis error: ${error.message}`, error.stack ?? '');
-    });
-    this.client.on('end', () => {
-      this.logger.warn('Redis connection ended');
-    });
+  constructor(@InjectRedis() private readonly client: Redis) {}
+
+  async onModuleInit(): Promise<void> {
+    try {
+      this.client.on('connect', () => {
+        this.logger.debug('Redis connection established');
+      });
+      this.client.on('ready', () => {
+        this.logger.debug('Redis connection ready');
+      });
+      this.client.on('reconnecting', (delay) => {
+        this.logger.warn(`Redis reconnecting in ${delay}ms`);
+      });
+      this.client.on('error', (error) => {
+        this.logger.error(`Redis error: ${error.message}`, error.stack ?? '');
+      });
+      this.client.on('end', () => {
+        this.logger.warn('Redis connection ended');
+      });
+
+      await this.waitForReady(15000);
+    } catch (error) {
+      this.logger.error(
+        `Failed to establish Redis connection on module init: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      throw error;
+    }
   }
 
   async waitForReady(timeoutMs = 15000): Promise<void> {
@@ -85,13 +103,18 @@ export class RedisService implements OnModuleDestroy {
         return;
       }
 
-      if (this.client.status === 'wait' || this.client.status === 'end') {
-        this.client.connect().catch(onError);
-      }
+      // if (this.client.status === 'wait' || this.client.status === 'end') {
+      //   this.client.connect().catch(onError);
+      // }
     });
   }
 
   getClient(): Redis {
+    if (this.client.status !== 'ready') {
+      this.logger.warn(
+        `Attempting to get Redis client while connection is not ready (status: ${this.client.status})`,
+      );
+    }
     return this.client;
   }
 

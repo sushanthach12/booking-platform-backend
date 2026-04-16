@@ -18,7 +18,7 @@ export class RedisService implements IRedisService {
 
   async acquireLock(key: string, ttl: number = 30000): Promise<string | null> {
     try {
-      const client = this.redisClient.getInstance();
+      const client = this.redisClient.getClient();
       const lockValue = this.generateLockValue();
       const lockKey = `lock:${key}`;
       const result = await client.set(lockKey, lockValue, 'PX', ttl, 'NX');
@@ -32,7 +32,7 @@ export class RedisService implements IRedisService {
 
   async releaseLock(key: string, lockValue: string): Promise<boolean> {
     try {
-      const client = this.redisClient.getInstance();
+      const client = this.redisClient.getClient();
       const lockKey = `lock:${key}`;
       const result = await client.eval(
         RELEASE_LOCK_SCRIPT,
@@ -50,7 +50,7 @@ export class RedisService implements IRedisService {
 
   async get(key: string): Promise<string | null> {
     try {
-      return await this.redisClient.getInstance().get(key);
+      return await this.redisClient.getClient()?.get(key);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error getting key ${key}: ${message}`);
@@ -61,7 +61,7 @@ export class RedisService implements IRedisService {
   async getMany(keys: string[]): Promise<(string | null)[]> {
     if (keys.length === 0) return [];
     try {
-      return await this.redisClient.getInstance().mget(...keys);
+      return await this.redisClient.getClient()?.mget(...keys);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error getting keys (batch): ${message}`);
@@ -71,7 +71,7 @@ export class RedisService implements IRedisService {
 
   async set(key: string, value: string, ttl?: number): Promise<void> {
     try {
-      const client = this.redisClient.getInstance();
+      const client = this.redisClient.getClient();
       if (ttl != null && ttl > 0) {
         await client.set(key, value, 'PX', ttl);
       } else {
@@ -85,7 +85,7 @@ export class RedisService implements IRedisService {
 
   async del(key: string): Promise<void> {
     try {
-      await this.redisClient.getInstance().del(key);
+      await this.redisClient.getClient()?.del(key);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error deleting key ${key}: ${message}`);
@@ -95,7 +95,7 @@ export class RedisService implements IRedisService {
   async delMany(keys: string[]): Promise<void> {
     if (keys.length === 0) return;
     try {
-      const pipeline = this.redisClient.getInstance().pipeline();
+      const pipeline = this.redisClient.getClient()?.pipeline();
       for (const key of keys) {
         pipeline.del(key);
       }
@@ -108,7 +108,7 @@ export class RedisService implements IRedisService {
 
   async exists(key: string): Promise<boolean> {
     try {
-      const result = await this.redisClient.getInstance().exists(key);
+      const result = await this.redisClient.getClient()?.exists(key);
       return result === 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

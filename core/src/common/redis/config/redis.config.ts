@@ -81,8 +81,6 @@ export const redisConfig = (
     },
   };
 
-  console.log('config', JSON.stringify(config, null, 2));
-
   return config;
 };
 
@@ -90,17 +88,25 @@ export const getRedisConnectionOptions = (
   configService: ConfigService,
 ): QueueOptions => {
   const redisUrl = configService.getOrThrow<string>(coreEnv.redisUrl);
-  const url = new URL(redisUrl);
-  const host = url.hostname;
-  const port = parseInt(url.port, 10) || 6379;
-  const password = url.password;
 
   return {
     connection: {
-      host,
-      port,
-      password,
+      url: redisUrl, // ← just pass the URL directly
       tls: { rejectUnauthorized: false },
     },
   };
+};
+
+import { Redis } from 'ioredis';
+
+export const createRedisClient = (configService: ConfigService): Redis => {
+  const redisUrl = configService.getOrThrow<string>(coreEnv.redisUrl);
+  const isTls = redisUrl.startsWith('rediss://');
+
+  const client = new Redis(redisUrl, {
+    tls: isTls ? { rejectUnauthorized: false } : undefined,
+    maxRetriesPerRequest: null,
+  });
+
+  return client;
 };

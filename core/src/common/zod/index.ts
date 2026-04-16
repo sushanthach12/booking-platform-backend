@@ -17,7 +17,6 @@ export function parseWithZod<T>(schema: ZodSchema<T>, data: unknown): T {
     if (err instanceof ZodError) {
       const formattedErrors = formatZodErrors(err);
 
-      console.log(formattedErrors);
       throw new BadRequestException({
         message: 'Validation failed',
         errors: formattedErrors,
