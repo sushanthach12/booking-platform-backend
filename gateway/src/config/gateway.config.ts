@@ -37,7 +37,7 @@ export const gatewayDefaults = {
     port: 6379,
     connectTimeout: 10000,
     maxRetriesPerRequest: 3,
-    retryDelayMs: 200,
+    retryDelayMs: 100,
     retryMaxDelayMs: 2000,
     maxRetries: 0,
     keepAlive: 30000,

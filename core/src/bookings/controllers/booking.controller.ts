@@ -18,6 +18,7 @@ import { RequestUser } from '../../common/types/users.types';
 import { BOOKING_SERVICE } from '../../database';
 import { PropertyService } from '../../properties/services/property.service';
 import { UserService } from '../../users/services/user.service';
+import { BookingStatus } from '../enums';
 import type { IBookingService } from '../interfaces/booking-service.interface';
 import {
   CheckBookingAvailabilityDto,
@@ -28,6 +29,10 @@ import {
   JoinWaitlistDto,
 } from '../dto';
 import { CheckoutPreviewDto } from '../dto/checkout.dto';
+import {
+  EBookingStatusUpdate,
+  UpdateBookingStatusDto,
+} from '../dto/update-booking-status.dto';
 
 @ApiTags('bookings')
 @Controller('bookings')
@@ -288,6 +293,37 @@ export class BookingController {
     });
 
     return { data: response };
+  }
+
+  @Patch(':bookingId/status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update booking status (host: accept/decline; guest: cancel)' })
+  @ApiResponse({ status: 200, description: 'Booking status updated successfully.' })
+  async updateBookingStatus(
+    @Param() params: GetBookingQueryDto,
+    @CurrentUser() user: RequestUser,
+    @Body() body: UpdateBookingStatusDto,
+  ) {
+    this.logger.log(
+      `Update booking status to ${body.status} for booking: ${params.bookingId}`,
+    );
+
+    if (body.status === EBookingStatusUpdate.ACCEPTED) {
+      const response = await this.bookingService.confirmBooking({
+        query: params,
+        user,
+      });
+      return { data: response };
+    }
+
+    const isHostAction = body.status === EBookingStatusUpdate.DECLINED;
+    const response = await this.bookingService.cancelBooking(
+      params.bookingId,
+      user.id,
+      body.status === EBookingStatusUpdate.DECLINED ? 'host_declined' : undefined,
+      isHostAction,
+    );
+    return { data: { ...response, status: body.status === EBookingStatusUpdate.DECLINED ? BookingStatus.CANCELLED : response.status } };
   }
 
   @Get('price-alerts')

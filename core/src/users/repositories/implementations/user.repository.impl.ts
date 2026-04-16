@@ -43,13 +43,14 @@ export class UserRepositoryImpl implements IUserRepository {
 
     return this.userRepository.save(user);
   }
-  update(user: IUser): Promise<IUser> {
-    console.log(`Updating user:`, user);
-    throw new HttpException(
-      'Method not implemented.',
-      HttpStatus.NOT_IMPLEMENTED,
-    );
+
+  async update(user: IUser): Promise<IUser> {
+    await this.userRepository.save(user);
+    return this.userRepository.findOne({
+      where: { id: user.id },
+    }) as Promise<IUser>;
   }
+
   delete(id: string): Promise<void> {
     console.log(`Deleting user by ID: ${id}`);
     throw new HttpException(

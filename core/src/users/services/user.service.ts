@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { USER_REPOSITORY } from '../../database/di/symbols';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { EUserRole } from '../enums/user.enum';
 import {
   ICreateUserParams,
@@ -39,6 +40,29 @@ export class UserService {
       email: user.email,
       name: user.name,
       role: user.role as EUserRole,
+      phone: user.phone,
+    };
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<IGetProfileResponse> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const updated = await this.userRepository.update({
+      ...user,
+      ...(dto.name !== undefined ? { name: dto.name } : {}),
+      ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+    } as IUser);
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      name: updated.name,
+      role: updated.role as EUserRole,
+      phone: updated.phone,
     };
   }
 }

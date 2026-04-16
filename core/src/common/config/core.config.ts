@@ -1,0 +1,48 @@
+export const coreEnv = {
+  nodeEnv: 'NODE_ENV',
+  port: 'PORT',
+  httpTimeout: 'HTTP_TIMEOUT',
+  allowedOrigins: 'ALLOWED_ORIGINS',
+  corsCredentials: 'CORS_CREDENTIALS',
+  jwtSecret: 'JWT_SECRET',
+  jwtExpiresIn: 'JWT_EXPIRY',
+  redisUrl: 'REDIS_URL',
+  redisHost: 'REDIS_HOST',
+  redisPort: 'REDIS_PORT',
+  redisConnectTimeout: 'REDIS_CONNECT_TIMEOUT',
+  redisMaxRetriesPerRequest: 'REDIS_MAX_RETRIES_PER_REQUEST',
+  redisRetryDelayMs: 'REDIS_RETRY_DELAY_MS',
+  redisRetryMaxDelayMs: 'REDIS_RETRY_MAX_DELAY_MS',
+  redisMaxRetries: 'REDIS_MAX_RETRIES',
+  redisKeepAlive: 'REDIS_KEEP_ALIVE',
+  redisStartupTimeout: 'REDIS_STARTUP_TIMEOUT',
+  redisEnableReadyCheck: 'REDIS_ENABLE_READY_CHECK',
+  redisLazyConnect: 'REDIS_LAZY_CONNECT',
+} as const;
+
+export const coreDefaults = {
+  env: 'development',
+  port: 8001,
+  httpTimeout: 5000,
+  cors: {
+    allowedOrigins: ['*'],
+    credentials: true,
+  },
+  jwt: {
+    secret: 'change-me',
+    expiresIn: '1h',
+  },
+  redis: {
+    host: 'localhost',
+    port: 6379,
+    connectTimeout: 10000,
+    maxRetriesPerRequest: 3,
+    retryDelayMs: 100,
+    retryMaxDelayMs: 2000,
+    maxRetries: 0,
+    keepAlive: 30000,
+    startupTimeout: 15000,
+    enableReadyCheck: true,
+    lazyConnect: false,
+  },
+} as const;

@@ -1188,4 +1188,32 @@ export class PropertyService {
       params: { propertyId: params.propertyId, includeRelations: true },
     });
   }
+
+  async getPropertyStats(
+    propertyId: string,
+    hostId: string,
+  ): Promise<{
+    occupancyRate: number;
+    totalRevenue: number;
+    avgRating: number;
+    reviewCount: number;
+  }> {
+    const property = await this.propertyRepository.findPropertyById({
+      id: propertyId,
+    });
+    if (!property) throw new NotFoundException('Property not found');
+    if (property.hostId !== hostId)
+      throw new ForbiddenException('Access denied');
+
+    const rating = await this.propertyRepository.findPropertyRatingById({
+      id: propertyId,
+    });
+
+    return {
+      occupancyRate: 0,
+      totalRevenue: 0,
+      avgRating: rating ? Number(rating.averageRating) : 0,
+      reviewCount: rating ? rating.totalReviews : 0,
+    };
+  }
 }

@@ -13,3 +13,5 @@ export const BOOKING_PRICE_CALCULATOR = Symbol('IBookingPriceCalculator');
 export const AVAILABILITY_CHECKER = Symbol('IAvailabilityChecker');
 export const BOOKING_SERVICE = Symbol('IBookingService');
 export const REDIS_SERVICE = Symbol('IRedisService');
+export const WISHLIST_REPOSITORY = Symbol('IWishlistRepository');
+export const PAYOUT_REPOSITORY = Symbol('IPayoutRepository');

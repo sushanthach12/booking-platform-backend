@@ -6,6 +6,7 @@ export interface IUser {
   password: string;
   name: string;
   role: string;
+  phone?: string;
 }
 
 export interface ICreateUserParams {

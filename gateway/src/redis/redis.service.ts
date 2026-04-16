@@ -29,6 +29,11 @@ export class RedisService implements OnModuleDestroy {
       return;
     }
 
+    // ← add these early exits
+    if (this.client.status === 'end') {
+      throw new Error('Redis connection has ended');
+    }
+
     await new Promise<void>((resolve, reject) => {
       let timeoutId: NodeJS.Timeout | undefined;
       let settled = false;

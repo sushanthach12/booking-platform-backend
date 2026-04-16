@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IRedisService } from './interface/redis.interface';
-import { RedisClient } from './redis.client';
+import { RedisConnectionService } from './redis.conn.service';
 
 const RELEASE_LOCK_SCRIPT = `
   if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -14,7 +14,7 @@ const RELEASE_LOCK_SCRIPT = `
 export class RedisService implements IRedisService {
   private readonly logger = new Logger(RedisService.name);
 
-  constructor(private readonly redisClient: RedisClient) {}
+  constructor(private readonly redisClient: RedisConnectionService) {}
 
   async acquireLock(key: string, ttl: number = 30000): Promise<string | null> {
     try {

@@ -1,7 +1,7 @@
 import { RedisModuleOptions } from '@nestjs-modules/ioredis';
 import { ConfigService } from '@nestjs/config';
-import { gatewayDefaults, gatewayEnv } from '../../config/gateway.config';
 import { parseBoolean, parseNumber } from '../../config/config.utils';
+import { gatewayDefaults, gatewayEnv } from '../../config/gateway.config';
 
 export const redisConfig = (
   configService: ConfigService,
@@ -49,7 +49,7 @@ export const redisConfig = (
   const env =
     configService.get<string>(gatewayEnv.nodeEnv) ?? gatewayDefaults.env;
 
-  return {
+  const config: RedisModuleOptions = {
     type: 'single',
     url: redisUrl ?? `redis://${host}:${port}`,
     options: {
@@ -78,4 +78,6 @@ export const redisConfig = (
       },
     },
   };
+
+  return config;
 };

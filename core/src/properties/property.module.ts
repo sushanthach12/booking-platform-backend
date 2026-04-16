@@ -8,6 +8,7 @@ import {
 } from '../database';
 import { HostOnboardingController } from './controllers/host-onboarding.controller';
 import { PropertyAmenityController } from './controllers/property-amenity.controller';
+import { PropertyCalendarController } from './controllers/property-calendar.controller';
 import { PropertyImageController } from './controllers/property-image.controller';
 import { PropertyController } from './controllers/property.controller';
 import {
@@ -56,6 +57,7 @@ import { PropertyService } from './services/property.service';
     HostOnboardingController,
     PropertyImageController,
     PropertyAmenityController,
+    PropertyCalendarController,
   ],
   providers: [
     PropertyService,

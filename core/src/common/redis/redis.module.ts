@@ -1,14 +1,22 @@
+import { RedisModule } from '@nestjs-modules/ioredis';
 import { Global, Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { REDIS_SERVICE } from '../../database/di/symbols';
-import { RedisClient } from './redis.client';
+import { redisConfig } from './config/redis.config';
+import { RedisConnectionService } from './redis.conn.service';
 import { RedisService } from './redis.service';
 
 @Global()
 @Module({
-  imports: [ConfigModule],
+  imports: [
+    ConfigModule,
+    RedisModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => redisConfig(configService),
+    }),
+  ],
   providers: [
-    RedisClient,
+    RedisConnectionService,
     {
       provide: REDIS_SERVICE,
       useClass: RedisService,
@@ -16,4 +24,4 @@ import { RedisService } from './redis.service';
   ],
   exports: [REDIS_SERVICE],
 })
-export class RedisModule {}
+export class RedisClientModule {}
