@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { LoginDto, RegisterDto } from '../dto/auth.dto';
 import { AuthService } from '../services/auth.service';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
@@ -19,6 +20,7 @@ export class AuthController {
    * Register user
    * POST /auth/register
    */
+  @Public()
   @Post('register')
   @HttpCode(HttpStatus.OK)
   async register(@Body() registerDto: RegisterDto) {
@@ -40,6 +42,7 @@ export class AuthController {
    * Register user alias (signup)
    * POST /auth/signup
    */
+  @Public()
   @Post('signup')
   @HttpCode(HttpStatus.OK)
   async signup(@Body() registerDto: RegisterDto) {
@@ -50,6 +53,7 @@ export class AuthController {
    * Login user
    * POST /auth/login
    */
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
@@ -64,6 +68,7 @@ export class AuthController {
    * Request password reset
    * POST /auth/forgot-password
    */
+  @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() forgotPasswordDto: { email: string }) {
@@ -78,6 +83,7 @@ export class AuthController {
    * Reset password with token
    * POST /auth/reset-password
    */
+  @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(
