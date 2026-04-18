@@ -13,6 +13,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { BOOKING_SERVICE } from '../../database';
@@ -241,6 +242,7 @@ export class BookingController {
     return { data: response };
   }
 
+  @Public()
   @Post('check-availability')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Check property availability' })

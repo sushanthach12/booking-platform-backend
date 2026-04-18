@@ -11,6 +11,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { CreatePropertyDto } from '../dto/create-property.dto';
@@ -36,6 +37,7 @@ export class PropertyController {
 
   constructor(private readonly propertyService: PropertyService) {}
 
+  @Public()
   @Post('listing')
   @HttpCode(HttpStatus.OK)
   async getProperties(@Body() body: PropertyListingDto) {
@@ -64,6 +66,7 @@ export class PropertyController {
     return { data: response };
   }
 
+  @Public()
   @Get('details')
   @HttpCode(HttpStatus.OK)
   async getPropertyDetails(@Query() query: GetPropertyDetailsQueryDto) {
@@ -131,6 +134,7 @@ export class PropertyController {
     return { data: response };
   }
 
+  @Public()
   @Post('search')
   @HttpCode(HttpStatus.OK)
   async searchProperties(@Body() body: SearchPropertiesDto) {
@@ -156,6 +160,7 @@ export class PropertyController {
   }
 
   /** GET /properties/search — alias for POST /properties/search with query params */
+  @Public()
   @Get('search')
   @HttpCode(HttpStatus.OK)
   async searchPropertiesGet(@Query() query: SearchPropertiesDto) {
@@ -263,6 +268,7 @@ export class PropertyController {
   }
 
   /** GET /properties/:id — alias for GET /properties/details?propertyId=:id */
+  @Public()
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async getPropertyById(@Param('id') id: string) {

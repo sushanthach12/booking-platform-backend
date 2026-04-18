@@ -8,6 +8,7 @@ import {
   Logger,
   Post,
 } from '@nestjs/common';
+import { Public } from '../../common/decorators/public.decorator';
 import {
   IPaymentService,
   PaymentGatewayType,
@@ -22,6 +23,7 @@ export class PaymentController {
     private readonly paymentService: IPaymentService,
   ) {}
 
+  @Public()
   @Post('webhook/cashfree')
   @HttpCode(HttpStatus.OK)
   async handleCashfreeWebhook(
@@ -61,6 +63,7 @@ export class PaymentController {
     }
   }
 
+  @Public()
   @Post('webhook/razorpay')
   @HttpCode(HttpStatus.OK)
   async handleRazorpayWebhook(
@@ -100,6 +103,7 @@ export class PaymentController {
     }
   }
 
+  @Public()
   @Post('webhook/stripe')
   @HttpCode(HttpStatus.OK)
   async handleStripeWebhook(
