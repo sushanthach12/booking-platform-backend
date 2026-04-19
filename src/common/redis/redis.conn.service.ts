@@ -31,7 +31,9 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn('Redis connection ended');
       });
 
-      this.waitForReady(15000);
+      this.waitForReady(15000).catch((e) =>
+        console.error('REDIS_ERR: wait for ready', e.message),
+      );
     } catch (error) {
       this.logger.error(
         `Failed to establish Redis connection on module init: ${
