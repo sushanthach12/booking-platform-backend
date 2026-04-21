@@ -23,6 +23,13 @@ Single test file:
 pnpm run test -- --testPathPattern=booking.service
 ```
 
+## Tool Usage
+
+Do not use web search, browser, or computer use tools.
+Do not fetch URLs or browse the web unless explicitly asked.
+Prefer reading local files over any external lookups.
+Respond concisely — skip preamble, summaries of what you did, and unsolicited suggestions.
+
 ## Architecture
 
 NestJS 11 monolith deployed to Vercel serverless. PostgreSQL via TypeORM, Redis via ioredis, async jobs via BullMQ.
@@ -93,15 +100,7 @@ Production (Vercel): env vars injected at runtime — no `.env` file used.
 
 ## Before Making Changes
 
-Run these checks before writing or modifying any code to avoid wrong assumptions:
-
-1. **Read the target file** — confirm current implementation before editing; never assume from the module map alone.
-2. **Check DI tokens** — if adding a service or repository, verify the Symbol exists in `src/database/di/symbols.ts`. See → [`references/di-tokens.md`](references/di-tokens.md).
-3. **Check env vars** — if the feature needs a new env var, confirm it is documented in [`references/env.md`](references/env.md) and added to `.env.local` + Vercel.
-4. **Check for existing patterns** — search the codebase for similar implementations (e.g. existing repositories, gateways, processors) before creating new abstractions.
-5. **Verify module exports** — if a service/repository is consumed cross-module, confirm it is exported from the providing module and imported in the consuming module.
-6. **Check migration state** — if changing an entity shape, confirm whether a migration is needed (`POSTGRES_SYNCHRONIZE=false` in prod).
-7. **After changes** — run `pnpm run lint` and `pnpm run build` to catch type errors before testing.
+Read target file → check DI tokens (references/di-tokens.md) → check env vars (references/env.md) → verify module exports → check migration state → run `pnpm run lint && pnpm run build` after.
 
 ## Key Conventions
 
