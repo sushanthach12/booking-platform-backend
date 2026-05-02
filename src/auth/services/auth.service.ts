@@ -210,17 +210,21 @@ export class AuthService {
 
     const resetUrl = `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/reset-password?token=${token}`;
 
-    await this.emailService.send({
-      to: user.email,
-      subject: 'Reset your Stayly password',
-      html: `
+    this.emailService
+      .send({
+        to: user.email,
+        subject: 'Reset your Stayly password',
+        html: `
         <h2>Password Reset Request</h2>
         <p>Hi ${user.name},</p>
         <p>Click the link below to reset your password. This link expires in 15 minutes.</p>
         <p><a href="${resetUrl}" style="background:#4F46E5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px">Reset Password</a></p>
         <p>If you did not request a password reset, you can safely ignore this email.</p>
       `,
-    });
+      })
+      .catch((error) => {
+        this.logger.log('ERROR_SENDING_EMAIL', error.message);
+      });
 
     this.logger.log(`Password reset email dispatched for user ${user.id}`);
     return { message: 'If that email exists, a reset link has been sent' };
