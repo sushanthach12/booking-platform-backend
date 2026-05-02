@@ -709,20 +709,27 @@ export class PropertyService {
     const limit = Math.min(100, payload.limit ?? 10);
     const offset = (page - 1) * limit;
 
-    // TODO: Implement advanced search with filters
-    const [properties, totalItems] = await Promise.all([
-      this.propertyRepository.findProperties({
+    const sortBy =
+      payload.sortBy === 'distance'
+        ? 'created_at'
+        : (payload.sortBy ?? 'created_at');
+
+    const { properties, total } =
+      await this.propertyRepository.searchProperties({
         page,
         limit,
         offset,
-        propertyType: payload.propertyType?.[0] as EPropertyType, // Simplified for now
-        status: EPropertyStatus.ACTIVE,
-      }),
-      this.propertyRepository.countProperties({
-        propertyType: payload.propertyType?.[0] as EPropertyType,
-        status: EPropertyStatus.ACTIVE,
-      }),
-    ]);
+        location: payload.location,
+        propertyType: payload.propertyType as EPropertyType[] | undefined,
+        minPrice: payload.minPrice,
+        maxPrice: payload.maxPrice,
+        amenities: payload.amenities,
+        guests: payload.guests,
+        checkIn: payload.checkIn ? new Date(payload.checkIn) : undefined,
+        checkOut: payload.checkOut ? new Date(payload.checkOut) : undefined,
+        sortBy: sortBy,
+        sortOrder: payload.sortOrder === 'asc' ? 'ASC' : 'DESC',
+      });
 
     return {
       results: properties.map((property) => ({
@@ -739,9 +746,9 @@ export class PropertyService {
       pagination: {
         page,
         limit,
-        totalItems,
+        totalItems: total,
         length: properties.length,
-        totalPages: Math.ceil(totalItems / limit),
+        totalPages: Math.ceil(total / limit),
       },
     };
   }

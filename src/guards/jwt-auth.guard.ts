@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -10,6 +11,8 @@ import { JwtService } from '@nestjs/jwt';
 import type { ApiRequest } from '../common/interfaces/request.interface';
 import { gatewayDefaults, gatewayEnv } from '../common/config/gateway.config';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
+import { IRedisService } from '../common/redis';
+import { REDIS_SERVICE } from '../database/di/symbols';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -17,6 +20,7 @@ export class JwtAuthGuard implements CanActivate {
     private reflector: Reflector,
     private jwtService: JwtService,
     private configService: ConfigService,
+    @Inject(REDIS_SERVICE) private readonly redisService: IRedisService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,9 +42,11 @@ export class JwtAuthGuard implements CanActivate {
         this.configService.get<string>(gatewayEnv.jwtSecret) ??
         gatewayDefaults.jwt.secret;
 
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret,
-      });
+      const payload = await this.jwtService.verifyAsync<{
+        sub: string;
+        role: string;
+        jti?: string;
+      }>(token, { secret });
 
       const userId = payload.sub;
       const role = payload.role;
@@ -48,12 +54,20 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('Invalid token');
       }
 
-      request.user = {
-        id: userId,
-        role: role,
-      };
+      // Check blacklist (logout / token rotation)
+      if (payload.jti) {
+        const blacklisted = await this.redisService.exists(
+          `blacklist:${payload.jti}`,
+        );
+        if (blacklisted) {
+          throw new UnauthorizedException('Token has been revoked');
+        }
+      }
+
+      request.user = { id: userId, role };
       return true;
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
       throw new UnauthorizedException('Invalid token');
     }
   }

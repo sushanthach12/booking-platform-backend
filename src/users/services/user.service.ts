@@ -19,6 +19,16 @@ export class UserService {
     return this.userRepository.findByEmail(email);
   }
 
+  async findById(userId: string): Promise<IUser | null> {
+    return this.userRepository.findById(userId);
+  }
+
+  async updatePassword(userId: string, hashedPassword: string): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    await this.userRepository.update({ ...user, password: hashedPassword });
+  }
+
   async create(params: ICreateUserParams): Promise<IUser> {
     return this.userRepository.create({
       email: params.email,

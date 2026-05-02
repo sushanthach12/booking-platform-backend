@@ -13,6 +13,7 @@ import { PropertyModule } from '../properties/property.module';
 import { QueuesModule } from '../queues/queues.module';
 import { UserModule } from '../users/user.module';
 import { BookingController } from './controllers';
+import { BookingEmailListener } from './listeners/booking-email.listener';
 import {
   BookingEntity,
   BookingInvitationEntity,
@@ -73,6 +74,7 @@ import {
       provide: AVAILABILITY_CHECKER,
       useClass: AvailabilityCheckerService,
     },
+    BookingEmailListener,
   ],
   exports: [BOOKING_SERVICE, BookingSnapshotService],
 })

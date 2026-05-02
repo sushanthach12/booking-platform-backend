@@ -8,12 +8,18 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import moment from 'moment';
 import { DataSource } from 'typeorm';
 import { ECurrency } from '../../common/enums/currency.enum';
+import {
+  BOOKING_CANCELLED,
+  BOOKING_CONFIRMED,
+  BOOKING_PAYMENT_FAILED,
+} from '../../common/events/booking.events';
 import { IRedisService } from '../../common/redis';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,
@@ -92,6 +98,7 @@ export class BookingService implements IBookingService {
     private readonly availabilityChecker: IAvailabilityChecker,
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async createBooking(
@@ -814,6 +821,33 @@ export class BookingService implements IBookingService {
     }
 
     this.logger.log(`Booking ${bookingId} cancelled successfully`);
+
+    // Emit cancellation event for email notification (fire-and-forget)
+    try {
+      const guest = await this.userService.findById(
+        (cancelledBooking as BookingEntity).guestId,
+      );
+      if (guest) {
+        this.eventEmitter.emit(BOOKING_CANCELLED, {
+          bookingId,
+          guestEmail: guest.email,
+          guestName: guest.name,
+          propertyTitle: (cancelledBooking as BookingEntity).propertyId,
+          checkIn: (cancelledBooking as BookingEntity).checkInDate
+            ?.toISOString()
+            .substring(0, 10),
+          checkOut: (cancelledBooking as BookingEntity).checkOutDate
+            ?.toISOString()
+            .substring(0, 10),
+          reason,
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to emit cancellation event: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
     return this.mapToResponse(cancelledBooking as BookingEntity);
   }
 
@@ -858,6 +892,27 @@ export class BookingService implements IBookingService {
         } as BookingEntity;
       },
     );
+
+    // Emit confirmation event for email notification (fire-and-forget)
+    try {
+      const guest = await this.userService.findById(updatedBooking.guestId);
+      if (guest) {
+        this.eventEmitter.emit(BOOKING_CONFIRMED, {
+          bookingId: updatedBooking.id,
+          guestEmail: guest.email,
+          guestName: guest.name,
+          propertyTitle: updatedBooking.propertyId,
+          checkIn: updatedBooking.checkInDate?.toISOString().substring(0, 10),
+          checkOut: updatedBooking.checkOutDate?.toISOString().substring(0, 10),
+          totalAmount: Number(updatedBooking.grandTotal ?? 0),
+          currency: updatedBooking.currency ?? 'INR',
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to emit confirmation event: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     return this.mapToResponse(updatedBooking);
   }
@@ -945,6 +1000,23 @@ export class BookingService implements IBookingService {
       booking.roomId ?? null,
       datesInRange,
     );
+    // Emit payment failed event for email notification (fire-and-forget)
+    try {
+      const guest = await this.userService.findById(booking.guestId);
+      if (guest) {
+        this.eventEmitter.emit(BOOKING_PAYMENT_FAILED, {
+          bookingId,
+          guestEmail: guest.email,
+          guestName: guest.name,
+          propertyTitle: booking.propertyId,
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to emit payment failed event: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
     this.logger.log(`Expired unpaid booking ${bookingId}`);
     return true;
   }

@@ -9,6 +9,7 @@ import Redis from 'ioredis';
 import { AppController } from './app/app.controller';
 import { AppService } from './app/app.service';
 import { AuthModule } from './auth/auth.module';
+import { EmailModule } from './common/email/email.module';
 import { BookingJobsModule } from './bookings/booking-jobs/booking-jobs.module';
 import { BookingModule } from './bookings/booking.module';
 import { gatewayDefaults, gatewayEnv } from './common/config/gateway.config';
@@ -60,6 +61,7 @@ import { StorageModule } from './storage/storage.module';
       useFactory: getTypeOrmConfig,
     }),
 
+    EmailModule,
     AuthModule,
     PropertyModule,
     BookingModule,

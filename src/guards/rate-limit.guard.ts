@@ -9,6 +9,38 @@ import {
 import type { ApiRequest } from '../common/interfaces/request.interface';
 import { RedisConnectionService } from '../common/redis/redis.conn.service';
 
+interface RouteLimit {
+  pattern: RegExp;
+  methods?: string[];
+  limit: number;
+  ttl: number; // seconds
+}
+
+const ROUTE_LIMITS: RouteLimit[] = [
+  // Auth sensitive endpoints — 5 req/min
+  {
+    pattern: /\/auth\/(login|register|signup|forgot-password)/,
+    limit: 5,
+    ttl: 60,
+  },
+  // Property search — 30 req/min
+  {
+    pattern: /\/properties\/(search|availability)/,
+    limit: 30,
+    ttl: 60,
+  },
+  // Booking creation — 10 req/min
+  {
+    pattern: /\/bookings/,
+    methods: ['POST'],
+    limit: 10,
+    ttl: 60,
+  },
+];
+
+const DEFAULT_LIMIT = 100;
+const DEFAULT_TTL = 60;
+
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   private readonly logger = new Logger(RateLimitGuard.name);
@@ -18,9 +50,8 @@ export class RateLimitGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<ApiRequest>();
 
-    const key = this.getRateLimitKey(request);
-    const ttl = 60;
-    const limit = 100;
+    const { limit, ttl } = this.getRouteConfig(request);
+    const key = this.getRateLimitKey(request, limit, ttl);
 
     try {
       const client = this.redisService.getClient();
@@ -32,7 +63,7 @@ export class RateLimitGuard implements CanActivate {
 
       if (current > limit) {
         throw new HttpException(
-          'Too many requests',
+          { message: 'Too many requests', retryAfter: ttl },
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
@@ -48,13 +79,31 @@ export class RateLimitGuard implements CanActivate {
     return true;
   }
 
-  private getRateLimitKey(request: ApiRequest): string {
-    const userId = request.user?.id ?? 'anonymous';
+  private getRouteConfig(request: ApiRequest): { limit: number; ttl: number } {
+    const path = request.path ?? '';
+    const method = (request.method ?? 'GET').toUpperCase();
+
+    for (const route of ROUTE_LIMITS) {
+      if (!route.pattern.test(path)) continue;
+      if (route.methods && !route.methods.includes(method)) continue;
+      return { limit: route.limit, ttl: route.ttl };
+    }
+
+    return { limit: DEFAULT_LIMIT, ttl: DEFAULT_TTL };
+  }
+
+  private getRateLimitKey(
+    request: ApiRequest,
+    limit: number,
+    ttl: number,
+  ): string {
+    const userId = request.user?.id ?? 'anon';
     const forwardedFor = request.headers['x-forwarded-for'];
     const forwardedIp = Array.isArray(forwardedFor)
       ? forwardedFor[0]
       : forwardedFor?.split(',')[0];
     const ip = forwardedIp ?? request.ip ?? 'unknown';
-    return `rate_limit:api:${userId}:${ip}`;
+    // Bucket key encodes the limit/ttl so different routes get isolated counters
+    return `rate:${limit}:${ttl}:${userId}:${ip}:${request.path}`;
   }
 }

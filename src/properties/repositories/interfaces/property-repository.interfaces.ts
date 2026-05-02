@@ -63,6 +63,29 @@ export interface IFindPropertiesImplParams {
   title?: string;
 }
 
+export interface ISearchPropertiesImplParams {
+  page: number;
+  limit: number;
+  offset: number;
+  location?: string;
+  propertyType?: EPropertyType[];
+  minPrice?: number;
+  maxPrice?: number;
+  amenities?: string[];
+  minBeds?: number;
+  minBathrooms?: number;
+  guests?: number;
+  checkIn?: Date;
+  checkOut?: Date;
+  sortBy?: 'price' | 'rating' | 'created_at';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface ISearchPropertiesImplResult {
+  properties: PropertyEntity[];
+  total: number;
+}
+
 export interface ICountPropertiesImplParams {
   propertyType?: EPropertyType;
   status?: EPropertyStatus;
@@ -485,6 +508,9 @@ export interface IPropertyRepository {
   countProperties(params: ICountPropertiesImplParams): Promise<number>;
   updateProperty(params: IUpdatePropertyImplParams): Promise<PropertyEntity>;
   deleteProperty(params: IFindPropertyByIdImplParams): Promise<boolean>;
+  searchProperties(
+    params: ISearchPropertiesImplParams,
+  ): Promise<ISearchPropertiesImplResult>;
 
   // Amenity CRUD
   createAmenity(params: ICreateAmenityImplParams): Promise<Amenity>;

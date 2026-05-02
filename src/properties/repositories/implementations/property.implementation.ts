@@ -79,6 +79,8 @@ import {
   IPropertyStepRelations,
   IReplacePropertyAmenitiesImplParams,
   IReplacePropertyImagesImplParams,
+  ISearchPropertiesImplParams,
+  ISearchPropertiesImplResult,
   IUpdateAmenityImplParams,
   IUpdateHouseRuleImplParams,
   // IUpdatePropertyAmenityImplParams,
@@ -473,6 +475,98 @@ export class PropertyRepository implements IPropertyRepository {
       return await queryBuilder.getCount();
     } catch (error) {
       this.handleDbError(error, 'countProperties', 'Property');
+    }
+  }
+
+  async searchProperties(
+    params: ISearchPropertiesImplParams,
+  ): Promise<ISearchPropertiesImplResult> {
+    try {
+      const qb = this.propertyRepository
+        .createQueryBuilder('property')
+        .leftJoinAndSelect('property.images', 'image', 'image.isPrimary = true')
+        .leftJoinAndSelect('property.location', 'location')
+        .leftJoinAndSelect('property.pricing', 'pricing')
+        .leftJoinAndSelect('property.details', 'details')
+        .leftJoinAndSelect('property.ratings', 'ratings')
+        .where('property.status = :status', { status: EPropertyStatus.ACTIVE });
+
+      if (params.location) {
+        qb.andWhere(
+          '(LOWER(location.city) ILIKE :loc OR LOWER(location.country) ILIKE :loc OR LOWER(location.state) ILIKE :loc OR LOWER(location.addressLine1) ILIKE :loc)',
+          { loc: `%${params.location.toLowerCase()}%` },
+        );
+      }
+
+      if (params.propertyType?.length) {
+        qb.andWhere('property.propertyType IN (:...types)', {
+          types: params.propertyType,
+        });
+      }
+
+      if (params.minPrice != null) {
+        qb.andWhere('pricing.basePrice >= :minPrice', {
+          minPrice: params.minPrice,
+        });
+      }
+
+      if (params.maxPrice != null) {
+        qb.andWhere('pricing.basePrice <= :maxPrice', {
+          maxPrice: params.maxPrice,
+        });
+      }
+
+      if (params.guests != null) {
+        qb.andWhere('details.maxGuests >= :guests', { guests: params.guests });
+      }
+
+      if (params.minBeds != null) {
+        qb.andWhere('details.beds >= :minBeds', { minBeds: params.minBeds });
+      }
+
+      if (params.minBathrooms != null) {
+        qb.andWhere('details.bathrooms >= :minBathrooms', {
+          minBathrooms: params.minBathrooms,
+        });
+      }
+
+      if (params.amenities?.length) {
+        qb.innerJoin('property.amenities', 'pa')
+          .innerJoin('pa.amenity', 'amenity')
+          .andWhere('LOWER(amenity.name) IN (:...amenities)', {
+            amenities: params.amenities.map((a) => a.toLowerCase()),
+          });
+      }
+
+      if (params.checkIn && params.checkOut) {
+        // Exclude properties that have any unavailable date in the requested range
+        qb.andWhere(
+          `NOT EXISTS (
+            SELECT 1 FROM availability_calendar ac
+            WHERE ac.property_id = property.id
+              AND ac.date >= :checkIn
+              AND ac.date < :checkOut
+              AND ac.available = false
+          )`,
+          { checkIn: params.checkIn, checkOut: params.checkOut },
+        );
+      }
+
+      const sortColumn =
+        params.sortBy === 'price'
+          ? 'pricing.basePrice'
+          : params.sortBy === 'rating'
+            ? 'ratings.averageRating'
+            : 'property.createdAt';
+
+      qb.orderBy(sortColumn, params.sortOrder ?? 'DESC')
+        .limit(params.limit)
+        .offset(params.offset);
+
+      const [properties, total] = await qb.getManyAndCount();
+      return { properties, total };
+    } catch (error) {
+      this.handleDbError(error, 'searchProperties', 'Property');
     }
   }
 
