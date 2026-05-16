@@ -11,7 +11,7 @@ import {
 } from 'typeorm';
 import { PropertyEntity, RoomEntity } from '.';
 
-@Entity('availablity_calender')
+@Entity('availability_calendar')
 @Unique(['propertyId', 'roomId', 'date'])
 @Index('idx_availability_property_date', ['property', 'date'])
 @Index('idx_availability_room_date', ['room', 'date'])

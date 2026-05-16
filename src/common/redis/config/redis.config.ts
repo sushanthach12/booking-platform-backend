@@ -47,9 +47,12 @@ export const redisConfig = (
   );
   const env = configService.get<string>(coreEnv.nodeEnv) ?? coreDefaults.env;
 
+  const resolvedUrl = redisUrl ?? `redis://${host}:${port}`;
+  const useTls = resolvedUrl.startsWith('rediss://');
+
   const config: RedisModuleOptions = {
     type: 'single',
-    url: redisUrl ?? `redis://${host}:${port}`,
+    url: resolvedUrl,
     options: {
       connectionName: `api-${env}`,
       connectTimeout,
@@ -59,9 +62,7 @@ export const redisConfig = (
       keepAlive,
       autoResubscribe: true,
       autoResendUnfulfilledCommands: true,
-      tls: {
-        rejectUnauthorized: false,
-      },
+      ...(useTls && { tls: { rejectUnauthorized: false } }),
       retryStrategy: (times) => {
         if (maxRetries > 0 && times > maxRetries) {
           return null;

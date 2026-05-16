@@ -21,9 +21,10 @@ export class CashfreeGateway implements IPaymentGateway {
   private readonly baseUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('CASHFREE_API_KEY') || '';
+    this.apiKey =
+      this.configService.getOrThrow<string>('CASH_FREE_APP_ID') || '';
     this.apiSecret =
-      this.configService.get<string>('CASHFREE_API_SECRET') || '';
+      this.configService.getOrThrow<string>('CASH_FREE_SECRET_KEY') || '';
     this.baseUrl = getCashFreeBaseUrl();
   }
 
