@@ -25,6 +25,7 @@ export interface FindBookingsOptions extends PaginationOptions {
   hostId?: string;
   propertyId?: string;
   status?: BookingStatus;
+  statuses?: BookingStatus[];
   paymentStatus?: BookingPaymentStatus;
   startDate?: Date;
   endDate?: Date;

@@ -47,7 +47,8 @@ export class BookingRepository implements IBookingRepository {
     id: string,
     data: Partial<BookingEntity>,
   ): Promise<BookingEntity> {
-    await this.repository.update(id, data);
+    const { snapshot: _snapshot, ...updateData } = data;
+    await this.repository.update(id, updateData);
     const updated = await this.findById(id);
     if (!updated) {
       throw new NotFoundException(`Booking with id ${id} not found`);
@@ -312,7 +313,9 @@ export class BookingRepository implements IBookingRepository {
   async findWithPagination(
     options: FindBookingsOptions,
   ): Promise<PaginatedBookingsResult> {
-    const query = this.repository.createQueryBuilder('booking');
+    const query = this.repository
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.snapshot', 'snapshot');
 
     if (options.guestId) {
       query.andWhere('booking.guestId = :guestId', {
@@ -330,7 +333,11 @@ export class BookingRepository implements IBookingRepository {
       });
     }
 
-    if (options.status) {
+    if (options.statuses && options.statuses.length > 0) {
+      query.andWhere('booking.status IN (:...statuses)', {
+        statuses: options.statuses,
+      });
+    } else if (options.status) {
       query.andWhere('booking.status = :status', { status: options.status });
     }
 
@@ -375,6 +382,55 @@ export class BookingRepository implements IBookingRepository {
       page: options.page,
       limit: options.limit,
     };
+  }
+
+  async getGuestSummary(guestId: string): Promise<{
+    upcomingCount: number;
+    pastCount: number;
+    totalSpent: number;
+    currency: string;
+    uniqueLocations: number;
+  }> {
+    const rows: Array<{
+      status: string;
+      spent: string;
+      cnt: string;
+      locs: string;
+      currency: string;
+    }> = await this.repository
+      .createQueryBuilder('booking')
+      .leftJoin('booking.snapshot', 'snapshot')
+      .select('booking.status', 'status')
+      .addSelect('SUM(booking.grand_total)', 'spent')
+      .addSelect('COUNT(booking.id)', 'cnt')
+      .addSelect('COUNT(DISTINCT snapshot.location_label)', 'locs')
+      .addSelect('MAX(booking.currency)', 'currency')
+      .where('booking.guestId = :guestId', { guestId })
+      .groupBy('booking.status')
+      .getRawMany();
+
+    const UPCOMING = new Set(['pending', 'confirmed']);
+    const PAST = new Set(['completed', 'cancelled']);
+    const SPENT_IN = new Set(['confirmed', 'completed']);
+
+    let upcomingCount = 0;
+    let pastCount = 0;
+    let totalSpent = 0;
+    let uniqueLocations = 0;
+    let currency = 'USD';
+
+    for (const row of rows) {
+      const cnt = Number(row.cnt);
+      const spent = Number(row.spent ?? 0);
+      const locs = Number(row.locs ?? 0);
+      if (UPCOMING.has(row.status)) upcomingCount += cnt;
+      if (PAST.has(row.status)) pastCount += cnt;
+      if (SPENT_IN.has(row.status)) totalSpent += spent;
+      if (locs > uniqueLocations) uniqueLocations = locs;
+      if (row.currency) currency = row.currency;
+    }
+
+    return { upcomingCount, pastCount, totalSpent, currency, uniqueLocations };
   }
 
   async findSnapshotByBookingId(

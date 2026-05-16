@@ -67,10 +67,15 @@ export interface BookingResponse {
   updatedAt: Date;
   /** True when payment succeeded but host has not yet confirmed */
   requiresHostConfirmation: boolean;
+  /** Snapshot fields captured at booking time */
+  propertyTitle?: string;
+  propertyImage?: string;
+  locationLabel?: string;
 }
 
 export interface BookingQueryOptions {
   propertyId?: string;
+  tab?: 'upcoming' | 'past';
   status?: BookingStatus;
   paymentStatus?: BookingPaymentStatus;
   startDate?: string;

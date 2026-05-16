@@ -125,6 +125,15 @@ export class BookingController {
     return { data: response };
   }
 
+  @Get('summary')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get guest bookings summary (counts + total spent)' })
+  @ApiResponse({ status: 200, description: 'Summary retrieved successfully' })
+  async getBookingsSummary(@CurrentUser() user: RequestUser) {
+    const summary = await this.bookingService.getGuestBookingsSummary(user.id);
+    return { data: summary };
+  }
+
   @Get('host')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get host bookings' })

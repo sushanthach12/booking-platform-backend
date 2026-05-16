@@ -28,6 +28,16 @@ export class GetBookingsQueryDto {
 
   @ApiPropertyOptional({
     type: String,
+    description: 'Tab shortcut: "upcoming" maps to pending/confirmed, "past" maps to completed/cancelled',
+    enum: ['upcoming', 'past'],
+    example: 'upcoming',
+  })
+  @IsString()
+  @IsOptional()
+  tab?: 'upcoming' | 'past';
+
+  @ApiPropertyOptional({
+    type: String,
     description: 'Booking status filter',
     enum: BookingStatus,
     example: BookingStatus.CONFIRMED,

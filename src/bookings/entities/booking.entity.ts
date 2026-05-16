@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -11,6 +12,7 @@ import {
   BookingPaymentStatus,
   BookingStatus,
 } from '../enums/booking-status.enum';
+import { BookingSnapshotEntity } from './booking-snapshot.entity';
 
 @Entity('bookings')
 @Index(['propertyId', 'checkInDate', 'checkOutDate'])
@@ -168,4 +170,7 @@ export class BookingEntity {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToOne(() => BookingSnapshotEntity, (s) => s.booking, { eager: false })
+  snapshot?: BookingSnapshotEntity;
 }

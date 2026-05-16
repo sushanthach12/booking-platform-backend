@@ -83,6 +83,14 @@ export interface IBookingRepository {
     options: FindBookingsOptions,
   ): Promise<PaginatedBookingsResult>;
 
+  getGuestSummary(guestId: string): Promise<{
+    upcomingCount: number;
+    pastCount: number;
+    totalSpent: number;
+    currency: string;
+    uniqueLocations: number;
+  }>;
+
   findSnapshotByBookingId(
     bookingId: string,
   ): Promise<BookingSnapshotEntity | null>;

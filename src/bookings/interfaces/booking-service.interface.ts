@@ -29,6 +29,14 @@ export interface IBookingService {
     data: IGetBookingDetailsParams,
   ): Promise<IGetBookingDetailsResponse>;
 
+  getGuestBookingsSummary(userId: string): Promise<{
+    upcomingCount: number;
+    pastCount: number;
+    totalSpent: number;
+    currency: string;
+    uniqueLocations: number;
+  }>;
+
   getBookings(
     userId: string,
     query: BookingQueryOptions,

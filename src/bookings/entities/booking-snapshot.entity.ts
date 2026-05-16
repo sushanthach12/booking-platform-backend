@@ -4,7 +4,7 @@ import {
   Entity,
   Index,
   JoinColumn,
-  ManyToOne,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -52,7 +52,7 @@ export class BookingSnapshotEntity {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne(() => BookingEntity, { onDelete: 'CASCADE' })
+  @OneToOne(() => BookingEntity, (b) => b.snapshot, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'booking_id' })
   booking: BookingEntity;
 }

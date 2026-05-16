@@ -727,6 +727,16 @@ export class BookingService implements IBookingService {
     return response;
   }
 
+  async getGuestBookingsSummary(userId: string): Promise<{
+    upcomingCount: number;
+    pastCount: number;
+    totalSpent: number;
+    currency: string;
+    uniqueLocations: number;
+  }> {
+    return this.bookingRepository.getGuestSummary(userId);
+  }
+
   async getBookings(
     userId: string,
     query: BookingQueryOptions,
@@ -734,12 +744,18 @@ export class BookingService implements IBookingService {
   ): Promise<PaginatedBookings> {
     this.logger.log(`Getting bookings for user ${userId}, isHost: ${isHost}`);
 
+    const tabStatuses: Record<string, BookingStatus[]> = {
+      upcoming: [BookingStatus.PENDING, BookingStatus.CONFIRMED],
+      past: [BookingStatus.COMPLETED, BookingStatus.CANCELLED],
+    };
+
     const options = {
       page: query.page || 1,
       limit: query.limit || 20,
       sortBy: query.sortBy || 'createdAt',
       sortOrder: query.sortOrder || 'desc',
-      status: query.status,
+      status: query.tab ? undefined : query.status,
+      statuses: query.tab ? tabStatuses[query.tab] : undefined,
       paymentStatus: query.paymentStatus,
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
@@ -1398,6 +1414,9 @@ export class BookingService implements IBookingService {
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
       requiresHostConfirmation,
+      propertyTitle: booking.snapshot?.propertyTitle,
+      propertyImage: booking.snapshot?.propertyImage,
+      locationLabel: booking.snapshot?.locationLabel,
     };
   }
 }
