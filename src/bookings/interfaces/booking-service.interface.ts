@@ -60,6 +60,11 @@ export interface IBookingService {
     paymentStatus: string,
   ): Promise<void>;
 
+  getBookingStatus(
+    bookingId: string,
+    userId: string,
+  ): Promise<{ status: string; paymentStatus: string }>;
+
   checkAvailability(
     data: CheckBookingAvailabilityRequest,
   ): Promise<CheckBookingAvailabilityResponse>;

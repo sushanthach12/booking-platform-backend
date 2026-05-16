@@ -169,6 +169,37 @@ export class BookingController {
     return { data: response };
   }
 
+  @Get(':bookingId/status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get booking status (lightweight, for polling)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns booking status and payment status only.',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            paymentStatus: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  async getBookingStatus(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    this.logger.log(`Get booking status for booking ${bookingId}`);
+    const response = await this.bookingService.getBookingStatus(
+      bookingId,
+      user.id,
+    );
+    return { data: response };
+  }
+
   @Patch(':bookingId/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cancel a booking' })

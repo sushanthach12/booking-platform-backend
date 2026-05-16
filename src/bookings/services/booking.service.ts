@@ -588,6 +588,25 @@ export class BookingService implements IBookingService {
     ]);
   }
 
+  async getBookingStatus(
+    bookingId: string,
+    userId: string,
+  ): Promise<{ status: string; paymentStatus: string }> {
+    const booking = await this.bookingRepository.findById(bookingId);
+
+    if (!booking) {
+      throw new NotFoundException(`Booking with ID ${bookingId} not found`);
+    }
+
+    if (booking.guestId !== userId && booking.hostId !== userId) {
+      throw new ForbiddenException(
+        'You are not authorized to access this booking',
+      );
+    }
+
+    return { status: booking.status, paymentStatus: booking.paymentStatus };
+  }
+
   async getBookingDetails(
     data: IGetBookingDetailsParams,
   ): Promise<IGetBookingDetailsResponse> {
