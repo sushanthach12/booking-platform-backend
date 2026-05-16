@@ -541,22 +541,17 @@ export class PropertyService {
         };
       }
 
-      // TODO: Implement these methods in repository when ready
-      // Images, amenities, and rooms methods are commented out in the repository
-      /*
-      const [
-        images,
-        amenities,
-        rooms,
-      ] = await Promise.all([
+      // Fetch images, amenities and house rules in parallel
+      const [images, amenities, houseRules] = await Promise.all([
         this.propertyRepository.findPropertyImagesByPropertyId({ propertyId }),
-        this.propertyRepository.findPropertyAmenitiesByPropertyId({ propertyId }),
-        this.propertyRepository.findRoomsByPropertyId({ propertyId }),
+        this.propertyRepository.findPropertyAmenitiesByPropertyId({
+          propertyId,
+        }),
+        this.propertyRepository.findHouseRulesByPropertyId({ propertyId }),
       ]);
 
-      // Map images
-      if (images && images.length > 0) {
-        response.images = images.map(image => ({
+      if (images.length > 0) {
+        response.images = images.map((image) => ({
           id: image.id,
           url: image.url,
           thumbnailUrl: image.thumbnailUrl || undefined,
@@ -572,39 +567,26 @@ export class PropertyService {
         }));
       }
 
-      // Map amenities
-      if (amenities && amenities.length > 0) {
-        response.amenities = amenities.map(amenity => ({
-          id: amenity.amenity.id,
-          name: amenity.amenity.name,
-          description: amenity.amenity.description || undefined,
-          icon: amenity.amenity.icon || undefined,
-          category: amenity.amenity.category,
-        }));
+      if (amenities.length > 0) {
+        response.amenities = amenities
+          .filter((pa) => pa.amenity)
+          .map((pa) => ({
+            id: pa.amenity.id,
+            name: pa.amenity.name,
+            description: pa.amenity.description || undefined,
+            icon: pa.amenity.icon || undefined,
+            category: pa.amenity.category,
+          }));
       }
 
-      // Map rooms
-      if (rooms && rooms.length > 0) {
-        response.rooms = rooms.map(room => ({
-          id: room.id,
-          name: room.name,
-          description: room.description || undefined,
-          roomType: room.roomType,
-          beds: room.beds,
-          bedType: room.bedType || undefined,
-          maxGuests: room.maxGuests,
-          basePrice: room.basePrice || undefined,
-          isPrivate: room.isPrivate,
-          hasBathroom: room.hasBathroom,
-          hasBalcony: room.hasBalcony,
-          floorNumber: room.floorNumber || undefined,
-          squareMeters: room.squareMeters || undefined,
-          status: room.status,
-          createdAt: room.createdAt,
-          updatedAt: room.updatedAt,
+      if (houseRules.length > 0) {
+        response.houseRules = houseRules.map((r) => ({
+          id: r.id,
+          ruleType: r.ruleType,
+          allowed: r.allowed,
+          description: r.description || undefined,
         }));
       }
-      */
     }
 
     return response;

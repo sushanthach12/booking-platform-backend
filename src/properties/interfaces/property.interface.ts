@@ -135,6 +135,13 @@ export interface IGetPropertyDetailsRequestParams {
   };
 }
 
+export interface HouseRuleItemResponse {
+  id: string;
+  ruleType: string;
+  allowed: boolean;
+  description?: string;
+}
+
 export interface IGetPropertyDetailsResponse {
   id: string;
   hostId: string;
@@ -151,6 +158,7 @@ export interface IGetPropertyDetailsResponse {
   policies?: PropertyPolicyResponse;
   images?: PropertyImageResponse[];
   amenities?: PropertyAmenityResponse[];
+  houseRules?: HouseRuleItemResponse[];
   rooms?: RoomResponse[];
   ratings?: PropertyRatingResponse;
 }

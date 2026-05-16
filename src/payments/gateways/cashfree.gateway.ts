@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { getCashFreeBaseUrl } from '../helpers/cashfree.helper';
+import {
+  getCashFreeBaseUrl,
+  getCashFreeNotifyUrl,
+} from '../helpers/cashfree.helper';
 import {
   GatewayPaymentResponse,
   GatewayStatusResponse,
@@ -37,6 +40,8 @@ export class CashfreeGateway implements IPaymentGateway {
   ): Promise<GatewayPaymentResponse> {
     this.logger.log(`Creating Cashfree payment for order: ${orderId}`);
 
+    const webhookURL = getCashFreeNotifyUrl();
+
     try {
       const body = {
         order_id: orderId,
@@ -50,10 +55,12 @@ export class CashfreeGateway implements IPaymentGateway {
         },
         order_meta: {
           return_url: options?.returnUrl ?? '',
-          notify_url: options?.notifyUrl ?? '',
-          payment_methods: options?.paymentMethods?.join(',') ?? '',
+          notify_url: webhookURL,
         },
         order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        order_tags: {
+          order_id: orderId,
+        },
       };
 
       const response = await fetch(`${this.baseUrl}/orders`, {

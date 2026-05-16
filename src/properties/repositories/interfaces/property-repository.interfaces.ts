@@ -1,6 +1,8 @@
 import { Amenity, AmenityCategory } from '../../entities/amenity.entity';
 import { HouseRuleEntity, RuleType } from '../../entities/house-rules.entity';
+import { PropertyAmenityEntity } from '../../entities/property-amenity.entity';
 import { PropertyDetailsEntity } from '../../entities/property-details.entity';
+import { PropertyImageEntity } from '../../entities/property-image.entity';
 import { PropertyLocationEntity } from '../../entities/property-location.entity';
 import { PropertyPolicyEntity } from '../../entities/property-policy.entity';
 import { PropertyPricingEntity } from '../../entities/property-pricing.entity';
@@ -313,6 +315,19 @@ export interface IFindHouseRulesImplParams {
   offset?: number;
 }
 
+// Property Image / Amenity / HouseRule by-property-id lookups
+export interface IFindPropertyImagesByPropertyIdImplParams {
+  propertyId: string;
+}
+
+export interface IFindPropertyAmenitiesByPropertyIdImplParams {
+  propertyId: string;
+}
+
+export interface IFindHouseRulesByPropertyIdImplParams {
+  propertyId: string;
+}
+
 // Property Details Entity Interfaces
 export interface ICreatePropertyDetailsImplParams {
   propertyId: string;
@@ -593,6 +608,17 @@ export interface IPropertyRepository {
   findRooms(params?: IFindRoomsImplParams): Promise<RoomEntity[]>;
   updateRoom(params: IUpdateRoomImplParams): Promise<RoomEntity>;
   deleteRoom(params: IFindRoomByIdImplParams): Promise<boolean>;
+
+  // Property images / amenities / house rules by propertyId
+  findPropertyImagesByPropertyId(
+    params: IFindPropertyImagesByPropertyIdImplParams,
+  ): Promise<PropertyImageEntity[]>;
+  findPropertyAmenitiesByPropertyId(
+    params: IFindPropertyAmenitiesByPropertyIdImplParams,
+  ): Promise<PropertyAmenityEntity[]>;
+  findHouseRulesByPropertyId(
+    params: IFindHouseRulesByPropertyIdImplParams,
+  ): Promise<HouseRuleEntity[]>;
 
   // House Rule CRUD
   createHouseRule(params: ICreateHouseRuleImplParams): Promise<HouseRuleEntity>;

@@ -56,14 +56,17 @@ import {
   IFindDraftPropertyByHostIdImplParams,
   IFindHouseRuleByIdImplParams,
   IFindHouseRulesImplParams,
+  IFindHouseRulesByPropertyIdImplParams,
   IFindPropertiesImplParams,
   // IFindPropertyAmenitiesImplParams,
   // IFindPropertyAmenityByIdImplParams,
+  IFindPropertyAmenitiesByPropertyIdImplParams,
   IFindPropertyByIdImplParams,
   IFindPropertyDetailsByIdImplParams,
   IFindPropertyDetailsByPropertyIdImplParams,
   // IFindPropertyImageByIdImplParams,
   // IFindPropertyImagesImplParams,
+  IFindPropertyImagesByPropertyIdImplParams,
   IFindPropertyLocationByIdImplParams,
   IFindPropertyLocationByPropertyIdImplParams,
   IFindPropertyPolicyByIdImplParams,
@@ -1313,6 +1316,54 @@ export class PropertyRepository implements IPropertyRepository {
       return (result.affected ?? 0) > 0;
     } catch (error) {
       this.handleDbError(error, 'deleteHouseRule', 'HouseRule');
+    }
+  }
+
+  // ==================== By-PropertyId Lookups ====================
+
+  async findPropertyImagesByPropertyId(
+    params: IFindPropertyImagesByPropertyIdImplParams,
+  ): Promise<PropertyImageEntity[]> {
+    try {
+      return await this.propertyImageRepository.find({
+        where: { propertyId: params.propertyId },
+        order: { displayOrder: 'ASC' },
+      });
+    } catch (error) {
+      this.handleDbError(
+        error,
+        'findPropertyImagesByPropertyId',
+        'PropertyImage',
+      );
+    }
+  }
+
+  async findPropertyAmenitiesByPropertyId(
+    params: IFindPropertyAmenitiesByPropertyIdImplParams,
+  ): Promise<PropertyAmenityEntity[]> {
+    try {
+      return await this.propertyAmenityRepository.find({
+        where: { propertyId: params.propertyId },
+        relations: ['amenity'],
+      });
+    } catch (error) {
+      this.handleDbError(
+        error,
+        'findPropertyAmenitiesByPropertyId',
+        'PropertyAmenity',
+      );
+    }
+  }
+
+  async findHouseRulesByPropertyId(
+    params: IFindHouseRulesByPropertyIdImplParams,
+  ): Promise<HouseRuleEntity[]> {
+    try {
+      return await this.houseRuleRepository.find({
+        where: { propertyId: params.propertyId },
+      });
+    } catch (error) {
+      this.handleDbError(error, 'findHouseRulesByPropertyId', 'HouseRule');
     }
   }
 
