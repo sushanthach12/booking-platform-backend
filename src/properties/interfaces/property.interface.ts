@@ -89,6 +89,11 @@ export interface IGetPropertiesResult {
   propertyType: EPropertyType;
   status: EPropertyStatus;
   coverImage: string | null;
+  location?: {
+    city: string;
+    state?: string;
+    country: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

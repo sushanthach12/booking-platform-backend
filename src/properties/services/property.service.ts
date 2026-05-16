@@ -103,6 +103,13 @@ export class PropertyService {
         propertyType: property.propertyType as EPropertyType,
         status: property.status as EPropertyStatus,
         coverImage: property.images?.[0]?.url ?? null,
+        location: property.location
+          ? {
+              city: property.location.city,
+              state: property.location.state ?? undefined,
+              country: property.location.country,
+            }
+          : undefined,
         createdAt: property.createdAt,
         updatedAt: property.updatedAt,
       })),
@@ -740,6 +747,13 @@ export class PropertyService {
         propertyType: property.propertyType as EPropertyType,
         status: property.status as EPropertyStatus,
         coverImage: property.images?.[0]?.url ?? null,
+        location: property.location
+          ? {
+              city: property.location.city,
+              state: property.location.state ?? undefined,
+              country: property.location.country,
+            }
+          : undefined,
         pricing: property.pricing
           ? {
               basePrice: property.pricing.basePrice,
