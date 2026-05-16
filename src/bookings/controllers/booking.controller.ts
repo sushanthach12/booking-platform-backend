@@ -19,8 +19,6 @@ import { RequestUser } from '../../common/types/users.types';
 import { BOOKING_SERVICE } from '../../database';
 import { PropertyService } from '../../properties/services/property.service';
 import { UserService } from '../../users/services/user.service';
-import { BookingStatus } from '../enums';
-import type { IBookingService } from '../interfaces/booking-service.interface';
 import {
   CheckBookingAvailabilityDto,
   CreateBookingDto,
@@ -34,6 +32,8 @@ import {
   EBookingStatusUpdate,
   UpdateBookingStatusDto,
 } from '../dto/update-booking-status.dto';
+import { BookingStatus } from '../enums';
+import type { IBookingService } from '../interfaces/booking-service.interface';
 
 @ApiTags('bookings')
 @Controller({ path: 'bookings', version: '1' })
@@ -299,8 +299,13 @@ export class BookingController {
 
   @Patch(':bookingId/status')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update booking status (host: accept/decline; guest: cancel)' })
-  @ApiResponse({ status: 200, description: 'Booking status updated successfully.' })
+  @ApiOperation({
+    summary: 'Update booking status (host: accept/decline; guest: cancel)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking status updated successfully.',
+  })
   async updateBookingStatus(
     @Param() params: GetBookingQueryDto,
     @CurrentUser() user: RequestUser,
@@ -322,10 +327,20 @@ export class BookingController {
     const response = await this.bookingService.cancelBooking(
       params.bookingId,
       user.id,
-      body.status === EBookingStatusUpdate.DECLINED ? 'host_declined' : undefined,
+      body.status === EBookingStatusUpdate.DECLINED
+        ? 'host_declined'
+        : undefined,
       isHostAction,
     );
-    return { data: { ...response, status: body.status === EBookingStatusUpdate.DECLINED ? BookingStatus.CANCELLED : response.status } };
+    return {
+      data: {
+        ...response,
+        status:
+          body.status === EBookingStatusUpdate.DECLINED
+            ? BookingStatus.CANCELLED
+            : response.status,
+      },
+    };
   }
 
   @Get('price-alerts')

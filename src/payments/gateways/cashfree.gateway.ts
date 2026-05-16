@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+import { getCashFreeBaseUrl } from '../helpers/cashfree.helper';
 import {
   GatewayPaymentResponse,
   GatewayStatusResponse,
@@ -23,9 +24,7 @@ export class CashfreeGateway implements IPaymentGateway {
     this.apiKey = this.configService.get<string>('CASHFREE_API_KEY') || '';
     this.apiSecret =
       this.configService.get<string>('CASHFREE_API_SECRET') || '';
-    this.baseUrl =
-      this.configService.get<string>('CASHFREE_API_URL') ||
-      'https://sandbox.cashfree.com/pg';
+    this.baseUrl = getCashFreeBaseUrl();
   }
 
   async createPayment(
