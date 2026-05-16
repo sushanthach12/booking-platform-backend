@@ -94,6 +94,14 @@ export interface IGetPropertiesResult {
     state?: string;
     country: string;
   };
+  pricing?: {
+    basePrice: number;
+    currency: string;
+  } | null;
+  ratings?: {
+    averageRating: number;
+    totalReviews: number;
+  } | null;
   createdAt: Date;
   updatedAt: Date;
 }

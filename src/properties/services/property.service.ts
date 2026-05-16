@@ -88,9 +88,10 @@ export class PropertyService {
         page,
         limit,
         offset,
+        status: EPropertyStatus.ACTIVE,
       }),
       this.propertyRepository.countProperties({
-        propertyType: EPropertyType.APARTMENT,
+        status: EPropertyStatus.ACTIVE,
       }),
     ]);
 
@@ -110,6 +111,18 @@ export class PropertyService {
               country: property.location.country,
             }
           : undefined,
+        pricing: property.pricing
+          ? {
+              basePrice: property.pricing.basePrice,
+              currency: property.pricing.currency,
+            }
+          : null,
+        ratings: property.ratings
+          ? {
+              averageRating: property.ratings.averageRating || 0,
+              totalReviews: property.ratings.totalReviews || 0,
+            }
+          : null,
         createdAt: property.createdAt,
         updatedAt: property.updatedAt,
       })),

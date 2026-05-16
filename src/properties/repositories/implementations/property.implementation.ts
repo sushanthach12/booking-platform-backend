@@ -414,6 +414,8 @@ export class PropertyRepository implements IPropertyRepository {
         'image.isPrimary = true',
       );
       queryBuilder.leftJoinAndSelect('property.location', 'location');
+      queryBuilder.leftJoinAndSelect('property.pricing', 'pricing');
+      queryBuilder.leftJoinAndSelect('property.ratings', 'ratings');
 
       if (params?.hostId) {
         queryBuilder.where('property.hostId = :hostId', {
