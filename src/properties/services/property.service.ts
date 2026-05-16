@@ -740,6 +740,12 @@ export class PropertyService {
         propertyType: property.propertyType as EPropertyType,
         status: property.status as EPropertyStatus,
         coverImage: property.images?.[0]?.url ?? null,
+        pricing: property.pricing
+          ? {
+              basePrice: property.pricing.basePrice,
+              currency: property.pricing.currency,
+            }
+          : null,
         createdAt: property.createdAt,
         updatedAt: property.updatedAt,
       })),
