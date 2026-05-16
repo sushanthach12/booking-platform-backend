@@ -119,10 +119,10 @@ export interface IPaymentGateway {
     options?: PaymentOptions,
   ): Promise<GatewayPaymentResponse>;
   getPaymentStatus(orderId: string): Promise<GatewayStatusResponse>;
-  verifyWebhook(
+  webhookPayment(
     payload: any,
     signature: string,
-  ): Promise<WebhookVerificationResult>;
+  ): Promise<WebhookPaymentResult>;
   refundPayment(orderId: string, amount?: number): Promise<RefundResponse>;
   terminatePayment(orderId: string): Promise<boolean>;
 }
@@ -148,6 +148,17 @@ export interface GatewayStatusResponse {
 export interface WebhookVerificationResult {
   valid: boolean;
   webhookData?: any;
+  error?: string;
+}
+
+export interface WebhookPaymentResult {
+  valid: boolean;
+  transactionId?: string;
+  gatewayPaymentId?: string;
+  status?: PaymentGatewayStatus;
+  amount?: number;
+  currency?: string;
+  rawStatus?: string;
   error?: string;
 }
 

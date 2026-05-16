@@ -13,10 +13,12 @@ import { PaymentGatewayFactory } from '../factories/payment-gateway.factory';
 import {
   IPaymentService,
   PaymentCustomerDetails,
+  PaymentGatewayStatus,
   PaymentGatewayType,
   PaymentOptions,
   PaymentResponse,
   PaymentStatus,
+  WebhookPaymentResult,
 } from '../interfaces/payment.interface';
 import { PaymentTransactionService } from './payment-transaction.service';
 
@@ -206,26 +208,16 @@ export class PaymentService implements IPaymentService {
 
     try {
       const gateway = this.paymentGatewayFactory.createGateway(gatewayType);
-      const verificationResult = await gateway.verifyWebhook(
-        payload,
-        signature,
-      );
+      const result = await gateway.webhookPayment(payload, signature);
 
-      if (!verificationResult.valid) {
+      if (!result.valid) {
         return {
           success: false,
-          error: verificationResult.error || 'Webhook verification failed',
+          error: result.error || 'Webhook verification failed',
         };
       }
 
-      const webhookData = verificationResult.webhookData;
-
-      // Prefer the txn query param embedded in the notify URL, then fall back
-      // to order_tags.transaction_id set at order creation time.
-      const resolvedTransactionId =
-        transactionId ||
-        webhookData?.data?.order?.order_tags?.transaction_id ||
-        webhookData?.order_tags?.transaction_id;
+      const resolvedTransactionId = transactionId || result.transactionId;
 
       if (!resolvedTransactionId) {
         return {
@@ -234,20 +226,13 @@ export class PaymentService implements IPaymentService {
         };
       }
 
-      // Update transaction based on webhook data
-      await this.processWebhookUpdate(resolvedTransactionId, webhookData);
+      await this.processWebhookUpdate(resolvedTransactionId, result);
 
-      return {
-        success: true,
-        transactionId: resolvedTransactionId,
-      };
+      return { success: true, transactionId: resolvedTransactionId };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Webhook handling failed: ${message}`);
-      return {
-        success: false,
-        error: message,
-      };
+      return { success: false, error: message };
     }
   }
 
@@ -329,17 +314,33 @@ export class PaymentService implements IPaymentService {
 
   private async processWebhookUpdate(
     transactionId: string,
-    webhookData: Record<string, unknown>,
+    result: WebhookPaymentResult,
   ): Promise<void> {
-    const status = this.mapGatewayStatusToTransactionStatus(
-      (webhookData.status as string) ?? '',
-    );
+    const transaction =
+      await this.paymentTransactionService.findById(transactionId);
+
+    if (!transaction) {
+      this.logger.warn(
+        `processWebhookUpdate: transaction not found ${transactionId}`,
+      );
+      return;
+    }
+
+    if (transaction.status !== PaymentStatus.PENDING) {
+      this.logger.debug(
+        `Skipping webhook update for ${transactionId} — already in state: ${transaction.status}`,
+      );
+      return;
+    }
+
+    const gatewayStatus = result.status ?? PaymentGatewayStatus.PENDING;
+    const status = this.mapGatewayStatusToTransactionStatus(gatewayStatus);
 
     await this.paymentTransactionService.update(transactionId, {
       status,
-      gatewayStatus: webhookData.status as string,
-      gatewayPaymentId: webhookData.paymentId as string,
-      webhookData,
+      gatewayStatus: result.rawStatus ?? gatewayStatus,
+      gatewayPaymentId: result.gatewayPaymentId,
+      processedAt: new Date(),
       updatedAt: new Date(),
     });
 

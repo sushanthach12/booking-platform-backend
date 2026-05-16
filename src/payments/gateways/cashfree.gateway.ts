@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
 import {
   getCashFreeBaseUrl,
   getCashFreeNotifyUrl,
@@ -13,7 +12,7 @@ import {
   PaymentGatewayStatus,
   PaymentOptions,
   RefundResponse,
-  WebhookVerificationResult,
+  WebhookPaymentResult,
 } from '../interfaces/payment.interface';
 
 @Injectable()
@@ -151,68 +150,46 @@ export class CashfreeGateway implements IPaymentGateway {
     }
   }
 
-  async verifyWebhook(
+  async webhookPayment(
     payload: unknown,
-    signature: string,
-  ): Promise<WebhookVerificationResult> {
-    this.logger.log('Verifying Cashfree webhook');
+    _signature: string,
+  ): Promise<WebhookPaymentResult> {
+    this.logger.log('Processing Cashfree webhook');
 
     try {
-      if (!signature || !payload) {
-        return { valid: false, error: 'Missing signature or payload' };
+      if (!payload) {
+        return { valid: false, error: 'Missing payload' };
       }
 
-      // Cashfree signs: timestamp + raw body, header is x-webhook-signature
-      // Format: "timestamp.rawBody" → HMAC-SHA256 → base64
-      // The signature header may contain the timestamp prefix: "ts=<ts>,v1=<sig>"
-      const rawBody =
-        typeof payload === 'string' ? payload : JSON.stringify(payload);
+      const data: Record<string, unknown> =
+        typeof payload === 'string'
+          ? JSON.parse(payload)
+          : (payload as Record<string, unknown>);
 
-      // Support both plain base64 and "ts=xxx,v1=xxx" format
-      let computedSig: string;
-      if (signature.includes(',')) {
-        // Parse timestamp from header
-        const parts = Object.fromEntries(
-          signature.split(',').map((p) => p.split('=')),
-        );
-        const ts = parts['ts'] ?? '';
-        const signedPayload = `${ts}${rawBody}`;
-        computedSig = crypto
-          .createHmac('sha256', this.apiSecret)
-          .update(signedPayload)
-          .digest('base64');
+      const eventData = data.data as Record<string, unknown> | undefined;
+      const payment = eventData?.payment as Record<string, unknown> | undefined;
+      const order = eventData?.order as Record<string, unknown> | undefined;
+      const orderTags = order?.order_tags as
+        | Record<string, unknown>
+        | undefined;
 
-        const isValid = parts['v1'] === computedSig;
-        return {
-          valid: isValid,
-          webhookData: isValid
-            ? typeof payload === 'string'
-              ? JSON.parse(payload)
-              : payload
-            : undefined,
-          error: isValid ? undefined : 'Signature mismatch',
-        };
-      }
+      const rawStatus = (payment?.payment_status as string) ?? '';
+      const gatewayStatus = this.mapCashfreeStatus(rawStatus);
 
-      // Plain HMAC-SHA256 over raw body
-      computedSig = crypto
-        .createHmac('sha256', this.apiSecret)
-        .update(rawBody)
-        .digest('base64');
-
-      const isValid = signature === computedSig;
       return {
-        valid: isValid,
-        webhookData: isValid
-          ? typeof payload === 'string'
-            ? JSON.parse(payload)
-            : payload
-          : undefined,
-        error: isValid ? undefined : 'Signature mismatch',
+        valid: true,
+        transactionId:
+          (orderTags?.transaction_id as string | undefined) ??
+          (order?.order_id as string | undefined),
+        gatewayPaymentId: payment?.cf_payment_id as string | undefined,
+        status: gatewayStatus,
+        rawStatus,
+        amount: payment?.payment_amount as number | undefined,
+        currency: payment?.payment_currency as string | undefined,
       };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Webhook verification failed: ${msg}`);
+      this.logger.error(`Webhook processing failed: ${msg}`);
       return { valid: false, error: msg };
     }
   }
@@ -314,7 +291,7 @@ export class CashfreeGateway implements IPaymentGateway {
   private buildHeaders(): Record<string, string> {
     return {
       'Content-Type': 'application/json',
-      'x-api-version': '2023-08-01',
+      'x-api-version': '2025-01-01',
       'x-client-id': this.apiKey,
       'x-client-secret': this.apiSecret,
     };
@@ -323,11 +300,13 @@ export class CashfreeGateway implements IPaymentGateway {
   private mapCashfreeStatus(status?: string): PaymentGatewayStatus {
     switch (status?.toUpperCase()) {
       case 'PAID':
+      case 'SUCCESS':
         return PaymentGatewayStatus.SUCCESS;
       case 'EXPIRED':
       case 'CANCELLED':
         return PaymentGatewayStatus.CANCELLED;
       case 'FAILED':
+      case 'TERMINATED':
         return PaymentGatewayStatus.FAILED;
       case 'REFUNDED':
         return PaymentGatewayStatus.REFUNDED;

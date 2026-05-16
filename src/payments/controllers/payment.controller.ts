@@ -29,7 +29,7 @@ export class PaymentController {
   @HttpCode(HttpStatus.OK)
   async handleCashfreeWebhook(
     @Body() payload: Record<string, unknown>,
-    @Headers('x-cashfree-signature') signature: string,
+    @Headers('x-webhook-signature') signature: string,
     @Query('txn') transactionId?: string,
   ) {
     this.logger.log('Received Cashfree webhook');
