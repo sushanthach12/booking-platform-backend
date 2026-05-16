@@ -200,6 +200,7 @@ export class PaymentService implements IPaymentService {
     gatewayType: PaymentGatewayType,
     payload: any,
     signature: string,
+    transactionId?: string,
   ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     this.logger.log(`Handling webhook for gateway: ${gatewayType}`);
 
@@ -218,9 +219,15 @@ export class PaymentService implements IPaymentService {
       }
 
       const webhookData = verificationResult.webhookData;
-      const transactionId = webhookData?.orderId || webhookData?.transactionId;
 
-      if (!transactionId) {
+      // Prefer the txn query param embedded in the notify URL, then fall back
+      // to order_tags.transaction_id set at order creation time.
+      const resolvedTransactionId =
+        transactionId ||
+        webhookData?.data?.order?.order_tags?.transaction_id ||
+        webhookData?.order_tags?.transaction_id;
+
+      if (!resolvedTransactionId) {
         return {
           success: false,
           error: 'Transaction ID not found in webhook data',
@@ -228,11 +235,11 @@ export class PaymentService implements IPaymentService {
       }
 
       // Update transaction based on webhook data
-      await this.processWebhookUpdate(transactionId, webhookData);
+      await this.processWebhookUpdate(resolvedTransactionId, webhookData);
 
       return {
         success: true,
-        transactionId,
+        transactionId: resolvedTransactionId,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

@@ -7,6 +7,7 @@ import {
   Inject,
   Logger,
   Post,
+  Query,
 } from '@nestjs/common';
 import { Public } from '../../common/decorators/public.decorator';
 import {
@@ -29,6 +30,7 @@ export class PaymentController {
   async handleCashfreeWebhook(
     @Body() payload: Record<string, unknown>,
     @Headers('x-cashfree-signature') signature: string,
+    @Query('txn') transactionId?: string,
   ) {
     this.logger.log('Received Cashfree webhook');
 
@@ -37,6 +39,7 @@ export class PaymentController {
         PaymentGatewayType.CASHFREE,
         payload,
         signature,
+        transactionId,
       );
 
       if (result.success) {

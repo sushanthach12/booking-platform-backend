@@ -32,19 +32,21 @@ export class CashfreeGateway implements IPaymentGateway {
   }
 
   async createPayment(
-    orderId: string,
+    transactionId: string,
     amount: number,
     currency: string,
     customerDetails: PaymentCustomerDetails,
     options?: PaymentOptions,
   ): Promise<GatewayPaymentResponse> {
-    this.logger.log(`Creating Cashfree payment for order: ${orderId}`);
+    this.logger.log(
+      `Creating Cashfree payment for transaction: ${transactionId}`,
+    );
 
-    const webhookURL = getCashFreeNotifyUrl();
+    const webhookURL = getCashFreeNotifyUrl(transactionId);
 
     try {
       const body = {
-        order_id: orderId,
+        order_id: transactionId,
         order_amount: amount,
         order_currency: currency,
         customer_details: {
@@ -59,7 +61,7 @@ export class CashfreeGateway implements IPaymentGateway {
         },
         order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         order_tags: {
-          order_id: orderId,
+          transaction_id: transactionId,
         },
       };
 
@@ -85,14 +87,14 @@ export class CashfreeGateway implements IPaymentGateway {
         );
         return {
           success: false,
-          orderId,
+          orderId: transactionId,
           error: data.message ?? 'Payment creation failed',
         };
       }
 
       return {
         success: true,
-        orderId: data.order_id ?? orderId,
+        orderId: data.order_id ?? transactionId,
         paymentLinkId: data.payment_link,
         paymentSessionId: data.payment_session_id,
         expiresAt: data.order_expiry_time
@@ -102,7 +104,7 @@ export class CashfreeGateway implements IPaymentGateway {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to create Cashfree payment: ${msg}`);
-      return { success: false, orderId, error: msg };
+      return { success: false, orderId: transactionId, error: msg };
     }
   }
 

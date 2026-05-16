@@ -19,6 +19,7 @@ export interface IPaymentService {
     gatewayType: PaymentGatewayType,
     payload: any,
     signature: string,
+    transactionId?: string,
   ): Promise<WebhookResult>;
 
   terminatePayment(transactionId: string): Promise<boolean>;
@@ -111,7 +112,7 @@ export enum PaymentStatus {
 // Gateway-specific interfaces (kept separate as they're implementation details)
 export interface IPaymentGateway {
   createPayment(
-    orderId: string,
+    transactionId: string,
     amount: number,
     currency: string,
     customerDetails: PaymentCustomerDetails,
