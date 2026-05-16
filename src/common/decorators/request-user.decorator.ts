@@ -18,7 +18,7 @@ export const CurrentUser = createParamDecorator(
     const request = ctx.switchToHttp().getRequest<Request>();
     const user = request.headers.user
       ? (JSON.parse(request.headers.user as string) as RequestUser)
-      : null;
+      : (request.user ?? null);
 
     if (!user) {
       throw new UnauthorizedException('No user found');

@@ -5,12 +5,12 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import type { ApiRequest } from '../common/interfaces/request.interface';
 import { gatewayDefaults, gatewayEnv } from '../common/config/gateway.config';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
+import type { ApiRequest } from '../common/interfaces/request.interface';
 import { IRedisService } from '../common/redis';
 import { REDIS_SERVICE } from '../database/di/symbols';
 
