@@ -30,7 +30,12 @@ export const CurrentUser = createParamDecorator(
 export const RequestUserId = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest<Request>();
-    const user = JSON.parse(request.headers.user as string) as RequestUser;
-    return user.id;
+    // JwtAuthGuard sets request.user after verifying the Bearer token
+    if (request.user?.id) return request.user.id;
+    // Fallback: gateway may forward user as a JSON header
+    if (request.headers.user) {
+      return (JSON.parse(request.headers.user as string) as RequestUser).id;
+    }
+    throw new UnauthorizedException('User not authenticated');
   },
 );

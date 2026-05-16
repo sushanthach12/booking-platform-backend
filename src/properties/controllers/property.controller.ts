@@ -10,10 +10,13 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
+import type { ApiRequest } from '../../common/interfaces/request.interface';
 import { RequestUser } from '../../common/types/users.types';
+import { WishlistService } from '../../users/services/wishlist.service';
 import { CreatePropertyDto } from '../dto/create-property.dto';
 import { PropertyListingDto } from '../dto/listing.dto';
 import {
@@ -35,17 +38,19 @@ import { PropertyService } from '../services/property.service';
 export class PropertyController {
   private readonly logger = new Logger(PropertyController.name);
 
-  constructor(private readonly propertyService: PropertyService) {}
+  constructor(
+    private readonly propertyService: PropertyService,
+    private readonly wishlistService: WishlistService,
+  ) {}
 
   @Public()
   @Post('listing')
   @HttpCode(HttpStatus.OK)
-  async getProperties(@Body() body: PropertyListingDto) {
+  async getProperties(@Body() body: PropertyListingDto, @Req() req: ApiRequest) {
     this.logger.log(`Get properties request received`);
 
-    const response = await this.propertyService.getProperties({
-      payload: body,
-    });
+    const response = await this.propertyService.getProperties({ payload: body });
+    await this.annotateWishlistStatus(req.user?.id, response.results);
 
     return { data: response };
   }
@@ -137,12 +142,11 @@ export class PropertyController {
   @Public()
   @Post('search')
   @HttpCode(HttpStatus.OK)
-  async searchProperties(@Body() body: SearchPropertiesDto) {
+  async searchProperties(@Body() body: SearchPropertiesDto, @Req() req: ApiRequest) {
     this.logger.log(`Search properties request received`);
 
-    const response = await this.propertyService.searchProperties({
-      payload: body,
-    });
+    const response = await this.propertyService.searchProperties({ payload: body });
+    await this.annotateWishlistStatus(req.user?.id, response.results);
 
     return { data: response };
   }
@@ -163,12 +167,11 @@ export class PropertyController {
   @Public()
   @Get('search')
   @HttpCode(HttpStatus.OK)
-  async searchPropertiesGet(@Query() query: SearchPropertiesDto) {
+  async searchPropertiesGet(@Query() query: SearchPropertiesDto, @Req() req: ApiRequest) {
     this.logger.log(`Search properties (GET) request received`);
 
-    const response = await this.propertyService.searchProperties({
-      payload: query,
-    });
+    const response = await this.propertyService.searchProperties({ payload: query });
+    await this.annotateWishlistStatus(req.user?.id, response.results);
 
     return { data: response };
   }
@@ -282,5 +285,21 @@ export class PropertyController {
     });
 
     return { data: response };
+  }
+
+  private async annotateWishlistStatus(
+    userId: string | undefined,
+    results: Array<{ id: string; isWishlisted?: boolean }>,
+  ): Promise<void> {
+    if (!userId || results.length === 0) return;
+    try {
+      const ids = results.map((r) => r.id);
+      const wishlisted = await this.wishlistService.getWishlistedIds(userId, ids);
+      for (const result of results) {
+        result.isWishlisted = wishlisted.has(result.id);
+      }
+    } catch {
+      // non-critical — leave isWishlisted undefined on failure
+    }
   }
 }

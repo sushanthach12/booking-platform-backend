@@ -104,6 +104,7 @@ export interface IGetPropertiesResult {
   } | null;
   createdAt: Date;
   updatedAt: Date;
+  isWishlisted?: boolean;
 }
 
 export interface IGetPropertiesResponse {

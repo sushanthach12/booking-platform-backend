@@ -38,4 +38,13 @@ export class WishlistRepository implements IWishlistRepository {
   async exists(userId: string, propertyId: string): Promise<boolean> {
     return this.repo.existsBy({ userId, propertyId });
   }
+
+  async findWishlistedIds(userId: string, propertyIds: string[]): Promise<Set<string>> {
+    if (propertyIds.length === 0) return new Set();
+    const items = await this.repo.find({
+      where: propertyIds.map((propertyId) => ({ userId, propertyId })),
+      select: ['propertyId'],
+    });
+    return new Set(items.map((i) => i.propertyId));
+  }
 }

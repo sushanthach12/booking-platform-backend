@@ -91,4 +91,15 @@ export class UsersMeController {
     await this.wishlistService.removeFromWishlist(userId, propertyId);
     return { data: { success: true } };
   }
+
+  @Get('wishlist/:propertyId/status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Check if property is in wishlist' })
+  async isWishlisted(
+    @RequestUserId() userId: string,
+    @Param('propertyId') propertyId: string,
+  ) {
+    const wishlisted = await this.wishlistService.isWishlisted(userId, propertyId);
+    return { data: { wishlisted } };
+  }
 }
