@@ -766,11 +766,17 @@ export class BookingService implements IBookingService {
       ...(isHost ? { hostId: userId } : { guestId: userId }),
     });
 
+    const bookings = result.bookings.map((booking) => this.mapToResponse(booking));
+    const totalPages = Math.ceil(result.total / result.limit);
     return {
-      bookings: result.bookings.map((booking) => this.mapToResponse(booking)),
-      total: result.total,
-      page: result.page,
-      limit: result.limit,
+      bookings,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages,
+        length: bookings.length,
+      },
     };
   }
 

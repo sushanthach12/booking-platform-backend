@@ -116,6 +116,7 @@ export class PropertyService {
       pagination: {
         page,
         limit,
+        total: totalItems,
         totalItems,
         length: properties.length,
         totalPages: Math.ceil(totalItems / limit),
@@ -748,6 +749,7 @@ export class PropertyService {
       pagination: {
         page,
         limit,
+        total,
         totalItems: total,
         length: properties.length,
         totalPages: Math.ceil(total / limit),
@@ -769,6 +771,7 @@ export class PropertyService {
       pagination: {
         page: 1,
         limit,
+        total: 0,
         totalItems: 0,
         length: 0,
         totalPages: 0,
@@ -820,6 +823,7 @@ export class PropertyService {
       pagination: {
         page,
         limit,
+        total: totalItems,
         totalItems,
         length: properties.length,
         totalPages: Math.ceil(totalItems / limit),

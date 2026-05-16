@@ -88,9 +88,13 @@ export interface BookingQueryOptions {
 
 export interface PaginatedBookings {
   bookings: BookingResponse[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    length: number;
+  };
 }
 
 export interface AvailabilityResult {
