@@ -200,6 +200,25 @@ export class BookingController {
     return { data: response };
   }
 
+  @Post(':bookingId/retry-payment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Retry payment for a pending booking' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'New payment session created. Use paymentSessionId with the payment SDK.',
+  })
+  async retryPayment(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    this.logger.log(
+      `Retry payment request for booking ${bookingId} from user ${user.id}`,
+    );
+    const response = await this.bookingService.retryPayment(bookingId, user.id);
+    return { data: response };
+  }
+
   @Patch(':bookingId/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cancel a booking' })

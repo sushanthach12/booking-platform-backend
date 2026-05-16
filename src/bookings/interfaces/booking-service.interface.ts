@@ -73,6 +73,11 @@ export interface IBookingService {
     request: CheckoutPreviewRequest,
     userId: string,
   ): Promise<CheckoutPreviewResponse>;
+
+  retryPayment(
+    bookingId: string,
+    userId: string,
+  ): Promise<{ paymentSessionId: string; paymentLink: string }>;
 }
 
 /**

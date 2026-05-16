@@ -1269,6 +1269,106 @@ export class BookingService implements IBookingService {
     };
   }
 
+  /**
+   * Retries payment for a PENDING booking whose previous Cashfree order failed or expired.
+   * Does NOT create a new booking or re-check availability — the dates are already blocked.
+   * Terminates the old payment order, issues a new Cashfree order, and re-enqueues the
+   * payment timeout job so the 15-minute window resets.
+   */
+  async retryPayment(
+    bookingId: string,
+    userId: string,
+  ): Promise<{ paymentSessionId: string; paymentLink: string }> {
+    const booking = await this.bookingRepository.findById(bookingId);
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.guestId !== userId) {
+      throw new ForbiddenException('You do not have access to this booking');
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException(
+        'Only pending bookings can have their payment retried',
+      );
+    }
+
+    // Terminate the previous payment order (fire-and-forget — it may already be expired)
+    if (booking.paymentTransactionId) {
+      try {
+        await this.paymentService.terminatePayment(
+          booking.paymentTransactionId,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Could not terminate old payment ${booking.paymentTransactionId} during retry: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    const userProfile = await this.userService.getProfile(userId);
+
+    const customerDetails: PaymentCustomerDetails = {
+      customerId: userId,
+      email: userProfile.email ?? '',
+      name: userProfile.name ?? '',
+      phone: userProfile.phone ?? '',
+    };
+
+    let paymentResponse: PaymentResponse;
+    try {
+      const grandTotal = Number(booking.grandTotal);
+      paymentResponse = await this.createPaymentWithTimeout(
+        grandTotal,
+        booking.currency,
+        customerDetails,
+        {
+          amount: grandTotal,
+          currency: booking.currency,
+          bookingId: booking.id,
+          guestId: userId,
+          propertyId: booking.propertyId,
+          metadata: {
+            bookingId: booking.id,
+            propertyId: booking.propertyId,
+            guestId: userId,
+            numberOfNights: booking.numberOfNights,
+          },
+        },
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Unable to process payment. Please try again.';
+      throw new BadRequestException(message);
+    }
+
+    // Persist new transaction ID and reset payment status to PENDING
+    await this.bookingRepository.update(bookingId, {
+      paymentTransactionId: paymentResponse.transactionId,
+      paymentStatus: BookingPaymentStatus.PENDING,
+    });
+
+    // Re-enqueue payment timeout job so the 15-minute window restarts
+    await this.bookingPaymentTimeoutQueue.add(
+      JOB_EXPIRE_UNPAID_BOOKING,
+      { bookingId, paymentTransactionId: paymentResponse.transactionId },
+      { delay: PAYMENT_TIMEOUT_MS },
+    );
+
+    this.logger.log(
+      `Payment retried for booking ${bookingId}, new transaction: ${paymentResponse.transactionId}`,
+    );
+
+    return {
+      paymentSessionId: paymentResponse.paymentSessionId ?? '',
+      paymentLink: paymentResponse.paymentLink ?? '',
+    };
+  }
+
   private mapToResponse(booking: BookingEntity): BookingResponse {
     const paymentStatus = booking.paymentStatus as BookingPaymentStatus;
     const status = booking.status as BookingStatus;
