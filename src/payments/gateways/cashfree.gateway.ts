@@ -48,12 +48,12 @@ export class CashfreeGateway implements IPaymentGateway {
       const body = {
         order_id: transactionId,
         order_amount: amount,
-        order_currency: currency,
+        order_currency: 'INR',
         customer_details: {
           customer_id: customerDetails.customerId,
           customer_email: customerDetails.email,
           customer_name: customerDetails.name,
-          customer_phone: customerDetails.phone ?? '9999999999',
+          customer_phone: customerDetails.phone || '9999999999',
         },
         order_meta: {
           return_url: options?.returnUrl ?? '',
