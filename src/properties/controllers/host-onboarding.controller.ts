@@ -203,7 +203,7 @@ export class HostOnboardingController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Return full draft property details (with relations) for pre-filling the wizard on resume',
+      'Return lean property data for the edit form — works for any status the host owns (draft or published)',
   })
   async getDraftDetails(
     @CurrentUser() user: RequestUser,

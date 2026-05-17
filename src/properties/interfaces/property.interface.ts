@@ -151,6 +151,56 @@ export interface HouseRuleItemResponse {
   description?: string;
 }
 
+/** Lean response for the edit listing page — only the fields the edit form needs. */
+export interface IGetPropertyForEditResponse {
+  id: string;
+  title: string;
+  description: string | null;
+  propertyType: string;
+  status: string;
+  basicInfo: {
+    title: string;
+    description: string | null;
+    propertyType: string;
+  };
+  location: {
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state?: string;
+    country: string;
+    postalCode?: string;
+    latitude?: number;
+    longitude?: number;
+  } | null;
+  pricingAndPolicies: {
+    basePrice: number;
+    currency: string;
+    minNights: number;
+    maxNights: number;
+    maxGuests: number;
+    checkInTime: string;
+    checkOutTime: string;
+  } | null;
+  amenitiesAndRules: {
+    amenities: { name: string; category: string }[];
+    rules: { type: string; allowed: boolean; description?: string }[];
+  };
+  media: {
+    images: {
+      url: string;
+      thumbnailUrl?: string;
+      altText?: string;
+      displayOrder: number;
+      isPrimary: boolean;
+      width?: number;
+      height?: number;
+      fileSize?: number;
+      mimeType?: string;
+    }[];
+  };
+}
+
 export interface IGetPropertyDetailsResponse {
   id: string;
   hostId: string;

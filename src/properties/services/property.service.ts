@@ -42,6 +42,7 @@ import {
   IGetPropertyAvailabilityResponse,
   IGetPropertyDetailsRequestParams,
   IGetPropertyDetailsResponse,
+  IGetPropertyForEditResponse,
   INearbyPropertiesRequestParams,
   ISearchPropertiesRequestParams,
   IUpdatePropertyAvailabilityRequestParams,
@@ -1180,7 +1181,7 @@ export class PropertyService {
   async getDraftDetails(params: {
     user: RequestUser;
     propertyId: string;
-  }): Promise<IGetPropertyDetailsResponse> {
+  }): Promise<IGetPropertyForEditResponse> {
     const property = await this.propertyRepository.findPropertyById({
       id: params.propertyId,
     });
@@ -1188,13 +1189,97 @@ export class PropertyService {
     if (property.hostId !== params.user.id) {
       throw new ForbiddenException('Access denied');
     }
-    if (property.status !== EPropertyStatus.DRAFT) {
-      throw new BadRequestException('Property is not a draft');
-    }
 
-    return this.getPropertyDetails({
-      params: { propertyId: params.propertyId, includeRelations: true },
-    });
+    // Fetch only the fields the edit form needs — skip ratings, rooms, availability
+    const [location, pricing, details, policy, images, amenities, houseRules] =
+      await Promise.all([
+        this.propertyRepository.findPropertyLocationByPropertyId({
+          propertyId: params.propertyId,
+        }),
+        this.propertyRepository.findPropertyPricingByPropertyId({
+          propertyId: params.propertyId,
+        }),
+        this.propertyRepository.findPropertyDetailsByPropertyId({
+          propertyId: params.propertyId,
+        }),
+        this.propertyRepository.findPropertyPolicyByPropertyId({
+          propertyId: params.propertyId,
+        }),
+        this.propertyRepository.findPropertyImagesByPropertyId({
+          propertyId: params.propertyId,
+        }),
+        this.propertyRepository.findPropertyAmenitiesByPropertyId({
+          propertyId: params.propertyId,
+        }),
+        this.propertyRepository.findHouseRulesByPropertyId({
+          propertyId: params.propertyId,
+        }),
+      ]);
+
+    return {
+      id: property.id,
+      title: property.title,
+      description: property.description,
+      propertyType: property.propertyType,
+      status: property.status,
+      basicInfo: {
+        title: property.title,
+        description: property.description,
+        propertyType: property.propertyType,
+      },
+      location: location
+        ? {
+            addressLine1: location.addressLine1,
+            addressLine2: location.addressLine2 || undefined,
+            city: location.city,
+            state: location.state || undefined,
+            country: location.country,
+            postalCode: location.postalCode || undefined,
+            latitude: location.latitude ? Number(location.latitude) : undefined,
+            longitude: location.longitude
+              ? Number(location.longitude)
+              : undefined,
+          }
+        : null,
+      pricingAndPolicies:
+        pricing || policy
+          ? {
+              basePrice: pricing ? Number(pricing.basePrice) : 0,
+              currency: pricing?.currency ?? 'INR',
+              minNights: policy?.minNights ?? 1,
+              maxNights: policy?.maxNights ?? 30,
+              maxGuests: details?.maxGuests ?? 1,
+              checkInTime: policy?.checkInTime ?? '15:00',
+              checkOutTime: policy?.checkOutTime ?? '11:00',
+            }
+          : null,
+      amenitiesAndRules: {
+        amenities: amenities
+          .filter((pa) => pa.amenity)
+          .map((pa) => ({
+            name: pa.amenity.name,
+            category: pa.amenity.category,
+          })),
+        rules: houseRules.map((r) => ({
+          type: r.ruleType,
+          allowed: r.allowed,
+          description: r.description || undefined,
+        })),
+      },
+      media: {
+        images: images.map((img) => ({
+          url: img.url,
+          thumbnailUrl: img.thumbnailUrl || undefined,
+          altText: img.altText || undefined,
+          displayOrder: img.displayOrder,
+          isPrimary: img.isPrimary,
+          width: img.width || undefined,
+          height: img.height || undefined,
+          fileSize: img.fileSize || undefined,
+          mimeType: img.mimeType || undefined,
+        })),
+      },
+    };
   }
 
   async getPropertyStats(
