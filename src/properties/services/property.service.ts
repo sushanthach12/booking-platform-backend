@@ -959,11 +959,8 @@ export class PropertyService {
     });
     if (!property) throw new NotFoundException('Property not found');
     if (property.hostId !== params.user.id) {
-      throw new ForbiddenException('Only property owner can update this draft');
-    }
-    if (property.status !== EPropertyStatus.DRAFT) {
-      throw new BadRequestException(
-        'Only DRAFT properties can be updated via onboarding steps',
+      throw new ForbiddenException(
+        'Only property owner can update this property',
       );
     }
 
@@ -989,11 +986,8 @@ export class PropertyService {
     });
     if (!property) throw new NotFoundException('Property not found');
     if (property.hostId !== params.user.id) {
-      throw new ForbiddenException('Only property owner can update this draft');
-    }
-    if (property.status !== EPropertyStatus.DRAFT) {
-      throw new BadRequestException(
-        'Only DRAFT properties can be updated via onboarding steps',
+      throw new ForbiddenException(
+        'Only property owner can update this property',
       );
     }
 
@@ -1045,11 +1039,8 @@ export class PropertyService {
     });
     if (!property) throw new NotFoundException('Property not found');
     if (property.hostId !== params.user.id) {
-      throw new ForbiddenException('Only property owner can update this draft');
-    }
-    if (property.status !== EPropertyStatus.DRAFT) {
-      throw new BadRequestException(
-        'Only DRAFT properties can be updated via onboarding steps',
+      throw new ForbiddenException(
+        'Only property owner can update this property',
       );
     }
 
@@ -1069,11 +1060,8 @@ export class PropertyService {
     });
     if (!property) throw new NotFoundException('Property not found');
     if (property.hostId !== params.user.id) {
-      throw new ForbiddenException('Only property owner can update this draft');
-    }
-    if (property.status !== EPropertyStatus.DRAFT) {
-      throw new BadRequestException(
-        'Only DRAFT properties can be updated via onboarding steps',
+      throw new ForbiddenException(
+        'Only property owner can update this property',
       );
     }
 
