@@ -75,4 +75,32 @@ export class UserService {
       phone: updated.phone,
     };
   }
+
+  async becomeHost(userId: string): Promise<IGetProfileResponse> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    if (user.role === EUserRole.HOST) {
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: EUserRole.HOST,
+        phone: user.phone,
+      };
+    }
+
+    const updated = await this.userRepository.update({
+      ...user,
+      role: EUserRole.HOST,
+    } as IUser);
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      name: updated.name,
+      role: EUserRole.HOST,
+      phone: updated.phone,
+    };
+  }
 }

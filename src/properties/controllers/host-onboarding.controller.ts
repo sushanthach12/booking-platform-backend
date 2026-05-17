@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import {
@@ -20,6 +21,7 @@ import {
   OnboardingStep4Dto,
   OnboardingStep5Dto,
 } from '../dto/host-onboarding-steps.dto';
+import { EUserRole } from '../../users/enums/user.enum';
 import { PropertyService } from '../services/property.service';
 
 /**
@@ -38,6 +40,7 @@ import { PropertyService } from '../services/property.service';
  *     - GET   /host/onboard/draft?propertyId=... → returns full draft state for pre-fill
  */
 @ApiTags('Host Onboarding')
+@Roles(EUserRole.HOST)
 @Controller({ path: 'host', version: '1' })
 export class HostOnboardingController {
   private readonly logger = new Logger(HostOnboardingController.name);

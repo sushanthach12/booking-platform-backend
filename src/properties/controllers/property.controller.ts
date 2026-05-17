@@ -13,6 +13,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import type { ApiRequest } from '../../common/interfaces/request.interface';
 import { RequestUser } from '../../common/types/users.types';
@@ -32,6 +33,7 @@ import {
   UpdatePropertyDto,
   UpdatePropertyStatusDto,
 } from '../dto/property-crud.dto';
+import { EUserRole } from '../../users/enums/user.enum';
 import { PropertyService } from '../services/property.service';
 
 @Controller({ path: 'properties', version: '1' })
@@ -46,16 +48,22 @@ export class PropertyController {
   @Public()
   @Post('listing')
   @HttpCode(HttpStatus.OK)
-  async getProperties(@Body() body: PropertyListingDto, @Req() req: ApiRequest) {
+  async getProperties(
+    @Body() body: PropertyListingDto,
+    @Req() req: ApiRequest,
+  ) {
     this.logger.log(`Get properties request received`);
 
-    const response = await this.propertyService.getProperties({ payload: body });
+    const response = await this.propertyService.getProperties({
+      payload: body,
+    });
     await this.annotateWishlistStatus(req.user?.id, response.results);
 
     return { data: response };
   }
 
   @Post()
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   async createProperty(
     @CurrentUser() user: RequestUser,
@@ -88,6 +96,7 @@ export class PropertyController {
   }
 
   @Patch('details')
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   async updateProperty(
     @Query() query: PropertyQueryDto,
@@ -106,6 +115,7 @@ export class PropertyController {
   }
 
   @Delete()
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   async deleteProperty(
     @Query() query: PropertyQueryDto,
@@ -122,6 +132,7 @@ export class PropertyController {
   }
 
   @Patch('status')
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   async updatePropertyStatus(
     @Query() query: PropertyQueryDto,
@@ -142,10 +153,15 @@ export class PropertyController {
   @Public()
   @Post('search')
   @HttpCode(HttpStatus.OK)
-  async searchProperties(@Body() body: SearchPropertiesDto, @Req() req: ApiRequest) {
+  async searchProperties(
+    @Body() body: SearchPropertiesDto,
+    @Req() req: ApiRequest,
+  ) {
     this.logger.log(`Search properties request received`);
 
-    const response = await this.propertyService.searchProperties({ payload: body });
+    const response = await this.propertyService.searchProperties({
+      payload: body,
+    });
     await this.annotateWishlistStatus(req.user?.id, response.results);
 
     return { data: response };
@@ -167,16 +183,22 @@ export class PropertyController {
   @Public()
   @Get('search')
   @HttpCode(HttpStatus.OK)
-  async searchPropertiesGet(@Query() query: SearchPropertiesDto, @Req() req: ApiRequest) {
+  async searchPropertiesGet(
+    @Query() query: SearchPropertiesDto,
+    @Req() req: ApiRequest,
+  ) {
     this.logger.log(`Search properties (GET) request received`);
 
-    const response = await this.propertyService.searchProperties({ payload: query });
+    const response = await this.propertyService.searchProperties({
+      payload: query,
+    });
     await this.annotateWishlistStatus(req.user?.id, response.results);
 
     return { data: response };
   }
 
   @Get('host/me')
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   async getHostProperties(
     @CurrentUser() user: RequestUser,
@@ -193,6 +215,7 @@ export class PropertyController {
   }
 
   @Get('analytics')
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   async getPropertyAnalytics(
     @Query() query: GetPropertyAnalyticsQueryDto,
@@ -294,7 +317,10 @@ export class PropertyController {
     if (!userId || results.length === 0) return;
     try {
       const ids = results.map((r) => r.id);
-      const wishlisted = await this.wishlistService.getWishlistedIds(userId, ids);
+      const wishlisted = await this.wishlistService.getWishlistedIds(
+        userId,
+        ids,
+      );
       for (const result of results) {
         result.isWishlisted = wishlisted.has(result.id);
       }

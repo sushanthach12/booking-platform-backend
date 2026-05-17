@@ -14,11 +14,13 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { AVAILABILITY_CALENDAR_REPOSITORY } from '../../database';
 import { BlockDatesDto } from '../dto/block-dates.dto';
 import type { IAvailabilityCalendarRepository } from '../repositories/interfaces/availability-calendar.repository.interface';
+import { EUserRole } from '../../users/enums/user.enum';
 import { PropertyService } from '../services/property.service';
 
 @ApiTags('properties')
@@ -33,6 +35,7 @@ export class PropertyCalendarController {
   ) {}
 
   @Get(':propertyId/stats')
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get property stats (host only)' })
   async getPropertyStats(
@@ -131,6 +134,7 @@ export class PropertyCalendarController {
   }
 
   @Post(':propertyId/calendar/block')
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Block dates on a property calendar' })
   async blockDates(
@@ -162,6 +166,7 @@ export class PropertyCalendarController {
   }
 
   @Delete(':propertyId/calendar/:blockId')
+  @Roles(EUserRole.HOST)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Unblock a date by restoring availability' })
   async unblockDate(

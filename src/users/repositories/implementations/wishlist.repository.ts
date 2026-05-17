@@ -2,7 +2,10 @@ import { ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WishlistEntity } from '../../entities/wishlist.entity';
-import type { IWishlistItem, IWishlistRepository } from '../../interfaces/wishlist.interface';
+import type {
+  IWishlistItem,
+  IWishlistRepository,
+} from '../../interfaces/wishlist.interface';
 
 export class WishlistRepository implements IWishlistRepository {
   constructor(
@@ -39,7 +42,10 @@ export class WishlistRepository implements IWishlistRepository {
     return this.repo.existsBy({ userId, propertyId });
   }
 
-  async findWishlistedIds(userId: string, propertyIds: string[]): Promise<Set<string>> {
+  async findWishlistedIds(
+    userId: string,
+    propertyIds: string[],
+  ): Promise<Set<string>> {
     if (propertyIds.length === 0) return new Set();
     const items = await this.repo.find({
       where: propertyIds.map((propertyId) => ({ userId, propertyId })),

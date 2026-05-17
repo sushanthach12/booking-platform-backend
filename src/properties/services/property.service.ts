@@ -15,7 +15,6 @@ import {
   AVAILABILITY_CALENDAR_REPOSITORY,
   PROPERTY_REPOSITORY,
 } from '../../database';
-import { EUserRole } from '../../users/enums/user.enum';
 import {
   OnboardingStep2Dto,
   OnboardingStep3Dto,
@@ -200,11 +199,6 @@ export class PropertyService {
     // if zod schema validations are needed, use parseWithZod
     const validatedParams = parseWithZod(CreatePropertyRequestSchema, params);
     this.validateCreatePropertyPayload(validatedParams.payload);
-
-    // check if the user is a host
-    if (validatedParams.user.role !== EUserRole.HOST) {
-      throw new ForbiddenException('Only hosts can create properties');
-    }
 
     const { user: host, payload } = validatedParams;
 
@@ -797,10 +791,6 @@ export class PropertyService {
   ): Promise<IGetPropertiesResponse> {
     const { user, payload } = params;
 
-    if (user.role !== EUserRole.HOST) {
-      throw new ForbiddenException('Only hosts can view their properties');
-    }
-
     const page = payload.page ?? 1;
     const limit = Math.min(100, payload.limit ?? 10);
     const offset = (page - 1) * limit;
@@ -888,10 +878,6 @@ export class PropertyService {
       propertyId?: string;
     };
   }): Promise<{ id: string; slug: string; status: EPropertyStatus }> {
-    if (params.user.role !== EUserRole.HOST) {
-      throw new ForbiddenException('Only hosts can create properties');
-    }
-
     // ── UPDATE existing draft ─────────────────────────────────────────────────
     if (params.payload.propertyId) {
       const existing = await this.propertyRepository.findPropertyById({
@@ -1157,10 +1143,6 @@ export class PropertyService {
     completedSteps: number[];
     currentStep: number;
   } | null> {
-    if (params.user.role !== EUserRole.HOST) {
-      return null;
-    }
-
     const draft = await this.propertyRepository.findDraftPropertyByHostId({
       hostId: params.user.id,
     });

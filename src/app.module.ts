@@ -21,6 +21,7 @@ import { HealthController } from './controllers/health.controller';
 import { getTypeOrmConfig } from './database';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
+import { RolesGuard } from './guards/roles.guard';
 import { PaymentModule } from './payments/payment.module';
 import { PropertyModule } from './properties/property.module';
 import { QueuesModule } from './queues/queues.module';
@@ -82,6 +83,10 @@ import { StorageModule } from './storage/storage.module';
     {
       provide: APP_GUARD,
       useClass: RateLimitGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
     {
       provide: APP_INTERCEPTOR,

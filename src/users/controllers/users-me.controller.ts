@@ -36,6 +36,15 @@ export class UsersMeController {
     return { data: profile };
   }
 
+  @Patch('become-host')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Elevate current user to host role' })
+  async becomeHost(@RequestUserId() userId: string) {
+    this.logger.log(`Become host request for user ${userId}`);
+    const updated = await this.userService.becomeHost(userId);
+    return { data: updated };
+  }
+
   @Patch()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update current user profile' })
@@ -75,7 +84,9 @@ export class UsersMeController {
     @RequestUserId() userId: string,
     @Param('propertyId') propertyId: string,
   ) {
-    this.logger.log(`Add property ${propertyId} to wishlist for user ${userId}`);
+    this.logger.log(
+      `Add property ${propertyId} to wishlist for user ${userId}`,
+    );
     const item = await this.wishlistService.addToWishlist(userId, propertyId);
     return { data: item };
   }
@@ -87,7 +98,9 @@ export class UsersMeController {
     @RequestUserId() userId: string,
     @Param('propertyId') propertyId: string,
   ) {
-    this.logger.log(`Remove property ${propertyId} from wishlist for user ${userId}`);
+    this.logger.log(
+      `Remove property ${propertyId} from wishlist for user ${userId}`,
+    );
     await this.wishlistService.removeFromWishlist(userId, propertyId);
     return { data: { success: true } };
   }
@@ -99,7 +112,10 @@ export class UsersMeController {
     @RequestUserId() userId: string,
     @Param('propertyId') propertyId: string,
   ) {
-    const wishlisted = await this.wishlistService.isWishlisted(userId, propertyId);
+    const wishlisted = await this.wishlistService.isWishlisted(
+      userId,
+      propertyId,
+    );
     return { data: { wishlisted } };
   }
 }

@@ -6,7 +6,11 @@ import { PropertyImageEntity } from '../../properties/entities/property-image.en
 import { PropertyLocationEntity } from '../../properties/entities/property-location.entity';
 import { PropertyPricingEntity } from '../../properties/entities/property-pricing.entity';
 import { WISHLIST_REPOSITORY } from '../../database/di/symbols';
-import type { IWishlistItem, IWishlistItemEnriched, IWishlistRepository } from '../interfaces/wishlist.interface';
+import type {
+  IWishlistItem,
+  IWishlistItemEnriched,
+  IWishlistRepository,
+} from '../interfaces/wishlist.interface';
 
 @Injectable()
 export class WishlistService {
@@ -27,8 +31,17 @@ export class WishlistService {
     userId: string,
     page = 1,
     limit = 20,
-  ): Promise<{ items: IWishlistItemEnriched[]; total: number; page: number; limit: number }> {
-    const { items, total } = await this.wishlistRepository.findByUser(userId, page, limit);
+  ): Promise<{
+    items: IWishlistItemEnriched[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const { items, total } = await this.wishlistRepository.findByUser(
+      userId,
+      page,
+      limit,
+    );
 
     if (items.length === 0) {
       return { items: [], total, page, limit };
@@ -37,7 +50,10 @@ export class WishlistService {
     const propertyIds = items.map((i) => i.propertyId);
 
     const [properties, images, locations, pricings] = await Promise.all([
-      this.propertyRepo.find({ where: { id: In(propertyIds) }, select: ['id', 'title'] }),
+      this.propertyRepo.find({
+        where: { id: In(propertyIds) },
+        select: ['id', 'title'],
+      }),
       this.imageRepo.find({
         where: { propertyId: In(propertyIds), isPrimary: true },
         select: ['propertyId', 'url'],
@@ -93,7 +109,10 @@ export class WishlistService {
     return { items: enriched, total, page, limit };
   }
 
-  async addToWishlist(userId: string, propertyId: string): Promise<IWishlistItem> {
+  async addToWishlist(
+    userId: string,
+    propertyId: string,
+  ): Promise<IWishlistItem> {
     return this.wishlistRepository.add(userId, propertyId);
   }
 
@@ -105,7 +124,10 @@ export class WishlistService {
     return this.wishlistRepository.exists(userId, propertyId);
   }
 
-  async getWishlistedIds(userId: string, propertyIds: string[]): Promise<Set<string>> {
+  async getWishlistedIds(
+    userId: string,
+    propertyIds: string[],
+  ): Promise<Set<string>> {
     return this.wishlistRepository.findWishlistedIds(userId, propertyIds);
   }
 }

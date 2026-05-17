@@ -13,6 +13,7 @@ import { PropertyModule } from '../properties/property.module';
 import { QueuesModule } from '../queues/queues.module';
 import { UserModule } from '../users/user.module';
 import { BookingController } from './controllers';
+import { HostBookingController } from './host/host-booking.controller';
 import { BookingEmailListener } from './listeners/booking-email.listener';
 import {
   BookingEntity,
@@ -55,7 +56,7 @@ import {
     ]),
     PaymentModule,
   ],
-  controllers: [BookingController],
+  controllers: [BookingController, HostBookingController],
   providers: [
     {
       provide: BOOKING_SERVICE,

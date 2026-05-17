@@ -14,9 +14,11 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { BOOKING_SERVICE } from '../../database';
+import { EUserRole } from '../../users/enums/user.enum';
 import { PropertyService } from '../../properties/services/property.service';
 import { UserService } from '../../users/services/user.service';
 import {
@@ -28,11 +30,6 @@ import {
   JoinWaitlistDto,
 } from '../dto';
 import { CheckoutPreviewDto } from '../dto/checkout.dto';
-import {
-  EBookingStatusUpdate,
-  UpdateBookingStatusDto,
-} from '../dto/update-booking-status.dto';
-import { BookingStatus } from '../enums';
 import type { IBookingService } from '../interfaces/booking-service.interface';
 
 @ApiTags('bookings')
@@ -48,6 +45,7 @@ export class BookingController {
   ) {}
 
   @Post()
+  @Roles(EUserRole.GUEST)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Create a new booking' })
   @ApiResponse({
@@ -126,34 +124,15 @@ export class BookingController {
   }
 
   @Get('summary')
+  @Roles(EUserRole.GUEST)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get guest bookings summary (counts + total spent)' })
+  @ApiOperation({
+    summary: 'Get guest bookings summary (counts + total spent)',
+  })
   @ApiResponse({ status: 200, description: 'Summary retrieved successfully' })
   async getBookingsSummary(@CurrentUser() user: RequestUser) {
     const summary = await this.bookingService.getGuestBookingsSummary(user.id);
     return { data: summary };
-  }
-
-  @Get('host')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get host bookings' })
-  @ApiResponse({
-    status: 200,
-    description: 'Host bookings retrieved successfully',
-  })
-  async getHostBookings(
-    @CurrentUser() user: RequestUser,
-    @Query() query: GetBookingsQueryDto,
-  ) {
-    this.logger.log(`Get host bookings request received from user ${user.id}`);
-
-    const response = await this.bookingService.getBookings(
-      user.id,
-      query,
-      true,
-    );
-
-    return { data: response };
   }
 
   @Get('details')
@@ -254,29 +233,6 @@ export class BookingController {
     return { data: response };
   }
 
-  @Patch(':bookingId/confirm')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Confirm a booking' })
-  @ApiResponse({
-    status: 200,
-    description: 'Booking confirmed successfully.',
-  })
-  async confirmBooking(
-    @Param() params: GetBookingQueryDto,
-    @CurrentUser() user: RequestUser,
-  ) {
-    this.logger.log(
-      `Confirm booking request received for booking: ${params.bookingId}`,
-    );
-
-    const response = await this.bookingService.confirmBooking({
-      query: params,
-      user,
-    });
-
-    return { data: response };
-  }
-
   @Post('checkout/preview')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -354,52 +310,6 @@ export class BookingController {
     });
 
     return { data: response };
-  }
-
-  @Patch(':bookingId/status')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Update booking status (host: accept/decline; guest: cancel)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Booking status updated successfully.',
-  })
-  async updateBookingStatus(
-    @Param() params: GetBookingQueryDto,
-    @CurrentUser() user: RequestUser,
-    @Body() body: UpdateBookingStatusDto,
-  ) {
-    this.logger.log(
-      `Update booking status to ${body.status} for booking: ${params.bookingId}`,
-    );
-
-    if (body.status === EBookingStatusUpdate.ACCEPTED) {
-      const response = await this.bookingService.confirmBooking({
-        query: params,
-        user,
-      });
-      return { data: response };
-    }
-
-    const isHostAction = body.status === EBookingStatusUpdate.DECLINED;
-    const response = await this.bookingService.cancelBooking(
-      params.bookingId,
-      user.id,
-      body.status === EBookingStatusUpdate.DECLINED
-        ? 'host_declined'
-        : undefined,
-      isHostAction,
-    );
-    return {
-      data: {
-        ...response,
-        status:
-          body.status === EBookingStatusUpdate.DECLINED
-            ? BookingStatus.CANCELLED
-            : response.status,
-      },
-    };
   }
 
   @Get('price-alerts')

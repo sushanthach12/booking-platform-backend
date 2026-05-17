@@ -1,7 +1,10 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PayoutEntity } from '../entities/payout.entity';
-import type { IPayout, IPayoutRepository } from '../interfaces/payout.interface';
+import type {
+  IPayout,
+  IPayoutRepository,
+} from '../interfaces/payout.interface';
 
 export class PayoutRepository implements IPayoutRepository {
   constructor(

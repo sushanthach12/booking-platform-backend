@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import {
@@ -19,8 +20,10 @@ import {
   UpdatePropertyImageDto,
   UpdatePropertyImageParamsDto,
 } from '../dto/property-crud.dto';
+import { EUserRole } from '../../users/enums/user.enum';
 import { PropertyImageService } from '../services/property-image.service';
 
+@Roles(EUserRole.HOST)
 @Controller({ path: 'properties/:propertyId/images', version: '1' })
 export class PropertyImageController {
   private readonly logger = new Logger(PropertyImageController.name);
