@@ -722,6 +722,8 @@ export class PropertyService {
         minPrice: payload.minPrice,
         maxPrice: payload.maxPrice,
         amenities: payload.amenities,
+        minBeds: payload.minBeds,
+        minBathrooms: payload.minBathrooms,
         guests: payload.guests,
         checkIn: payload.checkIn ? new Date(payload.checkIn) : undefined,
         checkOut: payload.checkOut ? new Date(payload.checkOut) : undefined,

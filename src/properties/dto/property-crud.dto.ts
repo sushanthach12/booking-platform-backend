@@ -1211,6 +1211,28 @@ export class SearchPropertiesDto {
 
   @ApiProperty({
     type: Number,
+    description: 'Minimum number of bedrooms',
+    example: 2,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minBeds?: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Minimum number of bathrooms',
+    example: 1,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minBathrooms?: number;
+
+  @ApiProperty({
+    type: Number,
     description: 'Page number',
     example: 1,
     required: false,
