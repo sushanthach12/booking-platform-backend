@@ -1,4 +1,4 @@
-import { IsEnum } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export enum EBookingStatusUpdate {
   ACCEPTED = 'accepted',
@@ -9,4 +9,9 @@ export enum EBookingStatusUpdate {
 export class UpdateBookingStatusDto {
   @IsEnum(EBookingStatusUpdate)
   status: EBookingStatusUpdate;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }

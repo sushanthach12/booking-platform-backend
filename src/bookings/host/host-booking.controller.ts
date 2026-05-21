@@ -11,8 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/request-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { RequestUser } from '../../common/types/users.types';
 import { BOOKING_SERVICE } from '../../database';
 import { EUserRole } from '../../users/enums/user.enum';
@@ -82,9 +82,10 @@ export class HostBookingController {
     const response = await this.bookingService.cancelBooking(
       params.bookingId,
       user.id,
-      body.status === EBookingStatusUpdate.DECLINED
-        ? 'host_declined'
-        : undefined,
+      body.reason ??
+        (body.status === EBookingStatusUpdate.DECLINED
+          ? 'host_declined'
+          : undefined),
       true,
     );
     return {
