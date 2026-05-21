@@ -1287,7 +1287,9 @@ export class BookingService implements IBookingService {
         totalDiscount: summary.totalDiscount,
         grandTotal: summary.grandTotal,
         currency: ECurrency.INR,
+        lineItems: summary.lineItems ?? [],
       },
+      property: summary.propertyMeta ?? null,
       expiresAt: expiresAt.toISOString(),
       availability: { available },
     };

@@ -250,6 +250,13 @@ export interface CheckoutPreviewRequest {
   guestCount: number;
 }
 
+/** A single line item in the checkout price breakdown */
+export interface CheckoutLineItem {
+  type: 'base' | 'cleaning_fee' | 'service_fee' | 'discount' | 'tax';
+  label: string;
+  amount: number;
+}
+
 /** Response for POST /bookings/checkout/preview */
 export interface CheckoutPreviewResponse {
   /** Signed JWT (10-min TTL) containing the quoted price. Pass to POST /bookings to skip re-pricing. */
@@ -269,7 +276,16 @@ export interface CheckoutPreviewResponse {
     totalDiscount: number;
     grandTotal: number;
     currency: string;
+    /** Ordered line items for checkout summary display */
+    lineItems: CheckoutLineItem[];
   };
+  /** Property metadata for checkout display */
+  property: {
+    cancellationPolicy: string;
+    checkInTime: string;
+    checkOutTime: string;
+    maxGuests: number;
+  } | null;
   /** ISO timestamp — when quoteToken expires */
   expiresAt: string;
   availability: { available: boolean };

@@ -33,7 +33,7 @@ export class LoggingInterceptor implements NestInterceptor {
         return `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`;
       })
       .join('&');
-    const fullUrl = `{{Api}}${path}${queryString ? `?${queryString}` : ''}`;
+    const fullUrl = `{{ApiGateway}}${path}${queryString ? `?${queryString}` : ''}`;
 
     const excludedHeaders = [
       'host',

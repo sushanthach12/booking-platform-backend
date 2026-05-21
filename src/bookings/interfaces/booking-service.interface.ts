@@ -92,6 +92,12 @@ export interface IBookingService {
  * Financial summary for a booking (subtotal, tax, grand total).
  * Used by pricing calculator and booking creation.
  */
+export interface BookingSummaryLineItem {
+  type: 'base' | 'cleaning_fee' | 'service_fee' | 'discount' | 'tax';
+  label: string;
+  amount: number;
+}
+
 export interface BookingSummary {
   basePricePerNight: number;
   subtotal: number;
@@ -102,6 +108,15 @@ export interface BookingSummary {
   taxRate: number;
   taxAmount: number;
   grandTotal: number;
+  /** Line items for display in checkout preview */
+  lineItems?: BookingSummaryLineItem[];
+  /** Property policy metadata for checkout preview display */
+  propertyMeta?: {
+    cancellationPolicy: string;
+    checkInTime: string;
+    checkOutTime: string;
+    maxGuests: number;
+  };
 }
 
 /**

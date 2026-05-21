@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PropertyService } from '../../properties/services/property.service';
 import type {
   BookingSummary,
+  BookingSummaryLineItem,
   IBookingPriceCalculator,
 } from '../interfaces/booking-service.interface';
 
@@ -44,6 +45,42 @@ export class DefaultBookingPriceCalculator implements IBookingPriceCalculator {
     const taxAmount = round2(amountAfterDiscount * (TAX_RATE_PERCENT / 100));
     const grandTotal = round2(amountAfterDiscount + taxAmount);
 
+    const lineItems: BookingSummaryLineItem[] = [
+      {
+        type: 'base',
+        label: `${numberOfNights} night${numberOfNights !== 1 ? 's' : ''} x ₹${basePricePerNight.toLocaleString('en-IN')}`,
+        amount: subtotal,
+      },
+    ];
+    if (cleaningFee > 0) {
+      lineItems.push({
+        type: 'cleaning_fee',
+        label: 'Cleaning fee',
+        amount: cleaningFee,
+      });
+    }
+    if (serviceFee > 0) {
+      lineItems.push({
+        type: 'service_fee',
+        label: 'Service fee',
+        amount: serviceFee,
+      });
+    }
+    if (totalDiscount > 0) {
+      lineItems.push({
+        type: 'discount',
+        label: 'Discount',
+        amount: -totalDiscount,
+      });
+    }
+    lineItems.push({
+      type: 'tax',
+      label: `Taxes (${TAX_RATE_PERCENT}%)`,
+      amount: taxAmount,
+    });
+
+    const policies = propertyDetails.policies;
+
     return {
       basePricePerNight,
       subtotal,
@@ -54,6 +91,15 @@ export class DefaultBookingPriceCalculator implements IBookingPriceCalculator {
       taxRate: TAX_RATE_PERCENT,
       taxAmount,
       grandTotal,
+      lineItems,
+      propertyMeta: policies
+        ? {
+            cancellationPolicy: policies.cancellationPolicy,
+            checkInTime: policies.checkInTime,
+            checkOutTime: policies.checkOutTime,
+            maxGuests: policies.maxGuests,
+          }
+        : undefined,
     };
   }
 }
