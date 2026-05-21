@@ -3,7 +3,9 @@ export const getCashFreeBaseUrl = () => {
 };
 
 export const getCashFreeNotifyUrl = (transactionId: string) => {
-  // const base = process.env.APP_URL ?? 'http://localhost:8000';
-  const base = 'https://w6nv1v9z-8000.inc1.devtunnels.ms';
+  const base = process.env.APP_URL ?? null;
+  if (!base) {
+    throw new Error('APP_URL environment variable is not set');
+  }
   return `${base}/api/v1/payments/webhook/cashfree?txn=${transactionId}`;
 };

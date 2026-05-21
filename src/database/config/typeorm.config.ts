@@ -14,6 +14,10 @@ export const getTypeOrmConfig = (
         .replace(/\\n/g, '\n'),
       rejectUnauthorized: true,
     };
+  } else {
+    sslConfig = {
+      rejectUnauthorized: false,
+    };
   }
 
   return {
