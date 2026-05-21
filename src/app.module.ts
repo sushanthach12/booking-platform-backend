@@ -9,10 +9,10 @@ import Redis from 'ioredis';
 import { AppController } from './app/app.controller';
 import { AppService } from './app/app.service';
 import { AuthModule } from './auth/auth.module';
-import { EmailModule } from './common/email/email.module';
 import { BookingJobsModule } from './bookings/booking-jobs/booking-jobs.module';
 import { BookingModule } from './bookings/booking.module';
 import { gatewayDefaults, gatewayEnv } from './common/config/gateway.config';
+import { EmailModule } from './common/email/email.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
@@ -35,8 +35,9 @@ import { StorageModule } from './storage/storage.module';
     RedisClientModule,
     BullModule.forRootAsync({
       inject: ['REDIS_CLIENT'],
+
       useFactory: (client: Redis) => ({
-        connection: client,
+        connection: client as any,
       }),
     }),
     JwtModule.registerAsync({
