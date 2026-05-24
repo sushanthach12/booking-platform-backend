@@ -1,4 +1,4 @@
-import type { PayoutStatus } from '../entities/payout.entity';
+import type { PayoutStatus } from '../../entities/payout.entity';
 
 export interface IPayout {
   id: string;

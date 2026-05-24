@@ -4,7 +4,7 @@ import type {
   IPayout,
   IPayoutRepository,
   IPayoutService,
-} from '../interfaces/payout.interface';
+} from '../repositories/interfaces/payout.interface';
 
 @Injectable()
 export class PayoutService implements IPayoutService {
