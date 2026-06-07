@@ -5,7 +5,7 @@ import { TlsOptions } from 'tls';
 export const getTypeOrmConfig = (
   configService: ConfigService,
 ): TypeOrmModuleOptions => {
-  let sslConfig: boolean | TlsOptions | undefined = false;
+  let sslConfig: boolean | TlsOptions = false;
 
   if (configService.get<string>('POSTGRES_SSL') === 'true') {
     sslConfig = {
@@ -13,10 +13,6 @@ export const getTypeOrmConfig = (
         .getOrThrow<string>('POSTGRES_CA_CERTIFICATE')
         .replace(/\\n/g, '\n'),
       rejectUnauthorized: true,
-    };
-  } else {
-    sslConfig = {
-      rejectUnauthorized: false,
     };
   }
 

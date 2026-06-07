@@ -36,13 +36,13 @@ export class BookingCompletionProcessor
         jobId: JOB_COMPLETE_PAST_BOOKINGS,
       },
     );
-    this.logger.log('Booking completion repeatable job scheduled (hourly)');
+    this.logger.debug('Booking completion repeatable job scheduled (hourly)');
   }
 
   async process(job: Job): Promise<void> {
     if (job.name !== JOB_COMPLETE_PAST_BOOKINGS) return;
 
-    this.logger.log('Running booking completion sweep');
+    this.logger.debug('Running booking completion sweep');
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -72,6 +72,6 @@ export class BookingCompletionProcessor
       .whereInIds(ids)
       .execute();
 
-    this.logger.log(`Marked ${ids.length} booking(s) as COMPLETED`);
+    this.logger.debug(`Marked ${ids.length} booking(s) as COMPLETED`);
   }
 }
