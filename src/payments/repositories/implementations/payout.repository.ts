@@ -1,11 +1,14 @@
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PayoutEntity } from '../../entities/payout.entity';
 import type {
   IPayout,
   IPayoutRepository,
-} from '../interfaces/payout.interface';
+  IPayoutSummary,
+} from '../interfaces/payout.repository.interface';
 
+@Injectable()
 export class PayoutRepository implements IPayoutRepository {
   constructor(
     @InjectRepository(PayoutEntity)
@@ -23,19 +26,92 @@ export class PayoutRepository implements IPayoutRepository {
       skip: (page - 1) * limit,
       take: limit,
     });
-    return { items: items as IPayout[], total };
+    return { items: items.map((p) => this.toModel(p)), total };
   }
 
   async findUpcoming(hostId: string): Promise<IPayout[]> {
-    return this.repo.find({
+    const items = await this.repo.find({
       where: { hostId, status: 'pending' },
       order: { scheduledDate: 'ASC' },
       take: 5,
-    }) as Promise<IPayout[]>;
+    });
+    return items.map((p) => this.toModel(p));
   }
 
   async create(data: Omit<IPayout, 'id' | 'createdAt'>): Promise<IPayout> {
     const entity = this.repo.create(data as PayoutEntity);
-    return this.repo.save(entity) as Promise<IPayout>;
+    const saved = await this.repo.save(entity);
+    return this.toModel(saved);
+  }
+
+  async getSummary(hostId: string): Promise<IPayoutSummary> {
+    const totals = await this.repo
+      .createQueryBuilder('p')
+      .select('COALESCE(SUM(p.amount), 0)', 'totalPaidOut')
+      .addSelect('MIN(p.paidAt)', 'paidOutSince')
+      .where('p.hostId = :hostId', { hostId })
+      .andWhere('p.status = :status', { status: 'paid' })
+      .getRawOne<{ totalPaidOut: string; paidOutSince: Date | null }>();
+
+    const monthRow = await this.repo
+      .createQueryBuilder('p')
+      .select('COALESCE(SUM(p.amount), 0)', 'thisMonth')
+      .where('p.hostId = :hostId', { hostId })
+      .andWhere('p.status = :status', { status: 'paid' })
+      .andWhere("date_trunc('month', p.paidAt) = date_trunc('month', NOW())")
+      .getRawOne<{ thisMonth: string }>();
+
+    const currencyRow = await this.repo
+      .createQueryBuilder('p')
+      .select('p.currency', 'currency')
+      .where('p.hostId = :hostId', { hostId })
+      .orderBy('p.createdAt', 'DESC')
+      .limit(1)
+      .getRawOne<{ currency: string }>();
+
+    const paidOutSince = totals?.paidOutSince ?? null;
+    return {
+      totalPaidOut: Number(totals?.totalPaidOut ?? 0),
+      paidOutSince:
+        paidOutSince instanceof Date
+          ? paidOutSince.toISOString()
+          : (paidOutSince ?? null),
+      thisMonth: Number(monthRow?.thisMonth ?? 0),
+      currency: currencyRow?.currency ?? 'INR',
+    };
+  }
+
+  async getMonthlyPaid(
+    hostId: string,
+    fromDate: string,
+  ): Promise<{ period: string; amount: number }[]> {
+    const rows = await this.repo
+      .createQueryBuilder('p')
+      .select("to_char(date_trunc('month', p.paidAt), 'YYYY-MM')", 'period')
+      .addSelect('COALESCE(SUM(p.amount), 0)', 'amount')
+      .where('p.hostId = :hostId', { hostId })
+      .andWhere('p.status = :status', { status: 'paid' })
+      .andWhere('p.paidAt >= :fromDate', { fromDate })
+      .groupBy("date_trunc('month', p.paidAt)")
+      .orderBy("date_trunc('month', p.paidAt)", 'ASC')
+      .getRawMany<{ period: string; amount: string }>();
+
+    return rows.map((r) => ({ period: r.period, amount: Number(r.amount) }));
+  }
+
+  /** Normalize a persisted row (decimals come back as strings from PG). */
+  private toModel(entity: PayoutEntity): IPayout {
+    return {
+      id: entity.id,
+      hostId: entity.hostId,
+      amount: Number(entity.amount),
+      currency: entity.currency,
+      status: entity.status,
+      scheduledDate: entity.scheduledDate,
+      paidAt: entity.paidAt,
+      createdAt: entity.createdAt,
+      bookingCount: entity.bookingCount,
+      accountLast4: entity.accountLast4,
+    };
   }
 }

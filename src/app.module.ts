@@ -25,6 +25,7 @@ import { RolesGuard } from './guards/roles.guard';
 import { PaymentModule } from './payments/payment.module';
 import { PropertyModule } from './properties/property.module';
 import { QueuesModule } from './queues/queues.module';
+import { ReviewModule } from './reviews/review.module';
 import { StorageModule } from './storage/storage.module';
 
 @Module({
@@ -70,6 +71,7 @@ import { StorageModule } from './storage/storage.module';
     PaymentModule,
     BookingJobsModule,
     StorageModule,
+    ReviewModule,
   ],
   controllers: [AppController, HealthController],
   providers: [

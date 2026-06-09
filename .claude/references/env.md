@@ -41,6 +41,7 @@ Production: set directly in Vercel dashboard or CI secrets.
 | `JWT_EXPIRY` | — | Access token expiry (code defaults to `15m`) |
 | `SESSION_SECRET` | — | Session encryption secret |
 | `SESSION_EXPIRY` | — | Session expiry in milliseconds |
+| `PAYOUT_ENCRYPTION_KEY` | — | AES-256-GCM key for payout-account fields at rest. 32-byte hex preferred; any other value is SHA-256–hashed to 32 bytes. Set a real key in production. |
 
 ## Cloudflare R2 Storage
 
