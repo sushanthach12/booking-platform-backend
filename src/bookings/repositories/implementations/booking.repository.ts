@@ -347,14 +347,16 @@ export class BookingRepository implements IBookingRepository {
       });
     }
 
+    // Overlap semantics: return any stay active within [startDate, endDate],
+    // including multi-day stays that cross the window edges.
     if (options.startDate) {
-      query.andWhere('booking.checkInDate >= :startDate', {
+      query.andWhere('booking.checkOutDate >= :startDate', {
         startDate: options.startDate,
       });
     }
 
     if (options.endDate) {
-      query.andWhere('booking.checkOutDate <= :endDate', {
+      query.andWhere('booking.checkInDate <= :endDate', {
         endDate: options.endDate,
       });
     }
