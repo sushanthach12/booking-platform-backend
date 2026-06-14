@@ -23,6 +23,9 @@ export interface IPaymentService {
   ): Promise<WebhookResult>;
 
   terminatePayment(transactionId: string): Promise<boolean>;
+
+  /** Partial or full refund of a captured payment by transaction id. */
+  refundPayment(transactionId: string, amount?: number): Promise<boolean>;
 }
 
 // Customer Details

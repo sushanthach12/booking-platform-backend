@@ -9,3 +9,14 @@ export const getCashFreeNotifyUrl = (transactionId: string) => {
   }
   return `${base}/api/v1/payments/webhook/cashfree?txn=${transactionId}`;
 };
+
+/**
+ * Cashfree Payouts v2 base URL. Separate product/credentials from the PG.
+ * Driven by `CASHFREE_PAYOUT_ENV` ('production' | anything else → sandbox).
+ */
+export const getCashfreePayoutBaseUrl = () => {
+  const env = (process.env.CASHFREE_PAYOUT_ENV ?? 'sandbox').toLowerCase();
+  return env === 'production'
+    ? 'https://api.cashfree.com/payout'
+    : 'https://sandbox.cashfree.com/payout';
+};

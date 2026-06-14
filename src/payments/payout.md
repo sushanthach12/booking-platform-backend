@@ -397,8 +397,11 @@ Add `@OnEvent` listeners in `src/bookings/listeners/booking-email.listener.ts` t
 
 ```typescript
 export const HOST_PAYOUT_ACCOUNT_REPOSITORY = Symbol('IHostPayoutAccountRepository');
-export const CASHFREE_PAYOUT_GATEWAY = Symbol('ICashfreePayoutGateway');
 ```
+
+The payout gateway is no longer bound to a DI token. `PayoutGatewayFactory`
+(`src/payments/factories/payout-gateway.factory.ts`) instantiates the concrete
+provider (`IPayoutGateway`) at runtime, mirroring `PaymentGatewayFactory`.
 
 ---
 

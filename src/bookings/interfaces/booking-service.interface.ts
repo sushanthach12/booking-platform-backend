@@ -108,6 +108,14 @@ export interface BookingSummary {
   taxRate: number;
   taxAmount: number;
   grandTotal: number;
+  /**
+   * Platform commission for this booking (GST-inclusive), deducted from the
+   * host — NOT an extra charge to the guest, so it does not affect grandTotal.
+   * Currently 0 until a commission rate is configured. See PlatformCommission.
+   */
+  platformFee: number;
+  /** What the host earns: `grandTotal − platformFee`. */
+  hostNet: number;
   /** Line items for display in checkout preview */
   lineItems?: BookingSummaryLineItem[];
   /** Property policy metadata for checkout preview display */

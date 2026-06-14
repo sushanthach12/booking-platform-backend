@@ -18,3 +18,9 @@ export const PAYOUT_REPOSITORY = Symbol('IPayoutRepository');
 export const PAYOUT_ACCOUNT_REPOSITORY = Symbol('IPayoutAccountRepository');
 export const REVIEW_REPOSITORY = Symbol('IReviewRepository');
 export const REVIEW_SERVICE = Symbol('IReviewService');
+export const PLATFORM_COMMISSION = Symbol('IPlatformCommission');
+export const WALLET_REPOSITORY = Symbol('IWalletRepository');
+export const WALLET_TRANSACTION_REPOSITORY = Symbol(
+  'IWalletTransactionRepository',
+);
+export const BALANCE_SERVICE = Symbol('IBalanceService');

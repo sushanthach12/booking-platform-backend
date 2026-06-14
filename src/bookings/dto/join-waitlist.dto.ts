@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsDate, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsDate, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class JoinWaitlistDto {

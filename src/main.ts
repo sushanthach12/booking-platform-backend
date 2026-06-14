@@ -10,6 +10,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    // Preserve the raw request body so webhook HMAC signatures (e.g. Cashfree
+    // payout) can be verified against the exact bytes that were signed.
+    rawBody: true,
   });
 
   app.enableCors({

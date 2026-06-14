@@ -24,10 +24,13 @@ import { IRedisService } from '../../common/redis';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,
   AVAILABILITY_CHECKER,
+  BALANCE_SERVICE,
   BOOKING_PRICE_CALCULATOR,
   BOOKING_REPOSITORY,
   REDIS_SERVICE,
 } from '../../database';
+import type { IBalanceService } from '../../payments/interfaces/balance.service.interface';
+import { CancellationPolicyService } from './cancellation-policy.service';
 import {
   IPaymentService,
   PaymentCustomerDetails,
@@ -99,6 +102,9 @@ export class BookingService implements IBookingService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly eventEmitter: EventEmitter2,
+    @Inject(BALANCE_SERVICE)
+    private readonly balanceService: IBalanceService,
+    private readonly cancellationPolicyService: CancellationPolicyService,
   ) {}
 
   async createBooking(
@@ -237,6 +243,8 @@ export class BookingService implements IBookingService {
           taxAmount: summary.taxAmount,
           totalDiscount: summary.totalDiscount,
           grandTotal: summary.grandTotal,
+          platformFee: summary.platformFee,
+          hostNet: summary.hostNet,
           currency: ECurrency.INR,
           status: BookingStatus.PENDING,
           paymentStatus: BookingPaymentStatus.PENDING,
@@ -492,6 +500,8 @@ export class BookingService implements IBookingService {
           taxAmount: summary.taxAmount,
           totalDiscount: summary.totalDiscount,
           grandTotal: summary.grandTotal,
+          platformFee: summary.platformFee,
+          hostNet: summary.hostNet,
           currency: ECurrency.INR,
           // Immediately confirmed — no payment gateway required
           status: BookingStatus.CONFIRMED,
@@ -849,16 +859,11 @@ export class BookingService implements IBookingService {
         _needsRefund: boolean;
       };
     if (_needsRefund && cancelledBooking.paymentTransactionId) {
-      this.logger.warn(
-        `Booking ${bookingId} was paid and confirmed — initiating refund for transaction ${cancelledBooking.paymentTransactionId}`,
-      );
       try {
-        await this.paymentService.terminatePayment(
-          cancelledBooking.paymentTransactionId,
-        );
+        await this.applyCancellationRefund(cancelledBooking as BookingEntity);
       } catch (err) {
         this.logger.error(
-          `Failed to initiate refund for booking ${bookingId}: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to apply cancellation refund for booking ${bookingId}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }
@@ -892,6 +897,64 @@ export class BookingService implements IBookingService {
     }
 
     return this.mapToResponse(cancelledBooking as BookingEntity);
+  }
+
+  /**
+   * Applies the snapshotted cancellation policy to a confirmed+paid booking:
+   * refunds the guest the policy-determined amount and routes the retained fee
+   * to the host as an on-hold earning. Refund base is the accommodation
+   * (subtotal); fees + tax are non-refundable unless the refund is 100%.
+   */
+  private async applyCancellationRefund(booking: BookingEntity): Promise<void> {
+    const snapshot = await this.bookingRepository.findSnapshotByBookingId(
+      booking.id,
+    );
+    const policyType = (
+      snapshot?.cancellationPolicy as { type?: string } | undefined
+    )?.type;
+    const { refundPercent } = this.cancellationPolicyService.resolve(
+      policyType,
+      new Date(booking.checkInDate),
+      booking.cancelledAt ?? new Date(),
+    );
+
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const subtotal = Number(booking.subtotal ?? 0);
+    const grandTotal = Number(booking.grandTotal ?? 0);
+
+    // 100% refunds the entire grand total (incl. fees + tax); partial refunds
+    // only the accommodation portion, pro-rated.
+    let guestRefund =
+      refundPercent >= 100
+        ? grandTotal
+        : round2(subtotal * (refundPercent / 100));
+    guestRefund = Math.min(Math.max(guestRefund, 0), grandTotal);
+    const retainedAmount = round2(grandTotal - guestRefund);
+
+    if (guestRefund > 0 && booking.paymentTransactionId) {
+      await this.paymentService.refundPayment(
+        booking.paymentTransactionId,
+        guestRefund,
+      );
+    }
+
+    // The retained fee becomes the host's earning (minus commission), on hold.
+    if (retainedAmount > 0) {
+      await this.balanceService.creditCancellationFee(
+        booking.id,
+        retainedAmount,
+      );
+    }
+
+    await this.dataSource.getRepository(BookingEntity).update(booking.id, {
+      refundAmount: guestRefund,
+      cancellationFee: retainedAmount,
+      refundPercentage: refundPercent,
+    });
+
+    this.logger.log(
+      `Booking ${booking.id} cancelled: refunded ${guestRefund}, retained ${retainedAmount} (${refundPercent}%)`,
+    );
   }
 
   async confirmBooking(data: IConfirmBookingParams): Promise<BookingResponse> {

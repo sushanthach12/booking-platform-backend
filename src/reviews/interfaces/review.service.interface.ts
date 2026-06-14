@@ -16,6 +16,15 @@ export interface IHostReview {
   response: IReviewResponse | null;
 }
 
+/** The review a guest left for a booking, with the host's optional reply. */
+export interface IGuestReview {
+  id: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  response: IReviewResponse | null;
+}
+
 export interface IReviewSummary {
   averageRating: number;
   totalReviews: number;
@@ -42,4 +51,9 @@ export interface IReviewService {
     text: string,
   ): Promise<IReviewResponse>;
   createReview(guestId: string, dto: CreateReviewDto): Promise<IHostReview>;
+  /** The review the guest left for a booking (with host reply), or null if none. */
+  getBookingReview(
+    guestId: string,
+    bookingId: string,
+  ): Promise<IGuestReview | null>;
 }

@@ -19,6 +19,8 @@ import { BookingSnapshotEntity } from './booking-snapshot.entity';
 @Index(['guestId'])
 @Index(['hostId'])
 @Index(['status'])
+// Drives the completion sweep: WHERE status = CONFIRMED AND checkOutDate <= NOW().
+@Index(['status', 'checkOutDate'])
 export class BookingEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -105,6 +107,30 @@ export class BookingEntity {
   })
   grandTotal?: number;
 
+  /**
+   * Platform commission captured for this booking (GST-inclusive), deducted
+   * from the host's earnings. Snapshotted at booking time so a later rate
+   * change never alters historical bookings. Defaults to 0.
+   */
+  @Column({
+    name: 'platform_fee',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  platformFee: number;
+
+  /** Host's net earnings for this booking: `grandTotal − platformFee`. */
+  @Column({
+    name: 'host_net',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  hostNet?: number;
+
   @Column({
     name: 'currency',
     type: 'varchar',
@@ -152,6 +178,36 @@ export class BookingEntity {
 
   @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
   cancellationReason?: string;
+
+  /** Amount refunded to the guest on cancellation (audit). */
+  @Column({
+    name: 'refund_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  refundAmount?: number;
+
+  /** Amount retained from the guest as a cancellation fee (audit). */
+  @Column({
+    name: 'cancellation_fee',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  cancellationFee?: number;
+
+  /** Refund percentage applied per the snapshotted policy (audit). */
+  @Column({
+    name: 'refund_percentage',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
+  refundPercentage?: number;
 
   @Column({ name: 'cancelled_at', type: 'timestamp', nullable: true })
   cancelledAt?: Date;

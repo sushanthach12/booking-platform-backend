@@ -14,7 +14,10 @@ import { QueuesModule } from '../queues/queues.module';
 import { UserModule } from '../users/user.module';
 import { BookingController } from './controllers';
 import { HostBookingController } from './host/host-booking.controller';
+import { CancellationPolicyService } from './services/cancellation-policy.service';
+import { BookingBalanceListener } from './listeners/booking-balance.listener';
 import { BookingEmailListener } from './listeners/booking-email.listener';
+import { PayoutEmailListener } from './listeners/payout-email.listener';
 import {
   BookingEntity,
   BookingInvitationEntity,
@@ -75,8 +78,11 @@ import {
       provide: AVAILABILITY_CHECKER,
       useClass: AvailabilityCheckerService,
     },
+    CancellationPolicyService,
     BookingEmailListener,
+    BookingBalanceListener,
+    PayoutEmailListener,
   ],
-  exports: [BOOKING_SERVICE, BookingSnapshotService],
+  exports: [BOOKING_SERVICE, BOOKING_REPOSITORY, BookingSnapshotService],
 })
 export class BookingModule {}

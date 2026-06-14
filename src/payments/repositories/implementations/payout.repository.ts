@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { PayoutEntity } from '../../entities/payout.entity';
+import { EPayoutStatus } from '../../enums/payout.enum';
 import type {
+  CreatePayoutInput,
   IPayout,
   IPayoutRepository,
   IPayoutSummary,
@@ -14,6 +16,16 @@ export class PayoutRepository implements IPayoutRepository {
     @InjectRepository(PayoutEntity)
     private readonly repo: Repository<PayoutEntity>,
   ) {}
+
+  async getInTransitTotal(hostId: string): Promise<number> {
+    const row = await this.repo
+      .createQueryBuilder('p')
+      .select('COALESCE(SUM(p.amount), 0)', 'total')
+      .where('p.hostId = :hostId', { hostId })
+      .andWhere('p.status = :status', { status: EPayoutStatus.PROCESSING })
+      .getRawOne<{ total: string }>();
+    return Number(row?.total ?? 0);
+  }
 
   async findByHost(
     hostId: string,
@@ -31,17 +43,35 @@ export class PayoutRepository implements IPayoutRepository {
 
   async findUpcoming(hostId: string): Promise<IPayout[]> {
     const items = await this.repo.find({
-      where: { hostId, status: 'pending' },
+      where: { hostId, status: EPayoutStatus.PENDING },
       order: { scheduledDate: 'ASC' },
       take: 5,
     });
     return items.map((p) => this.toModel(p));
   }
 
-  async create(data: Omit<IPayout, 'id' | 'createdAt'>): Promise<IPayout> {
-    const entity = this.repo.create(data as PayoutEntity);
-    const saved = await this.repo.save(entity);
+  async findById(id: string): Promise<IPayout | null> {
+    const entity = await this.repo.findOne({ where: { id } });
+    return entity ? this.toModel(entity) : null;
+  }
+
+  async create(
+    data: CreatePayoutInput,
+    manager?: EntityManager,
+  ): Promise<IPayout> {
+    const repo = manager ? manager.getRepository(PayoutEntity) : this.repo;
+    const entity = repo.create(data);
+    const saved = await repo.save(entity);
     return this.toModel(saved);
+  }
+
+  async update(
+    id: string,
+    patch: Partial<PayoutEntity>,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const repo = manager ? manager.getRepository(PayoutEntity) : this.repo;
+    await repo.update({ id }, patch);
   }
 
   async getSummary(hostId: string): Promise<IPayoutSummary> {
@@ -50,14 +80,14 @@ export class PayoutRepository implements IPayoutRepository {
       .select('COALESCE(SUM(p.amount), 0)', 'totalPaidOut')
       .addSelect('MIN(p.paidAt)', 'paidOutSince')
       .where('p.hostId = :hostId', { hostId })
-      .andWhere('p.status = :status', { status: 'paid' })
+      .andWhere('p.status = :status', { status: EPayoutStatus.PAID })
       .getRawOne<{ totalPaidOut: string; paidOutSince: Date | null }>();
 
     const monthRow = await this.repo
       .createQueryBuilder('p')
       .select('COALESCE(SUM(p.amount), 0)', 'thisMonth')
       .where('p.hostId = :hostId', { hostId })
-      .andWhere('p.status = :status', { status: 'paid' })
+      .andWhere('p.status = :status', { status: EPayoutStatus.PAID })
       .andWhere("date_trunc('month', p.paidAt) = date_trunc('month', NOW())")
       .getRawOne<{ thisMonth: string }>();
 
@@ -90,7 +120,7 @@ export class PayoutRepository implements IPayoutRepository {
       .select("to_char(date_trunc('month', p.paidAt), 'YYYY-MM')", 'period')
       .addSelect('COALESCE(SUM(p.amount), 0)', 'amount')
       .where('p.hostId = :hostId', { hostId })
-      .andWhere('p.status = :status', { status: 'paid' })
+      .andWhere('p.status = :status', { status: EPayoutStatus.PAID })
       .andWhere('p.paidAt >= :fromDate', { fromDate })
       .groupBy("date_trunc('month', p.paidAt)")
       .orderBy("date_trunc('month', p.paidAt)", 'ASC')
@@ -112,6 +142,13 @@ export class PayoutRepository implements IPayoutRepository {
       createdAt: entity.createdAt,
       bookingCount: entity.bookingCount,
       accountLast4: entity.accountLast4,
+      platformFee: Number(entity.platformFee ?? 0),
+      hostPayoutAccountId: entity.hostPayoutAccountId,
+      cashfreeTransferId: entity.cashfreeTransferId,
+      cashfreeStatus: entity.cashfreeStatus,
+      failureReason: entity.failureReason,
+      processedAt: entity.processedAt,
+      transferUtr: entity.transferUtr,
     };
   }
 }

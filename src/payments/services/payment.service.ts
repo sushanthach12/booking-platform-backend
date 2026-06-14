@@ -6,10 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Inject } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { JOB_SYNC_PAYMENT_STATUS } from '../../bookings/booking-jobs/constants';
+import { BALANCE_SERVICE } from '../../database/di/symbols';
 import { QUEUE_PAYMENT_STATUS_SYNC } from '../../queues/queues.module';
 import { PaymentGatewayFactory } from '../factories/payment-gateway.factory';
+import type { IBalanceService } from '../interfaces/balance.service.interface';
 import {
   IPaymentService,
   PaymentCustomerDetails,
@@ -32,6 +35,8 @@ export class PaymentService implements IPaymentService {
     private readonly paymentTransactionService: PaymentTransactionService,
     @InjectQueue(QUEUE_PAYMENT_STATUS_SYNC)
     private readonly paymentStatusSyncQueue: Queue,
+    @Inject(BALANCE_SERVICE)
+    private readonly balanceService: IBalanceService,
   ) {}
 
   async createPayment(
@@ -291,6 +296,50 @@ export class PaymentService implements IPaymentService {
     }
   }
 
+  async refundPayment(
+    transactionId: string,
+    amount?: number,
+  ): Promise<boolean> {
+    this.logger.log(
+      `Refunding ${amount ?? 'full'} for transaction: ${transactionId}`,
+    );
+    if (!transactionId) return false;
+
+    const transaction =
+      await this.paymentTransactionService.findById(transactionId);
+    if (!transaction?.gatewayOrderId) {
+      this.logger.error(
+        `Refund: transaction or order id missing for ${transactionId}`,
+      );
+      return false;
+    }
+
+    try {
+      const gateway = this.paymentGatewayFactory.createGateway(
+        transaction.gatewayType as PaymentGatewayType,
+      );
+      const result = await gateway.refundPayment(
+        transaction.gatewayOrderId,
+        amount,
+      );
+      if (result.success) {
+        const fullRefund =
+          amount == null || amount >= Number(transaction.amount);
+        await this.paymentTransactionService.update(transactionId, {
+          status: fullRefund
+            ? PaymentStatus.REFUNDED
+            : PaymentStatus.PARTIALLY_REFUNDED,
+          updatedAt: new Date(),
+        });
+      }
+      return result.success;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to refund payment: ${message}`);
+      return false;
+    }
+  }
+
   private generateTransactionId(): string {
     // Generate unique transaction ID with prefix
     const prefix = 'txn';
@@ -326,15 +375,37 @@ export class PaymentService implements IPaymentService {
       return;
     }
 
+    const gatewayStatus = result.status ?? PaymentGatewayStatus.PENDING;
+    const status = this.mapGatewayStatusToTransactionStatus(gatewayStatus);
+
+    // Post-success refund / chargeback: claw back the host's credited earning
+    // (Phase 8). This is the only transition allowed out of a final SUCCESS.
+    const isRefund =
+      status === PaymentStatus.REFUNDED ||
+      status === PaymentStatus.PARTIALLY_REFUNDED;
+    if (isRefund && transaction.status === PaymentStatus.SUCCESS) {
+      await this.paymentTransactionService.update(transactionId, {
+        status,
+        gatewayStatus: result.rawStatus ?? gatewayStatus,
+        processedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      if (transaction.bookingId) {
+        const refundedAmount = result.amount ?? Number(transaction.amount);
+        await this.balanceService.clawbackForRefund(
+          transaction.bookingId,
+          refundedAmount,
+        );
+      }
+      return;
+    }
+
     if (transaction.status !== PaymentStatus.PENDING) {
       this.logger.debug(
         `Skipping webhook update for ${transactionId} — already in state: ${transaction.status}`,
       );
       return;
     }
-
-    const gatewayStatus = result.status ?? PaymentGatewayStatus.PENDING;
-    const status = this.mapGatewayStatusToTransactionStatus(gatewayStatus);
 
     await this.paymentTransactionService.update(transactionId, {
       status,

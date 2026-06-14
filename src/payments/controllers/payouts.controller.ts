@@ -4,15 +4,18 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Logger,
   Post,
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { BALANCE_SERVICE } from '../../database/di/symbols';
 import { RequestUserId } from '../../common/decorators/request-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { EUserRole } from '../../users/enums/user.enum';
 import { CreatePayoutAccountDto } from '../dto/create-payout-account.dto';
+import type { IBalanceService } from '../interfaces/balance.service.interface';
 import { PayoutAccountService } from '../services/payout-account.service';
 import { PayoutService } from '../services/payout.service';
 
@@ -25,7 +28,27 @@ export class PayoutsController {
   constructor(
     private readonly payoutService: PayoutService,
     private readonly payoutAccountService: PayoutAccountService,
+    @Inject(BALANCE_SERVICE)
+    private readonly balanceService: IBalanceService,
   ) {}
+
+  @Get('balance')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Host earnings balance for the Payout screen' })
+  async getBalance(@RequestUserId() hostId: string) {
+    this.logger.log(`Get balance for host ${hostId}`);
+    const balance = await this.balanceService.getBalance(hostId);
+    return { data: balance };
+  }
+
+  @Post('request')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Request a payout of the full payable balance' })
+  async requestPayout(@RequestUserId() hostId: string) {
+    this.logger.log(`Payout requested by host ${hostId}`);
+    const result = await this.payoutService.requestPayout(hostId);
+    return { data: result };
+  }
 
   @Get()
   @HttpCode(HttpStatus.OK)

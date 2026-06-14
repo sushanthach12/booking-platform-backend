@@ -1,4 +1,5 @@
 import type { CreatePayoutAccountDto } from '../dto/create-payout-account.dto';
+import type { EBeneficiaryStatus } from '../enums/payout-account.enum';
 
 /** Client-safe view of a payout account — masked, no secrets. */
 export interface IPayoutAccount {
@@ -9,6 +10,8 @@ export interface IPayoutAccount {
   isPrimary: boolean;
   addedAt: string;
   currency: string;
+  /** Cashfree verification state; payouts allowed only when `verified`. */
+  beneficiaryStatus: EBeneficiaryStatus;
 }
 
 export interface IPayoutAccountService {

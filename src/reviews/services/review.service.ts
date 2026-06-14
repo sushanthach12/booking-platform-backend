@@ -19,6 +19,7 @@ import {
 } from '../../database/di/symbols';
 import { CreateReviewDto } from '../dto/create-review.dto';
 import type {
+  IGuestReview,
   IHostReview,
   IReviewResponse,
   IReviewService,
@@ -145,6 +146,33 @@ export class ReviewService implements IReviewService {
         respondedAt: null,
       },
     );
+  }
+
+  async getBookingReview(
+    guestId: string,
+    bookingId: string,
+  ): Promise<IGuestReview | null> {
+    const review = await this.reviewRepository.findByBooking(bookingId);
+    if (!review) {
+      return null;
+    }
+    if (review.guestId !== guestId) {
+      throw new ForbiddenException(
+        'You can only view reviews for your own bookings',
+      );
+    }
+    return {
+      id: review.id,
+      rating: review.rating,
+      comment: review.comment,
+      createdAt: review.createdAt.toISOString(),
+      response: review.responseText
+        ? {
+            text: review.responseText,
+            respondedAt: (review.respondedAt ?? new Date()).toISOString(),
+          }
+        : null,
+    };
   }
 
   private toHostReview(row: IHostReviewRow): IHostReview {

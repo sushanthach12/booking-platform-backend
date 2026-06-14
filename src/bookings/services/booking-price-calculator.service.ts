@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { PLATFORM_COMMISSION } from '../../database/di/symbols';
+import type { IPlatformCommission } from '../../payments/interfaces/platform-commission.interface';
 import { PropertyService } from '../../properties/services/property.service';
 import type {
   BookingSummary,
@@ -10,7 +12,11 @@ const TAX_RATE_PERCENT = 18;
 
 @Injectable()
 export class DefaultBookingPriceCalculator implements IBookingPriceCalculator {
-  constructor(private readonly propertyService: PropertyService) {}
+  constructor(
+    private readonly propertyService: PropertyService,
+    @Inject(PLATFORM_COMMISSION)
+    private readonly commission: IPlatformCommission,
+  ) {}
 
   async calculate(
     propertyId: string,
@@ -44,6 +50,11 @@ export class DefaultBookingPriceCalculator implements IBookingPriceCalculator {
     const amountAfterDiscount = round2(subtotal + totalFees - totalDiscount);
     const taxAmount = round2(amountAfterDiscount * (TAX_RATE_PERCENT / 100));
     const grandTotal = round2(amountAfterDiscount + taxAmount);
+
+    // Host-side platform commission. Deducted from the host's earnings, not
+    // added to the guest's total — so grandTotal is unaffected. Single source
+    // of truth lives behind the PLATFORM_COMMISSION token (rate defaults to 0).
+    const { platformFee, hostNet } = this.commission.split(grandTotal);
 
     const lineItems: BookingSummaryLineItem[] = [
       {
@@ -91,6 +102,8 @@ export class DefaultBookingPriceCalculator implements IBookingPriceCalculator {
       taxRate: TAX_RATE_PERCENT,
       taxAmount,
       grandTotal,
+      platformFee,
+      hostNet,
       lineItems,
       propertyMeta: policies
         ? {

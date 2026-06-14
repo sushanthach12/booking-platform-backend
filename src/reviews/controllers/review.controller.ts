@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Inject,
   Logger,
+  Param,
   Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -34,6 +36,22 @@ export class ReviewController {
       `Guest ${guestId} creating review for booking ${dto.bookingId}`,
     );
     const review = await this.reviewService.createReview(guestId, dto);
+    return { data: review };
+  }
+
+  @Get('booking/:bookingId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Get the guest's review for a booking, including the host reply",
+  })
+  async getBookingReview(
+    @RequestUserId() guestId: string,
+    @Param('bookingId') bookingId: string,
+  ) {
+    const review = await this.reviewService.getBookingReview(
+      guestId,
+      bookingId,
+    );
     return { data: review };
   }
 }
