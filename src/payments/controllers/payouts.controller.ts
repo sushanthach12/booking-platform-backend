@@ -1,11 +1,15 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Inject,
   Logger,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -98,6 +102,29 @@ export class PayoutsController {
     this.logger.log(`Add payout account for host ${hostId}`);
     const account = await this.payoutAccountService.addAccount(hostId, dto);
     return { data: account };
+  }
+
+  @Patch('accounts/:id/primary')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set a payout account as the primary destination' })
+  async setPrimaryAccount(
+    @RequestUserId() hostId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    this.logger.log(`Set primary payout account ${id} for host ${hostId}`);
+    const account = await this.payoutAccountService.setPrimary(hostId, id);
+    return { data: account };
+  }
+
+  @Delete('accounts/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove a linked payout account' })
+  async removeAccount(
+    @RequestUserId() hostId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    this.logger.log(`Remove payout account ${id} for host ${hostId}`);
+    await this.payoutAccountService.removeAccount(hostId, id);
   }
 
   @Get('summary')

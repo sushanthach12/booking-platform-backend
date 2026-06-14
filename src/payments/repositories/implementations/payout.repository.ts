@@ -27,6 +27,22 @@ export class PayoutRepository implements IPayoutRepository {
     return Number(row?.total ?? 0);
   }
 
+  async hasInFlightForAccount(accountId: string): Promise<boolean> {
+    const count = await this.repo.count({
+      where: [
+        {
+          hostPayoutAccountId: accountId,
+          status: EPayoutStatus.PENDING,
+        },
+        {
+          hostPayoutAccountId: accountId,
+          status: EPayoutStatus.PROCESSING,
+        },
+      ],
+    });
+    return count > 0;
+  }
+
   async findByHost(
     hostId: string,
     page: number,

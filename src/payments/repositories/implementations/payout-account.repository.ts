@@ -18,6 +18,13 @@ export class PayoutAccountRepository implements IPayoutAccountRepository {
     });
   }
 
+  async findByIdAndHost(
+    id: string,
+    hostId: string,
+  ): Promise<PayoutAccountEntity | null> {
+    return this.repo.findOne({ where: { id, hostId } });
+  }
+
   async countByHost(hostId: string): Promise<number> {
     return this.repo.count({ where: { hostId } });
   }
@@ -27,5 +34,17 @@ export class PayoutAccountRepository implements IPayoutAccountRepository {
   ): Promise<PayoutAccountEntity> {
     const entity = this.repo.create(data);
     return this.repo.save(entity);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.repo.delete({ id });
+  }
+
+  async setPrimary(id: string, hostId: string): Promise<void> {
+    await this.repo.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(PayoutAccountEntity);
+      await repo.update({ hostId }, { isPrimary: false });
+      await repo.update({ id, hostId }, { isPrimary: true });
+    });
   }
 }

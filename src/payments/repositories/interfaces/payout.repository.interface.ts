@@ -72,6 +72,11 @@ export interface IPayoutRepository {
   getSummary(hostId: string): Promise<IPayoutSummary>;
   /** Sum of payouts dispatched but not yet confirmed (status = 'processing'). */
   getInTransitTotal(hostId: string): Promise<number>;
+  /**
+   * True when a payout in a non-terminal state (`pending`/`processing`) is
+   * still bound to this payout account — used to block its removal.
+   */
+  hasInFlightForAccount(accountId: string): Promise<boolean>;
   /** Net paid amount grouped by calendar month for the lookback window. */
   getMonthlyPaid(
     hostId: string,

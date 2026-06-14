@@ -1,10 +1,15 @@
 import {
+  ConflictException,
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { PAYOUT_ACCOUNT_REPOSITORY } from '../../database/di/symbols';
+import {
+  PAYOUT_ACCOUNT_REPOSITORY,
+  PAYOUT_REPOSITORY,
+} from '../../database/di/symbols';
 import { CreatePayoutAccountDto } from '../dto/create-payout-account.dto';
 import { PayoutAccountEntity } from '../entities/payout-account.entity';
 import {
@@ -15,6 +20,7 @@ import { PayoutGatewayFactory } from '../factories/payout-gateway.factory';
 import { PayoutEncryptionHelper } from '../helpers/payout-encryption.helper';
 import type { IPayoutAccount } from '../interfaces/payout-account.service.interface';
 import type { IPayoutAccountRepository } from '../repositories/interfaces/payout-account.repository.interface';
+import type { IPayoutRepository } from '../repositories/interfaces/payout.repository.interface';
 
 const PAYOUT_CURRENCY = 'INR';
 
@@ -25,6 +31,8 @@ export class PayoutAccountService {
   constructor(
     @Inject(PAYOUT_ACCOUNT_REPOSITORY)
     private readonly repository: IPayoutAccountRepository,
+    @Inject(PAYOUT_REPOSITORY)
+    private readonly payoutRepository: IPayoutRepository,
     private readonly encryption: PayoutEncryptionHelper,
     private readonly payoutGatewayFactory: PayoutGatewayFactory,
   ) {}
@@ -84,12 +92,65 @@ export class PayoutAccountService {
         isUpi && dto.upiId ? this.encryption.encrypt(dto.upiId) : null,
       last4: this.deriveLast4(dto, isUpi),
       cashfreeBeneficiaryId: beneficiary.beneficiaryId,
-      beneficiaryStatus: beneficiary.status,
+      // A successful (non-invalid/failed) Cashfree registration means the
+      // account is usable now — there is no "pending" add state for us. Store
+      // it as VERIFIED so the host can immediately request payouts to it.
+      beneficiaryStatus: EBeneficiaryStatus.VERIFIED,
       isPrimary: isFirst,
       currency: PAYOUT_CURRENCY,
     });
 
     return this.toMasked(created);
+  }
+
+  /**
+   * Remove an owned account. Refuses while a payout to it is pending/processing
+   * (the funds could still be redirected). If the removed account was primary
+   * and others remain, the newest verified account (or just the newest) is
+   * promoted so the host always has a primary destination.
+   */
+  async removeAccount(hostId: string, accountId: string): Promise<void> {
+    const account = await this.repository.findByIdAndHost(accountId, hostId);
+    if (!account) {
+      throw new NotFoundException('Payout account not found');
+    }
+
+    if (await this.payoutRepository.hasInFlightForAccount(accountId)) {
+      throw new ConflictException(
+        'This account has a payout in progress and cannot be removed yet.',
+      );
+    }
+
+    await this.repository.delete(accountId);
+
+    if (account.isPrimary) {
+      // findByHost orders primary-first then newest-first, so [0] is newest.
+      const remaining = await this.repository.findByHost(hostId);
+      if (remaining.length) {
+        const next =
+          remaining.find(
+            (a) => a.beneficiaryStatus === EBeneficiaryStatus.VERIFIED,
+          ) ?? remaining[0];
+        await this.repository.setPrimary(next.id, hostId);
+      }
+    }
+
+    this.logger.log(`Removed payout account ${accountId} for host ${hostId}`);
+  }
+
+  /** Make an owned account the host's single primary payout destination. */
+  async setPrimary(hostId: string, accountId: string): Promise<IPayoutAccount> {
+    const account = await this.repository.findByIdAndHost(accountId, hostId);
+    if (!account) {
+      throw new NotFoundException('Payout account not found');
+    }
+
+    await this.repository.setPrimary(accountId, hostId);
+    this.logger.log(
+      `Set payout account ${accountId} as primary for host ${hostId}`,
+    );
+
+    return this.toMasked({ ...account, isPrimary: true });
   }
 
   /** Last 4 of the account number (bank) or the VPA handle (UPI) — display only. */

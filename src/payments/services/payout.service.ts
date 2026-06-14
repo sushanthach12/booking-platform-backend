@@ -169,11 +169,14 @@ export class PayoutService implements IPayoutService {
 
   async requestPayout(hostId: string): Promise<IRequestPayoutResult> {
     const accounts = await this.payoutAccountRepository.findByHost(hostId);
-    const verified = accounts.find(
+    const verifiedAccounts = accounts.filter(
       (a) =>
         a.beneficiaryStatus === EBeneficiaryStatus.VERIFIED &&
         a.cashfreeBeneficiaryId,
     );
+    // Pay to the host's chosen primary when it's verified; else any verified.
+    const verified =
+      verifiedAccounts.find((a) => a.isPrimary) ?? verifiedAccounts[0];
     if (!verified) {
       throw new BadRequestException(
         'Add a verified payout account before requesting a payout',
@@ -271,13 +274,17 @@ export class PayoutService implements IPayoutService {
     const accounts = await this.payoutAccountRepository.findByHost(
       payout.hostId,
     );
+    const verifiedAccounts = accounts.filter(
+      (a) =>
+        a.beneficiaryStatus === EBeneficiaryStatus.VERIFIED &&
+        a.cashfreeBeneficiaryId,
+    );
+    // Prefer the account the payout was bound to; otherwise the primary
+    // verified account, falling back to any verified one.
     const account =
       accounts.find((a) => a.id === payout.hostPayoutAccountId) ??
-      accounts.find(
-        (a) =>
-          a.beneficiaryStatus === EBeneficiaryStatus.VERIFIED &&
-          a.cashfreeBeneficiaryId,
-      );
+      verifiedAccounts.find((a) => a.isPrimary) ??
+      verifiedAccounts[0];
 
     if (!account?.cashfreeBeneficiaryId) {
       await this.payoutRepository.update(payoutId, {

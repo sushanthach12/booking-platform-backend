@@ -241,7 +241,7 @@ export class CashfreePayoutGateway implements IPayoutGateway {
   private parseWebhook(rawBody: string): PayoutWebhookEvent | null {
     let parsed: {
       type?: string;
-      data?: {
+      data?: Record<string, unknown> & {
         transfer_id?: string;
         status_code?: string;
         status_description?: string;
@@ -254,9 +254,26 @@ export class CashfreePayoutGateway implements IPayoutGateway {
       return null;
     }
 
+    const eventType = (parsed.type ?? '').toUpperCase();
     const transferId = parsed.data?.transfer_id;
-    const eventType = parsed.type ?? '';
-    if (!transferId) return null;
+
+    // Operational events (LOW_BALANCE_ALERT, CREDIT_CONFIRMATION,
+    // BENEFICIARY_INCIDENT, BULK_TRANSFER_REJECTED) carry no transfer_id — they
+    // don't map to a payout row. Acknowledge them (so the caller returns 200)
+    // and log the ones ops needs to see, rather than treating a valid event as
+    // an unparseable/spoofed body. Only a truly typeless body is unparseable.
+    if (!transferId) {
+      if (!eventType) return null;
+      this.logOperationalEvent(eventType, parsed.data);
+      return {
+        transferId: '',
+        eventType,
+        statusCode: null,
+        statusDescription: null,
+        transferUtr: null,
+        outcome: 'ignored',
+      };
+    }
 
     return {
       transferId,
@@ -266,6 +283,37 @@ export class CashfreePayoutGateway implements IPayoutGateway {
       transferUtr: parsed.data?.transfer_utr ?? null,
       outcome: this.mapWebhookOutcome(eventType),
     };
+  }
+
+  /**
+   * Non-transfer payout events have no payout row to update, but some are
+   * operationally critical. LOW_BALANCE_ALERT in particular means the payout
+   * fund source is low and pending payouts will start failing with
+   * INSUFFICIENT_BALANCE — surface it loudly. (Hook a pager/Slack alert here.)
+   */
+  private logOperationalEvent(eventType: string, data: unknown): void {
+    const detail = JSON.stringify(data ?? {});
+    switch (eventType) {
+      case 'LOW_BALANCE_ALERT':
+        this.logger.error(
+          `Cashfree payout LOW_BALANCE_ALERT — top up the payout fund source; ` +
+            `pending payouts will fail with INSUFFICIENT_BALANCE. ${detail}`,
+        );
+        break;
+      case 'BENEFICIARY_INCIDENT':
+        this.logger.warn(`Cashfree payout BENEFICIARY_INCIDENT: ${detail}`);
+        break;
+      case 'BULK_TRANSFER_REJECTED':
+        this.logger.warn(`Cashfree payout BULK_TRANSFER_REJECTED: ${detail}`);
+        break;
+      case 'CREDIT_CONFIRMATION':
+        this.logger.log(`Cashfree payout CREDIT_CONFIRMATION: ${detail}`);
+        break;
+      default:
+        this.logger.warn(
+          `Unhandled payout webhook event without transfer_id: ${eventType}`,
+        );
+    }
   }
 
   private mapWebhookOutcome(eventType: string): PayoutWebhookEvent['outcome'] {

@@ -20,4 +20,11 @@ export interface IPayoutAccountService {
     hostId: string,
     dto: CreatePayoutAccountDto,
   ): Promise<IPayoutAccount>;
+  /**
+   * Remove a host's payout account. Blocked while a payout to it is in flight;
+   * if the removed account was primary, another account is auto-promoted.
+   */
+  removeAccount(hostId: string, accountId: string): Promise<void>;
+  /** Make an owned account the host's primary payout destination. */
+  setPrimary(hostId: string, accountId: string): Promise<IPayoutAccount>;
 }
