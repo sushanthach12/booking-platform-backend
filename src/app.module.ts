@@ -26,6 +26,7 @@ import { PaymentModule } from './payments/payment.module';
 import { PropertyModule } from './properties/property.module';
 import { QueuesModule } from './queues/queues.module';
 import { ReviewModule } from './reviews/review.module';
+import { SeedModule } from './seed/seed.module';
 import { StorageModule } from './storage/storage.module';
 
 @Module({
@@ -72,6 +73,7 @@ import { StorageModule } from './storage/storage.module';
     BookingJobsModule,
     StorageModule,
     ReviewModule,
+    SeedModule,
   ],
   controllers: [AppController, HealthController],
   providers: [
