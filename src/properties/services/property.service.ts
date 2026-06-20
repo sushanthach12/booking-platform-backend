@@ -707,8 +707,11 @@ export class PropertyService {
     const limit = Math.min(100, payload.limit ?? 10);
     const offset = (page - 1) * limit;
 
+    const hasGeo = payload.latitude != null && payload.longitude != null;
+
+    // 'distance' sort only makes sense with coordinates; otherwise fall back.
     const sortBy =
-      payload.sortBy === 'distance'
+      payload.sortBy === 'distance' && !hasGeo
         ? 'created_at'
         : (payload.sortBy ?? 'created_at');
 
@@ -718,6 +721,9 @@ export class PropertyService {
         limit,
         offset,
         location: payload.location,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        radius: payload.radius,
         propertyType: payload.propertyType as EPropertyType[] | undefined,
         minPrice: payload.minPrice,
         maxPrice: payload.maxPrice,

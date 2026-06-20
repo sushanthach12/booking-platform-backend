@@ -70,6 +70,12 @@ export interface ISearchPropertiesImplParams {
   limit: number;
   offset: number;
   location?: string;
+  /** Latitude of the searched place (from frontend geocoding). */
+  latitude?: number;
+  /** Longitude of the searched place (from frontend geocoding). */
+  longitude?: number;
+  /** Search radius in kilometers around (latitude, longitude). Defaults applied in the repository. */
+  radius?: number;
   propertyType?: EPropertyType[];
   minPrice?: number;
   maxPrice?: number;
@@ -79,7 +85,7 @@ export interface ISearchPropertiesImplParams {
   guests?: number;
   checkIn?: Date;
   checkOut?: Date;
-  sortBy?: 'price' | 'rating' | 'created_at';
+  sortBy?: 'price' | 'rating' | 'distance' | 'created_at';
   sortOrder?: 'ASC' | 'DESC';
 }
 

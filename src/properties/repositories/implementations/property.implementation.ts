@@ -497,11 +497,69 @@ export class PropertyRepository implements IPropertyRepository {
         .leftJoinAndSelect('property.ratings', 'ratings')
         .where('property.status = :status', { status: EPropertyStatus.ACTIVE });
 
-      if (params.location) {
-        qb.andWhere(
-          '(LOWER(location.city) ILIKE :loc OR LOWER(location.country) ILIKE :loc OR LOWER(location.state) ILIKE :loc OR LOWER(location.addressLine1) ILIKE :loc)',
-          { loc: `%${params.location.toLowerCase()}%` },
+      // Great-circle (Haversine) distance in km between the searched point and
+      // each property. LEAST/GREATEST clamp the acos argument to [-1, 1] to
+      // avoid NaN from floating-point rounding.
+      const distanceExpr = `(
+        6371 * acos(
+          LEAST(1, GREATEST(-1,
+            cos(radians(:originLat)) * cos(radians(location.latitude::double precision)) *
+            cos(radians(location.longitude::double precision) - radians(:originLng)) +
+            sin(radians(:originLat)) * sin(radians(location.latitude::double precision))
+          ))
+        )
+      )`;
+
+      const hasGeo = params.latitude != null && params.longitude != null;
+
+      // Build location matching as OR-ed conditions: a property matches if it
+      // falls inside the search radius OR its text fields match the location
+      // string. Combining them means a city search still returns that city's
+      // stays even when the geocoder resolves the name to the wrong point.
+      const locationConditions: string[] = [];
+      const locationParams: Record<string, unknown> = {};
+
+      if (hasGeo) {
+        const lat = params.latitude as number;
+        const lng = params.longitude as number;
+        const radiusKm = params.radius ?? 50;
+
+        const cosLat = Math.cos((lat * Math.PI) / 180);
+        const latDelta = radiusKm / 111.045; // ~km per degree latitude
+        const lngDelta = radiusKm / (111.045 * Math.max(Math.abs(cosLat), 1e-6));
+
+        // Bounding box (index-friendly, also excludes null coords) AND the
+        // precise great-circle distance check.
+        locationConditions.push(
+          `(location.latitude BETWEEN :minLat AND :maxLat
+            AND location.longitude BETWEEN :minLng AND :maxLng
+            AND ${distanceExpr} <= :radiusKm)`,
         );
+        Object.assign(locationParams, {
+          originLat: lat,
+          originLng: lng,
+          radiusKm,
+          minLat: lat - latDelta,
+          maxLat: lat + latDelta,
+          minLng: lng - lngDelta,
+          maxLng: lng + lngDelta,
+        });
+
+        qb.addSelect(distanceExpr, 'distance');
+      }
+
+      if (params.location) {
+        locationConditions.push(
+          `(LOWER(location.city) ILIKE :loc
+            OR LOWER(location.country) ILIKE :loc
+            OR LOWER(location.state) ILIKE :loc
+            OR LOWER(location.addressLine1) ILIKE :loc)`,
+        );
+        locationParams.loc = `%${params.location.toLowerCase()}%`;
+      }
+
+      if (locationConditions.length) {
+        qb.andWhere(`(${locationConditions.join(' OR ')})`, locationParams);
       }
 
       if (params.propertyType?.length) {
@@ -558,16 +616,24 @@ export class PropertyRepository implements IPropertyRepository {
         );
       }
 
-      const sortColumn =
-        params.sortBy === 'price'
-          ? 'pricing.basePrice'
-          : params.sortBy === 'rating'
-            ? 'ratings.averageRating'
-            : 'property.createdAt';
+      // Distance sort is only valid when coordinates were provided; nearest
+      // first by default. Other sorts default to descending.
+      let sortColumn: string;
+      let sortDir: 'ASC' | 'DESC';
+      if (params.sortBy === 'distance' && hasGeo) {
+        sortColumn = 'distance';
+        sortDir = params.sortOrder ?? 'ASC';
+      } else {
+        sortColumn =
+          params.sortBy === 'price'
+            ? 'pricing.basePrice'
+            : params.sortBy === 'rating'
+              ? 'ratings.averageRating'
+              : 'property.createdAt';
+        sortDir = params.sortOrder ?? 'DESC';
+      }
 
-      qb.orderBy(sortColumn, params.sortOrder ?? 'DESC')
-        .limit(params.limit)
-        .offset(params.offset);
+      qb.orderBy(sortColumn, sortDir).limit(params.limit).offset(params.offset);
 
       const [properties, total] = await qb.getManyAndCount();
       return { properties, total };
