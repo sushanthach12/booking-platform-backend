@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import {
   EPropertyAmenityCategory,
   EPropertyCancellationPolicy,
@@ -10,6 +11,7 @@ import {
 } from '../properties/enums/property.enum';
 import { ICreatePropertyRequestParams } from '../properties/interfaces/property.interface';
 import { PropertyService } from '../properties/services/property.service';
+import { StorageService } from '../storage/services/storage.service';
 import { EUserRole } from '../users/enums/user.enum';
 import { UserService } from '../users/services/user.service';
 
@@ -40,11 +42,6 @@ const SEED_HOSTS = [
     name: 'Ananya Iyer',
   },
 ];
-
-/** picsum.photos always returns a real photo — seed string keeps it consistent across runs */
-function imgs(...seeds: string[]): string[] {
-  return seeds.map((s) => `https://picsum.photos/seed/${s}/1200/800`);
-}
 
 const A = {
   wifi: {
@@ -232,7 +229,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -259,12 +259,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'bandra-penthouse-1',
         'bandra-penthouse-2',
         'bandra-penthouse-3',
         'bandra-penthouse-4',
-      ),
+      ],
     },
   },
   {
@@ -295,7 +295,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -321,12 +324,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.firstAid,
         A.concierge,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'jaipur-haveli-1',
         'jaipur-haveli-2',
         'jaipur-haveli-3',
         'jaipur-haveli-4',
-      ),
+      ],
     },
   },
   {
@@ -357,7 +360,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 15 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 15,
+            },
           },
         ],
       },
@@ -384,12 +390,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.firstAid,
         A.concierge,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'udaipur-villa-1',
         'udaipur-villa-2',
         'udaipur-villa-3',
         'udaipur-villa-4',
-      ),
+      ],
     },
   },
   {
@@ -420,7 +426,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -445,7 +454,7 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs('pondy-villa-1', 'pondy-villa-2', 'pondy-villa-3'),
+      imageUrls: ['pondy-villa-1', 'pondy-villa-2', 'pondy-villa-3'],
     },
   },
   // ── Arjun Mehta — Mumbai, Delhi & Goa ───────────────────────────────────────
@@ -477,7 +486,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -500,7 +512,7 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs('colaba-studio-1', 'colaba-studio-2', 'colaba-studio-3'),
+      imageUrls: ['colaba-studio-1', 'colaba-studio-2', 'colaba-studio-3'],
     },
   },
   {
@@ -531,7 +543,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -556,7 +571,7 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs('hauz-khas-apt-1', 'hauz-khas-apt-2', 'hauz-khas-apt-3'),
+      imageUrls: ['hauz-khas-apt-1', 'hauz-khas-apt-2', 'hauz-khas-apt-3'],
     },
   },
   {
@@ -587,7 +602,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -611,11 +629,11 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'panjim-heritage-1',
         'panjim-heritage-2',
         'panjim-heritage-3',
-      ),
+      ],
     },
   },
   {
@@ -646,7 +664,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -669,7 +690,7 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs('fort-kochi-1', 'fort-kochi-2', 'fort-kochi-3'),
+      imageUrls: ['fort-kochi-1', 'fort-kochi-2', 'fort-kochi-3'],
     },
   },
   // ── Kavya Nair — Delhi & Bangalore ──────────────────────────────────────────
@@ -701,7 +722,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 15 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 15,
+            },
           },
         ],
       },
@@ -730,12 +754,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.firstAid,
         A.concierge,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'delhi-penthouse-1',
         'delhi-penthouse-2',
         'delhi-penthouse-3',
         'delhi-penthouse-4',
-      ),
+      ],
     },
   },
   {
@@ -766,7 +790,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -790,11 +817,11 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'indiranagar-loft-1',
         'indiranagar-loft-2',
         'indiranagar-loft-3',
-      ),
+      ],
     },
   },
   {
@@ -825,7 +852,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -852,12 +882,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.firstAid,
         A.fireExtinguisher,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'koramangala-townhouse-1',
         'koramangala-townhouse-2',
         'koramangala-townhouse-3',
         'koramangala-townhouse-4',
-      ),
+      ],
     },
   },
   {
@@ -888,7 +918,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 15 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 15,
+            },
           },
         ],
       },
@@ -918,12 +951,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.firstAid,
         A.concierge,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'juhu-villa-1',
         'juhu-villa-2',
         'juhu-villa-3',
         'juhu-villa-4',
-      ),
+      ],
     },
   },
   // ── Rohit Desai — Kerala & Himalayan ────────────────────────────────────────
@@ -955,7 +988,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -979,11 +1015,11 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'alleppey-cottage-1',
         'alleppey-cottage-2',
         'alleppey-cottage-3',
-      ),
+      ],
     },
   },
   {
@@ -1014,7 +1050,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -1039,12 +1078,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'munnar-bungalow-1',
         'munnar-bungalow-2',
         'munnar-bungalow-3',
         'munnar-bungalow-4',
-      ),
+      ],
     },
   },
   {
@@ -1075,7 +1114,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -1100,7 +1142,7 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.firstAid,
         A.fireExtinguisher,
       ],
-      imageUrls: imgs('manali-chalet-1', 'manali-chalet-2', 'manali-chalet-3'),
+      imageUrls: ['manali-chalet-1', 'manali-chalet-2', 'manali-chalet-3'],
     },
   },
   {
@@ -1131,7 +1173,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -1157,7 +1202,7 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs('varkala-cliff-1', 'varkala-cliff-2', 'varkala-cliff-3'),
+      imageUrls: ['varkala-cliff-1', 'varkala-cliff-2', 'varkala-cliff-3'],
     },
   },
   // ── Ananya Iyer — Goa & Coorg & Rishikesh ───────────────────────────────────
@@ -1189,7 +1234,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 15 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 15,
+            },
           },
         ],
       },
@@ -1219,12 +1267,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.firstAid,
         A.concierge,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'calangute-villa-1',
         'calangute-villa-2',
         'calangute-villa-3',
         'calangute-villa-4',
-      ),
+      ],
     },
   },
   {
@@ -1255,7 +1303,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -1282,7 +1333,7 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs('anjuna-house-1', 'anjuna-house-2', 'anjuna-house-3'),
+      imageUrls: ['anjuna-house-1', 'anjuna-house-2', 'anjuna-house-3'],
     },
   },
   {
@@ -1313,7 +1364,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -1337,11 +1391,11 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'rishikesh-retreat-1',
         'rishikesh-retreat-2',
         'rishikesh-retreat-3',
-      ),
+      ],
     },
   },
   {
@@ -1372,7 +1426,10 @@ const SEED_PROPERTIES: PropertySeed[] = [
           },
           {
             type: EPropertyChargeTypes.SERVICE_FEE,
-            chargeFee: { type: EPropertyChargeFeeTypes.PERCENTAGE, value: 12 },
+            chargeFee: {
+              type: EPropertyChargeFeeTypes.PERCENTAGE,
+              value: 12,
+            },
           },
         ],
       },
@@ -1399,12 +1456,12 @@ const SEED_PROPERTIES: PropertySeed[] = [
         A.smokeDetector,
         A.firstAid,
       ],
-      imageUrls: imgs(
+      imageUrls: [
         'coorg-bungalow-1',
         'coorg-bungalow-2',
         'coorg-bungalow-3',
         'coorg-bungalow-4',
-      ),
+      ],
     },
   },
 ];
@@ -1416,6 +1473,7 @@ export class SeedService {
   constructor(
     private readonly userService: UserService,
     private readonly propertyService: PropertyService,
+    private readonly storageService: StorageService,
   ) {}
 
   async seed(): Promise<{
@@ -1453,14 +1511,38 @@ export class SeedService {
         role: EUserRole.HOST,
       };
 
+      const imageUrls = await Promise.all(
+        (seed.payload.imageUrls ?? []).map((name) =>
+          this.uploadSeedImage(hostId, name),
+        ),
+      );
+
       await this.propertyService.createProperty({
         user,
-        payload: seed.payload,
+        payload: { ...seed.payload, imageUrls },
       });
       created++;
       this.logger.log(`Created property: ${seed.payload.details.title}`);
     }
 
     return { hosts: hostIds.length, properties: created, skipped: false };
+  }
+
+  private async uploadSeedImage(hostId: string, name: string): Promise<string> {
+    const response = await fetch(
+      `https://picsum.photos/seed/${name}/1200/800`,
+      { redirect: 'follow' },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch seed image "${name}": ${response.status}`,
+      );
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const key = `uploads/general/${hostId}/${randomUUID()}-${name}.jpg`;
+
+    await this.storageService.putObject(key, buffer, 'image/jpeg');
+    return this.storageService.getPublicUrl(key);
   }
 }

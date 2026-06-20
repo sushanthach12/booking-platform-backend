@@ -1,5 +1,6 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Readable } from 'stream';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
@@ -66,5 +67,22 @@ export class StorageService {
   /** Build the public URL for a stored object key. */
   getPublicUrl(key: string): string {
     return `${this.publicBaseUrl}/${key}`;
+  }
+
+  /** Server-side upload — use for seeding or internal transfers, not browser uploads. */
+  async putObject(
+    key: string,
+    body: Buffer | Readable,
+    contentType: string,
+  ): Promise<void> {
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      }),
+    );
+    this.logger.log(`Object uploaded: key=${key}`);
   }
 }
