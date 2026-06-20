@@ -19,6 +19,7 @@ import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { RedisClientModule } from './common/redis';
 import { HealthController } from './controllers/health.controller';
 import { getTypeOrmConfig } from './database';
+import { HomeModule } from './home/home.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -68,6 +69,7 @@ import { StorageModule } from './storage/storage.module';
     EmailModule,
     AuthModule,
     PropertyModule,
+    HomeModule,
     BookingModule,
     PaymentModule,
     BookingJobsModule,
