@@ -35,6 +35,8 @@ export class UserService {
       password: params.password,
       name: params.name,
       role: params.role,
+      auth_provider: params.auth_provider,
+      google_id: params.google_id,
     });
   }
 

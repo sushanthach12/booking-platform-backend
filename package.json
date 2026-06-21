@@ -21,9 +21,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json --passWithNoTests"
   },
   "dependencies": {
-    "@nestjs-modules/ioredis": "^2.0.2",
     "@aws-sdk/client-s3": "^3.1029.0",
     "@aws-sdk/s3-request-presigner": "^3.1029.0",
+    "@nestjs-modules/ioredis": "^2.0.2",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.1.14",
     "@nestjs/config": "^4.0.2",
@@ -37,6 +37,7 @@
     "bullmq": "^5.25.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "google-auth-library": "^10.7.0",
     "ioredis": "^5.9.3",
     "jsonwebtoken": "^9.0.3",
     "moment": "^2.30.1",

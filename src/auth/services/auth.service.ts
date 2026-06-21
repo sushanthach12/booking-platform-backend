@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -9,10 +10,11 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { EmailService } from '../../common/email/email.service';
 import { IRedisService } from '../../common/redis';
 import { REDIS_SERVICE } from '../../database/di/symbols';
-import { EUserRole } from '../../users/enums/user.enum';
+import { EAuthProvider, EUserRole } from '../../users/enums/user.enum';
 import { IUser } from '../../users/interfaces/user.interface';
 import { UserService } from '../../users/services/user.service';
 import {
@@ -26,6 +28,7 @@ const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000; // 15 minutes
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly BCRYPT_ROUNDS = 10;
+  private googleClient?: OAuth2Client;
 
   constructor(
     private readonly jwtService: JwtService,
@@ -48,6 +51,13 @@ export class AuthService {
       return { userFound: false, user: null };
     }
 
+    // Google-only accounts have no password — block password login with guidance.
+    if (user.auth_provider === EAuthProvider.GOOGLE || !user.password) {
+      throw new UnauthorizedException(
+        'This account uses Google sign-in. Please continue with Google.',
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return { userFound: true, user: null };
@@ -59,6 +69,11 @@ export class AuthService {
   async register(data: IRegisterRequest): Promise<IRegisterResponse> {
     const existing = await this.userService.findByEmail(data.payload.email);
     if (existing) {
+      if (existing.auth_provider === EAuthProvider.GOOGLE) {
+        throw new ConflictException(
+          'An account with this email already exists. Please continue with Google.',
+        );
+      }
       throw new BadRequestException('Email already in use');
     }
 
@@ -113,6 +128,112 @@ export class AuthService {
       },
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+    };
+  }
+
+  async googleLogin(idToken: string): Promise<{
+    user: { id: string; email: string; name: string; role: string };
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    const profile = await this.verifyGoogleToken(idToken);
+
+    const existing = await this.userService.findByEmail(profile.email);
+
+    let user: IUser;
+    if (existing) {
+      // Email already registered with password — block, point them to that method.
+      if (existing.auth_provider !== EAuthProvider.GOOGLE) {
+        throw new ConflictException(
+          'An account with this email already exists. Please sign in with your password.',
+        );
+      }
+      user = existing;
+    } else {
+      user = await this.userService.create({
+        email: profile.email,
+        password: null,
+        name: profile.name,
+        role: EUserRole.GUEST,
+        auth_provider: EAuthProvider.GOOGLE,
+        google_id: profile.sub,
+      });
+      this.logger.log(`New Google user registered: ${user.id}`);
+    }
+
+    const tokens = await this.generateTokens(user);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  async becomeHost(userId: string): Promise<{
+    user: { id: string; email: string; name: string; role: string };
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    await this.userService.becomeHost(userId);
+
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Reissue tokens so the JWT carries the new host role (RolesGuard reads the
+    // role from the token, not the database).
+    const tokens = await this.generateTokens(user);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  private async verifyGoogleToken(idToken: string): Promise<{
+    email: string;
+    name: string;
+    sub: string;
+  }> {
+    const clientId = this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID');
+    if (!this.googleClient) {
+      this.googleClient = new OAuth2Client(clientId);
+    }
+
+    let payload: TokenPayload | undefined;
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Invalid Google token');
+    }
+
+    if (!payload?.email || !payload.email_verified) {
+      throw new UnauthorizedException(
+        'Google account email is missing or unverified',
+      );
+    }
+
+    return {
+      email: payload.email,
+      name: payload.name ?? payload.email,
+      sub: payload.sub,
     };
   }
 

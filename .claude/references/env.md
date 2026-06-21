@@ -39,6 +39,7 @@ Production: set directly in Vercel dashboard or CI secrets.
 |---|---|---|
 | `JWT_SECRET` | ✅ | Secret for signing JWT access tokens |
 | `JWT_EXPIRY` | — | Access token expiry (code defaults to `15m`) |
+| `GOOGLE_CLIENT_ID` | ✅ (for Google login) | Google OAuth Web client id; used as the audience to verify Google ID tokens. Must match the web app's `NEXT_PUBLIC_GOOGLE_CLIENT_ID`. |
 | `SESSION_SECRET` | — | Session encryption secret |
 | `SESSION_EXPIRY` | — | Session expiry in milliseconds |
 | `PAYOUT_ENCRYPTION_KEY` | — | AES-256-GCM key for payout-account fields at rest. 32-byte hex preferred; any other value is SHA-256–hashed to 32 bytes. Set a real key in production. |

@@ -1,11 +1,13 @@
-import { EUserRole } from '../../enums/user.enum';
+import { EAuthProvider, EUserRole } from '../../enums/user.enum';
 import { IUser } from '../../interfaces/user.interface';
 
 export interface ICreateUserImplParams {
   email: string;
-  password: string;
+  password?: string | null;
   name: string;
   role: EUserRole;
+  auth_provider?: EAuthProvider;
+  google_id?: string | null;
 }
 
 export interface IUserRepository {

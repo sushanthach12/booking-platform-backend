@@ -53,3 +53,14 @@ export class RegisterDto extends LoginDto {
   @IsNotEmpty()
   name: string;
 }
+
+export class GoogleAuthDto {
+  @ApiProperty({
+    type: String,
+    description: 'Google ID token (credential) returned by the Google Sign-In button',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  idToken: string;
+}

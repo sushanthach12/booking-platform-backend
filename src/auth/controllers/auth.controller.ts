@@ -4,6 +4,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Patch,
   Post,
   Request,
 } from '@nestjs/common';
@@ -11,7 +12,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { Public } from '../../common/decorators/public.decorator';
 import type { ApiRequest } from '../../common/interfaces/request.interface';
-import { LoginDto, RegisterDto } from '../dto/auth.dto';
+import { GoogleAuthDto, LoginDto, RegisterDto } from '../dto/auth.dto';
 import { AuthService } from '../services/auth.service';
 
 class ForgotPasswordDto {
@@ -75,6 +76,25 @@ export class AuthController {
   async login(@Body() loginDto: LoginDto) {
     this.logger.log('Login request received');
     const response = await this.authService.login(loginDto);
+    return { data: response };
+  }
+
+  @Public()
+  @Post('social/google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login or register with a Google ID token' })
+  async googleLogin(@Body() body: GoogleAuthDto) {
+    this.logger.log('Google login request received');
+    const response = await this.authService.googleLogin(body.idToken);
+    return { data: response };
+  }
+
+  @Patch('become-host')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Elevate current user to host and reissue tokens' })
+  async becomeHost(@Request() req: ApiRequest) {
+    const userId = req.user?.id ?? '';
+    const response = await this.authService.becomeHost(userId);
     return { data: response };
   }
 

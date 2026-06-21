@@ -8,3 +8,8 @@ export enum EUserStatus {
   INACTIVE = 'inactive',
   DELETED = 'deleted',
 }
+
+export enum EAuthProvider {
+  EMAIL = 'email',
+  GOOGLE = 'google',
+}

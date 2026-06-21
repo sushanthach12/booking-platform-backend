@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { EUserRole, EUserStatus } from '../enums/user.enum';
+import { EAuthProvider, EUserRole, EUserStatus } from '../enums/user.enum';
 
 @Entity('users')
 export class UserEntity {
@@ -15,11 +15,21 @@ export class UserEntity {
   @Column({ type: 'varchar', unique: true })
   email: string;
 
-  @Column({ type: 'varchar' })
-  password: string;
+  @Column({ type: 'varchar', nullable: true })
+  password: string | null;
 
   @Column({ type: 'varchar' })
   name: string;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: EAuthProvider.EMAIL,
+  })
+  auth_provider: string;
+
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  google_id: string | null;
 
   @Column({
     type: 'varchar',
