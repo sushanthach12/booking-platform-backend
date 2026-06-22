@@ -263,14 +263,11 @@ export class CashfreeGateway implements IPaymentGateway {
     this.logger.log(`Terminating payment for order: ${orderId}`);
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/orders/${orderId}/terminate`,
-        {
-          method: 'PATCH',
-          headers: this.buildHeaders(),
-          body: JSON.stringify({ order_status: 'TERMINATED' }),
-        },
-      );
+      const response = await fetch(`${this.baseUrl}/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: this.buildHeaders(),
+        body: JSON.stringify({ order_status: 'TERMINATED' }),
+      });
 
       if (!response.ok) {
         const data = (await response.json()) as { message?: string };
