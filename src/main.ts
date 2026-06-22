@@ -1,4 +1,9 @@
-import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  Logger,
+  RequestMethod,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { loadEnvConfig } from './common/config/env.config';
@@ -22,7 +27,11 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.setGlobalPrefix('api');
+  // Exclude the health check from the global `api` prefix so it is reachable
+  // at a stable, prefix-free `GET /health` for infra/uptime probes.
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'health', method: RequestMethod.GET }],
+  });
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',
