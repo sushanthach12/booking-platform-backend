@@ -1,5 +1,13 @@
 packages:
   - '.'
 
-ignoredBuiltDependencies:
-  - '@nestjs/core'
+allowBuilds:
+  '@nestjs/core': false
+  '@scarf/scarf': false
+  bcrypt: true
+  msgpackr-extract: true
+  unrs-resolver: true
+
+# pnpm 10+ reads overrides from here, not package.json's "pnpm" field.
+overrides:
+  ioredis: 5.9.3

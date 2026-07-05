@@ -17,10 +17,15 @@ import { REDIS_SERVICE } from '../../database/di/symbols';
 import { EAuthProvider, EUserRole } from '../../users/enums/user.enum';
 import { IUser } from '../../users/interfaces/user.interface';
 import { UserService } from '../../users/services/user.service';
+import { EOtpContext } from '../enums/auth.enum';
 import {
+  ILoginResponse,
+  IOtpChallengeResponse,
+  IPendingLogin,
+  IPendingSignup,
   IRegisterRequest,
-  IRegisterResponse,
 } from '../interfaces/auth.interface';
+import { OtpService } from './otp.service';
 
 const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -35,6 +40,7 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
+    private readonly otpService: OtpService,
     @Inject(REDIS_SERVICE)
     private readonly redisService: IRedisService,
   ) {}
@@ -66,7 +72,12 @@ export class AuthService {
     return { userFound: true, user };
   }
 
-  async register(data: IRegisterRequest): Promise<IRegisterResponse> {
+  /**
+   * Step 1 of signup: validate the request, then hold the (password-hashed)
+   * payload in Redis behind an OTP. The account is only created once the
+   * code is verified — see {@link verifyOtp}.
+   */
+  async register(data: IRegisterRequest): Promise<IOtpChallengeResponse> {
     const existing = await this.userService.findByEmail(data.payload.email);
     if (existing) {
       if (existing.auth_provider === EAuthProvider.GOOGLE) {
@@ -82,27 +93,35 @@ export class AuthService {
       this.BCRYPT_ROUNDS,
     );
 
-    const newUser = await this.userService.create({
+    const pending: IPendingSignup = {
       email: data.payload.email,
-      password: hashedPassword,
       name: data.payload.name,
+      hashedPassword,
       role: data.payload.userType ?? EUserRole.GUEST,
-    });
+    };
 
-    const tokens = await this.generateTokens(newUser);
+    await this.otpService.issue(
+      EOtpContext.SIGNUP,
+      data.payload.email,
+      data.payload.name,
+      pending,
+    );
 
     return {
-      user: { id: newUser.id, email: newUser.email, name: newUser.name },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
+      message: 'OTP sent successfully',
+      otpRequired: true,
+      email: data.payload.email,
     };
   }
 
-  async login(loginDto: { email: string; password: string }): Promise<{
-    user: { id: string; email: string; name: string; role: string };
-    accessToken: string;
-    refreshToken: string;
-  }> {
+  /**
+   * Step 1 of login: validate credentials, then challenge with an OTP.
+   * Tokens are only issued by {@link verifyOtp}.
+   */
+  async login(loginDto: {
+    email: string;
+    password: string;
+  }): Promise<IOtpChallengeResponse> {
     const validated = await this.validateUser(
       loginDto.email,
       loginDto.password,
@@ -117,25 +136,91 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Credentials');
     }
 
-    const tokens = await this.generateTokens(validated.user);
+    const pending: IPendingLogin = { userId: validated.user.id };
+    await this.otpService.issue(
+      EOtpContext.LOGIN,
+      validated.user.email,
+      validated.user.name,
+      pending,
+    );
 
     return {
+      message: 'OTP sent successfully',
+      otpRequired: true,
+      email: validated.user.email,
+    };
+  }
+
+  /**
+   * Step 2 for both flows: verify the OTP and issue the session. For signup
+   * this is also the moment the account is actually created.
+   */
+  async verifyOtp(
+    context: EOtpContext,
+    email: string,
+    otp: string,
+  ): Promise<ILoginResponse> {
+    if (context === EOtpContext.SIGNUP) {
+      const pending = await this.otpService.verify<IPendingSignup>(
+        context,
+        email,
+        otp,
+      );
+
+      // Re-check: the email could have been claimed while the OTP was pending.
+      const existing = await this.userService.findByEmail(pending.email);
+      if (existing) {
+        throw new ConflictException('Email already in use');
+      }
+
+      const newUser = await this.userService.create({
+        email: pending.email,
+        password: pending.hashedPassword,
+        name: pending.name,
+        role: pending.role,
+      });
+      this.logger.log(`User ${newUser.id} created after OTP verification`);
+
+      return this.buildAuthResponse(newUser);
+    }
+
+    const pending = await this.otpService.verify<IPendingLogin>(
+      context,
+      email,
+      otp,
+    );
+    const user = await this.userService.findById(pending.userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return this.buildAuthResponse(user);
+  }
+
+  /** Re-send the OTP for a pending login/signup verification. */
+  async resendOtp(
+    context: EOtpContext,
+    email: string,
+  ): Promise<IOtpChallengeResponse> {
+    await this.otpService.resend(context, email);
+    return { message: 'OTP sent successfully', otpRequired: true, email };
+  }
+
+  private async buildAuthResponse(user: IUser): Promise<ILoginResponse> {
+    const tokens = await this.generateTokens(user);
+    return {
       user: {
-        id: validated.user.id,
-        email: validated.user.email,
-        name: validated.user.name,
-        role: validated.user.role,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
       },
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };
   }
 
-  async googleLogin(idToken: string): Promise<{
-    user: { id: string; email: string; name: string; role: string };
-    accessToken: string;
-    refreshToken: string;
-  }> {
+  async googleLogin(idToken: string): Promise<ILoginResponse> {
     const profile = await this.verifyGoogleToken(idToken);
 
     const existing = await this.userService.findByEmail(profile.email);
@@ -161,25 +246,10 @@ export class AuthService {
       this.logger.log(`New Google user registered: ${user.id}`);
     }
 
-    const tokens = await this.generateTokens(user);
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    };
+    return this.buildAuthResponse(user);
   }
 
-  async becomeHost(userId: string): Promise<{
-    user: { id: string; email: string; name: string; role: string };
-    accessToken: string;
-    refreshToken: string;
-  }> {
+  async becomeHost(userId: string): Promise<ILoginResponse> {
     await this.userService.becomeHost(userId);
 
     const user = await this.userService.findById(userId);
@@ -189,18 +259,7 @@ export class AuthService {
 
     // Reissue tokens so the JWT carries the new host role (RolesGuard reads the
     // role from the token, not the database).
-    const tokens = await this.generateTokens(user);
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    };
+    return this.buildAuthResponse(user);
   }
 
   private async verifyGoogleToken(idToken: string): Promise<{

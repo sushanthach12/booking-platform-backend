@@ -526,7 +526,8 @@ export class PropertyRepository implements IPropertyRepository {
 
         const cosLat = Math.cos((lat * Math.PI) / 180);
         const latDelta = radiusKm / 111.045; // ~km per degree latitude
-        const lngDelta = radiusKm / (111.045 * Math.max(Math.abs(cosLat), 1e-6));
+        const lngDelta =
+          radiusKm / (111.045 * Math.max(Math.abs(cosLat), 1e-6));
 
         // Bounding box (index-friendly, also excludes null coords) AND the
         // precise great-circle distance check.

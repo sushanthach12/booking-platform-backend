@@ -12,7 +12,13 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { Public } from '../../common/decorators/public.decorator';
 import type { ApiRequest } from '../../common/interfaces/request.interface';
-import { GoogleAuthDto, LoginDto, RegisterDto } from '../dto/auth.dto';
+import {
+  GoogleAuthDto,
+  LoginDto,
+  RegisterDto,
+  ResendOtpDto,
+  VerifyOtpDto,
+} from '../dto/auth.dto';
 import { AuthService } from '../services/auth.service';
 
 class ForgotPasswordDto {
@@ -47,7 +53,9 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Register a new user' })
+  @ApiOperation({
+    summary: 'Start signup — sends an OTP, account not yet created',
+  })
   async register(@Body() registerDto: RegisterDto) {
     this.logger.log('Register request received');
     const response = await this.authService.register({
@@ -72,10 +80,38 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiOperation({
+    summary: 'Start login — validates credentials and sends an OTP',
+  })
   async login(@Body() loginDto: LoginDto) {
     this.logger.log('Login request received');
     const response = await this.authService.login(loginDto);
+    return { data: response };
+  }
+
+  @Public()
+  @Post('verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify the OTP and issue tokens (creates the account for signup)',
+  })
+  async verifyOtp(@Body() body: VerifyOtpDto) {
+    this.logger.log('OTP verification request received');
+    const response = await this.authService.verifyOtp(
+      body.context,
+      body.email,
+      body.otp,
+    );
+    return { data: response };
+  }
+
+  @Public()
+  @Post('resend-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Re-send the OTP for a pending login/signup' })
+  async resendOtp(@Body() body: ResendOtpDto) {
+    this.logger.log('OTP resend request received');
+    const response = await this.authService.resendOtp(body.context, body.email);
     return { data: response };
   }
 

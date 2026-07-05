@@ -7,9 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *  - google_id: Google subject id, unique, nullable
  *  - password becomes nullable (Google users have none)
  */
-export class AlterUsersAddAuthProvider1749430700000
-  implements MigrationInterface
-{
+export class AlterUsersAddAuthProvider1749430700000 implements MigrationInterface {
   name = 'AlterUsersAddAuthProvider1749430700000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
