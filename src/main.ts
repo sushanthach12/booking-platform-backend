@@ -13,8 +13,12 @@ const logger = new Logger('Bootstrap');
 async function bootstrap() {
   loadEnvConfig(logger);
 
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    logger: isDevelopment
+      ? ['error', 'warn', 'log', 'debug', 'verbose']
+      : ['error', 'warn', 'log'],
     // Preserve the raw request body so webhook HMAC signatures (e.g. Cashfree
     // payout) can be verified against the exact bytes that were signed.
     rawBody: true,

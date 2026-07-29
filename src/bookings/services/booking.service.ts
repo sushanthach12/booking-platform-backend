@@ -341,7 +341,13 @@ export class BookingService implements IBookingService {
           bookingId: updatedBooking.id,
           paymentTransactionId: paymentResponse.transactionId,
         },
-        { delay: PAYMENT_TIMEOUT_MS },
+        {
+          delay: PAYMENT_TIMEOUT_MS,
+          jobId: this.expireJobId(updatedBooking.id),
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnFail: false,
+        },
       );
 
       this.bookingDetailsQueue
@@ -1441,11 +1447,27 @@ export class BookingService implements IBookingService {
       paymentStatus: BookingPaymentStatus.PENDING,
     });
 
-    // Re-enqueue payment timeout job so the 15-minute window restarts
+    // Remove the timeout job from the original attempt before scheduling the
+    // new one — otherwise the old job still fires on its original schedule,
+    // cancels this booking out from under the guest's new payment link, and
+    // the incoming success webhook is silently ignored (terminal-status
+    // guard), leaving them charged with no booking and no refund.
+    const jobId = this.expireJobId(bookingId);
+    const staleJob = await this.bookingPaymentTimeoutQueue.getJob(jobId);
+    if (staleJob) {
+      await staleJob.remove();
+    }
+
     await this.bookingPaymentTimeoutQueue.add(
       JOB_EXPIRE_UNPAID_BOOKING,
       { bookingId, paymentTransactionId: paymentResponse.transactionId },
-      { delay: PAYMENT_TIMEOUT_MS },
+      {
+        delay: PAYMENT_TIMEOUT_MS,
+        jobId,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnFail: false,
+      },
     );
 
     this.logger.log(
@@ -1456,6 +1478,10 @@ export class BookingService implements IBookingService {
       paymentSessionId: paymentResponse.paymentSessionId ?? '',
       paymentLink: paymentResponse.paymentLink ?? '',
     };
+  }
+
+  private expireJobId(bookingId: string): string {
+    return `${JOB_EXPIRE_UNPAID_BOOKING}:${bookingId}`;
   }
 
   private mapToResponse(booking: BookingEntity): BookingResponse {

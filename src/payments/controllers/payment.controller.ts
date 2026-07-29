@@ -7,7 +7,6 @@ import {
   Inject,
   Logger,
   Post,
-  Query,
   Req,
   type RawBodyRequest,
 } from '@nestjs/common';
@@ -58,18 +57,19 @@ export class PaymentController {
   @Post('webhook/cashfree')
   @HttpCode(HttpStatus.OK)
   async handleCashfreeWebhook(
-    @Body() payload: Record<string, unknown>,
+    @Req() req: RawBodyRequest<Request>,
     @Headers('x-webhook-signature') signature: string,
-    @Query('txn') transactionId?: string,
+    @Headers('x-webhook-timestamp') timestamp: string,
   ) {
     this.logger.log('Received Cashfree webhook');
+    const rawBody = req.rawBody?.toString('utf8') ?? '';
 
     try {
       const result = await this.paymentService.handleWebhook(
         PaymentGatewayType.CASHFREE,
-        payload,
-        signature,
-        transactionId,
+        rawBody,
+        signature ?? '',
+        timestamp ?? '',
       );
 
       if (result.success) {
@@ -108,8 +108,9 @@ export class PaymentController {
     try {
       const result = await this.paymentService.handleWebhook(
         PaymentGatewayType.RAZORPAY,
-        payload,
+        JSON.stringify(payload),
         signature,
+        '',
       );
 
       if (result.success) {
@@ -148,8 +149,9 @@ export class PaymentController {
     try {
       const result = await this.paymentService.handleWebhook(
         PaymentGatewayType.STRIPE,
-        payload,
+        JSON.stringify(payload),
         signature,
+        '',
       );
 
       if (result.success) {

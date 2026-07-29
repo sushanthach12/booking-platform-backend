@@ -205,15 +205,19 @@ export class PaymentService implements IPaymentService {
 
   async handleWebhook(
     gatewayType: PaymentGatewayType,
-    payload: any,
+    rawBody: string,
     signature: string,
-    transactionId?: string,
+    timestamp: string,
   ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     this.logger.log(`Handling webhook for gateway: ${gatewayType}`);
 
     try {
       const gateway = this.paymentGatewayFactory.createGateway(gatewayType);
-      const result = await gateway.webhookPayment(payload, signature);
+      const result = await gateway.webhookPayment(
+        rawBody,
+        signature,
+        timestamp,
+      );
 
       if (!result.valid) {
         return {
@@ -222,7 +226,10 @@ export class PaymentService implements IPaymentService {
         };
       }
 
-      const resolvedTransactionId = transactionId || result.transactionId;
+      // Transaction id must come only from the signed payload — never from a
+      // caller-supplied query param, which would let a validly-signed webhook
+      // for one order be replayed against a different order.
+      const resolvedTransactionId = result.transactionId;
 
       if (!resolvedTransactionId) {
         return {
@@ -377,6 +384,23 @@ export class PaymentService implements IPaymentService {
 
     const gatewayStatus = result.status ?? PaymentGatewayStatus.PENDING;
     const status = this.mapGatewayStatusToTransactionStatus(gatewayStatus);
+
+    // A signed webhook is not the same as a webhook for the right amount —
+    // without this a legitimately-signed low-value order could be replayed
+    // to mark a higher-value transaction as paid.
+    if (status === PaymentStatus.SUCCESS) {
+      const expectedAmount = Number(transaction.amount);
+      const webhookAmount = result.amount;
+      if (
+        webhookAmount === undefined ||
+        Math.abs(webhookAmount - expectedAmount) > 0.01
+      ) {
+        this.logger.error(
+          `Webhook amount mismatch for ${transactionId}: expected ${expectedAmount}, got ${webhookAmount}`,
+        );
+        return;
+      }
+    }
 
     // Post-success refund / chargeback: claw back the host's credited earning
     // (Phase 8). This is the only transition allowed out of a final SUCCESS.

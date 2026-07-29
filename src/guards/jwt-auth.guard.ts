@@ -8,7 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { gatewayDefaults, gatewayEnv } from '../common/config/gateway.config';
+import { gatewayEnv } from '../common/config/gateway.config';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
 import type { ApiRequest } from '../common/interfaces/request.interface';
 import { IRedisService } from '../common/redis';
@@ -34,9 +34,9 @@ export class JwtAuthGuard implements CanActivate {
       const token = this.extractTokenFromHeader(request);
       if (token) {
         try {
-          const secret =
-            this.configService.get<string>(gatewayEnv.jwtSecret) ??
-            gatewayDefaults.jwt.secret;
+          const secret = this.configService.getOrThrow<string>(
+            gatewayEnv.jwtSecret,
+          );
           const payload = await this.jwtService.verifyAsync<{
             sub: string;
             role: string;
@@ -60,9 +60,9 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const secret =
-        this.configService.get<string>(gatewayEnv.jwtSecret) ??
-        gatewayDefaults.jwt.secret;
+      const secret = this.configService.getOrThrow<string>(
+        gatewayEnv.jwtSecret,
+      );
 
       const payload = await this.jwtService.verifyAsync<{
         sub: string;

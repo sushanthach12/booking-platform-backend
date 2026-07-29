@@ -17,9 +17,9 @@ export interface IPaymentService {
 
   handleWebhook(
     gatewayType: PaymentGatewayType,
-    payload: any,
+    rawBody: string,
     signature: string,
-    transactionId?: string,
+    timestamp: string,
   ): Promise<WebhookResult>;
 
   terminatePayment(transactionId: string): Promise<boolean>;
@@ -123,8 +123,9 @@ export interface IPaymentGateway {
   ): Promise<GatewayPaymentResponse>;
   getPaymentStatus(orderId: string): Promise<GatewayStatusResponse>;
   webhookPayment(
-    payload: any,
+    rawBody: string,
     signature: string,
+    timestamp: string,
   ): Promise<WebhookPaymentResult>;
   refundPayment(orderId: string, amount?: number): Promise<RefundResponse>;
   terminatePayment(orderId: string): Promise<boolean>;

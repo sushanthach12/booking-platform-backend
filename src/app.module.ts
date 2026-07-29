@@ -47,9 +47,7 @@ import { StorageModule } from './storage/storage.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) =>
         ({
-          secret:
-            configService.get<string>(gatewayEnv.jwtSecret) ??
-            gatewayDefaults.jwt.secret,
+          secret: configService.getOrThrow<string>(gatewayEnv.jwtSecret),
           global: true,
           signOptions: {
             expiresIn:

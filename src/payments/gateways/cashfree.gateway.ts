@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHmac, timingSafeEqual } from 'crypto';
 import {
   getCashFreeBaseUrl,
   getCashFreeNotifyUrl,
@@ -151,20 +152,23 @@ export class CashfreeGateway implements IPaymentGateway {
   }
 
   async webhookPayment(
-    payload: unknown,
-    _signature: string,
+    rawBody: string,
+    signature: string,
+    timestamp: string,
   ): Promise<WebhookPaymentResult> {
     this.logger.log('Processing Cashfree webhook');
 
     try {
-      if (!payload) {
+      if (!rawBody) {
         return { valid: false, error: 'Missing payload' };
       }
 
-      const data: Record<string, unknown> =
-        typeof payload === 'string'
-          ? JSON.parse(payload)
-          : (payload as Record<string, unknown>);
+      if (!this.verifySignature(signature, rawBody, timestamp)) {
+        this.logger.warn('Rejected payment webhook with invalid signature');
+        return { valid: false, error: 'Invalid webhook signature' };
+      }
+
+      const data: Record<string, unknown> = JSON.parse(rawBody);
 
       const eventData = data.data as Record<string, unknown> | undefined;
       const payment = eventData?.payment as Record<string, unknown> | undefined;
@@ -283,6 +287,20 @@ export class CashfreeGateway implements IPaymentGateway {
       this.logger.error(`Payment termination failed: ${msg}`);
       return false;
     }
+  }
+
+  private verifySignature(
+    signature: string,
+    rawBody: string,
+    timestamp: string,
+  ): boolean {
+    if (!this.apiSecret || !signature || !timestamp) return false;
+    const expected = createHmac('sha256', this.apiSecret)
+      .update(timestamp + rawBody)
+      .digest('base64');
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature);
+    return a.length === b.length && timingSafeEqual(a, b);
   }
 
   private buildHeaders(): Record<string, string> {

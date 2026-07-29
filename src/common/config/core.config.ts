@@ -28,10 +28,6 @@ export const coreDefaults = {
     allowedOrigins: ['*'],
     credentials: true,
   },
-  jwt: {
-    secret: 'change-me',
-    expiresIn: '1h',
-  },
   redis: {
     host: 'localhost',
     port: 6379,

@@ -1,10 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  randomBytes,
-} from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -14,9 +9,10 @@ const AUTH_TAG_LENGTH = 16;
  * AES-256-GCM encryption for sensitive payout-account fields at rest
  * (account number, IFSC). Never log plaintext or the derived key.
  *
- * Key source: `PAYOUT_ENCRYPTION_KEY` env var. A 32-byte hex string is used
- * directly; any other value is hashed to 32 bytes via SHA-256 so the helper
- * never throws on a short key, while a proper hex key remains canonical.
+ * Key source: `PAYOUT_ENCRYPTION_KEY` env var — must be a 64-character hex
+ * string (32 bytes). There is no fallback: an unset or malformed key fails
+ * startup rather than silently encrypting bank details with a constant
+ * that's public in git history.
  */
 @Injectable()
 export class PayoutEncryptionHelper {
@@ -58,12 +54,11 @@ export class PayoutEncryptionHelper {
 
   private deriveKey(): Buffer {
     const raw = process.env.PAYOUT_ENCRYPTION_KEY ?? '';
-    if (/^[0-9a-fA-F]{64}$/.test(raw)) {
-      return Buffer.from(raw, 'hex');
+    if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
+      throw new InternalServerErrorException(
+        'PAYOUT_ENCRYPTION_KEY must be set to a 64-character hex string (32 bytes)',
+      );
     }
-    // Fallback: SHA-256 any provided secret to a stable 32-byte key.
-    return createHash('sha256')
-      .update(raw || 'stayly-payout-dev-key')
-      .digest();
+    return Buffer.from(raw, 'hex');
   }
 }
