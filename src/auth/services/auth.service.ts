@@ -137,12 +137,18 @@ export class AuthService {
     }
 
     const pending: IPendingLogin = { userId: validated.user.id };
-    await this.otpService.issue(
-      EOtpContext.LOGIN,
-      validated.user.email,
-      validated.user.name,
-      pending,
-    );
+    this.otpService
+      .issue(
+        EOtpContext.LOGIN,
+        validated.user.email,
+        validated.user.name,
+        pending,
+      )
+      .catch((error) => {
+        this.logger.error(
+          `Error issuing OTP for ${validated.user?.email} (${EOtpContext.LOGIN}): ${error}`,
+        );
+      });
 
     return {
       message: 'OTP sent successfully',

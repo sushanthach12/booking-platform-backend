@@ -19,14 +19,15 @@ import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { RedisClientModule } from './common/redis';
 import { HealthController } from './controllers/health.controller';
 import { getTypeOrmConfig } from './database';
-import { HomeModule } from './home/home.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { HomeModule } from './home/home.module';
 import { PaymentModule } from './payments/payment.module';
 import { PropertyModule } from './properties/property.module';
 import { QueuesModule } from './queues/queues.module';
 import { ReviewModule } from './reviews/review.module';
+import { SearchModule } from './search/search.module';
 import { SeedModule } from './seed/seed.module';
 import { StorageModule } from './storage/storage.module';
 
@@ -74,6 +75,7 @@ import { StorageModule } from './storage/storage.module';
     StorageModule,
     ReviewModule,
     SeedModule,
+    SearchModule,
   ],
   controllers: [AppController, HealthController],
   providers: [

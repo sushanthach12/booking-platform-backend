@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import moment from 'moment';
 import { SlugHelper } from '../../common/helpers/slug.helper';
 import { timeToMinutes } from '../../common/helpers/time.helper';
@@ -65,6 +66,7 @@ export class PropertyService {
     private readonly propertyRepository: IPropertyRepository,
     @Inject(AVAILABILITY_CALENDAR_REPOSITORY)
     private readonly availabilityCalendarRepository: IAvailabilityCalendarRepository,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async getHostIdByPropertyId(propertyId: string): Promise<string | null> {
@@ -690,6 +692,10 @@ export class PropertyService {
       id: propertyId,
       status: payload.status,
     });
+
+    this.eventEmitter.emit('property.created', {
+      id: updatedProperty.id,
+    } as any);
 
     return {
       id: updatedProperty.id,

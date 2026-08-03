@@ -57,25 +57,31 @@ export class OtpService {
     name: string,
     payload: TPayload,
   ): Promise<void> {
-    await this.assertCooldown(context, email);
+    try {
+      await this.assertCooldown(context, email);
 
-    const code = this.generateCode();
-    const record: IOtpRecord<TPayload> = {
-      hash: this.hashCode(code),
-      attempts: 0,
-      resends: 0,
-      expiresAt: Date.now() + OTP_TTL_MS,
-      name,
-      payload,
-    };
+      const code = this.generateCode();
+      const record: IOtpRecord<TPayload> = {
+        hash: this.hashCode(code),
+        attempts: 0,
+        resends: 0,
+        expiresAt: Date.now() + OTP_TTL_MS,
+        name,
+        payload,
+      };
 
-    await this.redisService.set(
-      this.recordKey(context, email),
-      JSON.stringify(record),
-      OTP_TTL_MS,
-    );
-    await this.dispatch(context, email, name, code);
-    await this.setCooldown(context, email);
+      await this.redisService.set(
+        this.recordKey(context, email),
+        JSON.stringify(record),
+        OTP_TTL_MS,
+      );
+      await this.dispatch(context, email, name, code);
+      await this.setCooldown(context, email);
+    } catch (error) {
+      this.logger.error(
+        `Error issuing OTP for ${email} (${context}): ${error}`,
+      );
+    }
   }
 
   /**
