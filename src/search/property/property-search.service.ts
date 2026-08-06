@@ -1,24 +1,24 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { SearchPropertiesDto } from '../../properties/dto/property-crud.dto';
 import { ISearchProvider } from '../core/interfaces/search-provider.interface';
 import {
   ISearchable,
   SearchOutcome,
 } from '../core/interfaces/searchable.interface';
 import { SEARCH_PROVIDER } from '../core/search.tokens';
-import { SearchPropertyDto } from './dto/search-property.dto';
-import { PROPERTY_INDEX_NAME } from './index/property-index.config';
+import { PROPERTY_INDEX_ALIAS } from './index/property-index.config';
 import { PropertyDocument } from './interfaces/property-document.interface';
 import { PropertyQueryBuilder } from './query-builders/property-query.builder';
 
 /**
- * Single responsibility: turn a SearchPropertyDto into a search result.
+ * Single responsibility: turn a SearchPropertiesDto into a search result.
  * Delegates query construction to PropertyQueryBuilder and execution to
  * the ISearchProvider abstraction — this class has no idea it's talking
  * to OpenSearch specifically.
  */
 @Injectable()
 export class PropertySearchService implements ISearchable<
-  SearchPropertyDto,
+  SearchPropertiesDto,
   PropertyDocument
 > {
   constructor(
@@ -27,18 +27,18 @@ export class PropertySearchService implements ISearchable<
   ) {}
 
   async search(
-    query: SearchPropertyDto,
+    query: SearchPropertiesDto,
   ): Promise<SearchOutcome<PropertyDocument>> {
     const body = this.queryBuilder.build(query);
     const result = await this.searchProvider.search<PropertyDocument>(
-      PROPERTY_INDEX_NAME,
+      PROPERTY_INDEX_ALIAS,
       body,
     );
 
     return {
       total: result.total,
-      page: query.page,
-      size: query.size,
+      page: query.page ?? 1,
+      size: query.limit ?? 10,
       results: result.hits,
       facets: result.aggregations,
     };

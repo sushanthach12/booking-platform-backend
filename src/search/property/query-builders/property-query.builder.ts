@@ -1,54 +1,35 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { SearchPropertiesDto } from '../../../properties/dto/property-crud.dto';
 import { QueryFilterStrategy } from '../../core/interfaces/query-filter-strategy.interface';
-import { SearchPropertyDto } from '../dto/search-property.dto';
-import { PROPERTY_QUERY_FILTERS } from '../../core/search.tokens';
+import { SortStrategy } from '../../core/interfaces/sort-strategy.interface';
+import { BaseQueryBuilder } from '../../core/query/base-query.builder';
+import {
+  PROPERTY_PUBLIC_QUERY_FILTERS,
+  PROPERTY_SORT_STRATEGIES,
+} from '../../core/search.tokens';
 
 /**
- * Builder pattern: assembles the final OpenSearch request body from
- * whatever filter strategies are registered. Open for extension — add a
- * new QueryFilterStrategy and register it in the module — closed for
- * modification, since this class never changes when a filter is added.
+ * Builder pattern: assembles the public search request body from whatever
+ * filter/sort strategies are registered. Open for extension — add a new
+ * QueryFilterStrategy/SortStrategy and register it in the module — closed
+ * for modification, since this class never changes when one is added.
  */
 @Injectable()
-export class PropertyQueryBuilder {
+export class PropertyQueryBuilder extends BaseQueryBuilder<SearchPropertiesDto> {
   constructor(
-    @Inject(PROPERTY_QUERY_FILTERS)
-    private readonly filters: QueryFilterStrategy<SearchPropertyDto>[],
-  ) {}
+    @Inject(PROPERTY_PUBLIC_QUERY_FILTERS)
+    filters: QueryFilterStrategy<SearchPropertiesDto>[],
+    @Inject(PROPERTY_SORT_STRATEGIES)
+    sorts: SortStrategy<SearchPropertiesDto>[],
+  ) {
+    super(filters, sorts);
+  }
 
-  build(params: SearchPropertyDto): Record<string, any> {
-    const must: Record<string, any>[] = [];
-    const filter: Record<string, any>[] = [];
-
-    for (const strategy of this.filters) {
-      if (!strategy.supports(params)) continue;
-      const clause = strategy.toClause(params);
-      (strategy.target === 'must' ? must : filter).push(clause);
-    }
-
-    const body: Record<string, any> = {
-      from: (params.page - 1) * params.size,
-      size: params.size,
-      query: { bool: { must, filter } },
-      aggs: {
-        amenities: { terms: { field: 'amenities' } },
-        propertyType: { terms: { field: 'propertyType' } },
-      },
+  protected aggregations(): Record<string, unknown> {
+    return {
+      amenities: { terms: { field: 'amenitySlugs' } },
+      propertyType: { terms: { field: 'propertyType' } },
+      priceStats: { stats: { field: 'basePrice' } },
     };
-
-    // Sort by proximity only makes sense for radius search
-    if (params.lat != null && params.lon != null && params.radiusKm != null) {
-      body.sort = [
-        {
-          _geo_distance: {
-            location: { lat: params.lat, lon: params.lon },
-            order: 'asc',
-            unit: 'km',
-          },
-        },
-      ];
-    }
-
-    return body;
   }
 }

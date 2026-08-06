@@ -15,6 +15,17 @@ Source: `src/database/di/symbols.ts`
 | `AVAILABILITY_CHECKER` | `IAvailabilityChecker` | `AvailabilityCheckerService` | `BookingModule` |
 | `PAYMENT_TRANSACTION_REPOSITORY` | `IPaymentTransactionRepository` | `PaymentTransactionRepository` | `PaymentModule` |
 
+Source: `src/search/core/search.tokens.ts`
+
+| Token | Interface | Implemented by | Provided in |
+|---|---|---|---|
+| `SEARCH_PROVIDER` | `ISearchProvider` | `OpenSearchAdapter` | `SearchCoreModule` (global) |
+| `PROPERTY_SEARCH_FACADE` | `IPropertySearchFacade` | `PropertySearchFacade` | `PropertySearchModule` |
+| `PROPERTY_PUBLIC_QUERY_FILTERS` | `QueryFilterStrategy<SearchPropertiesDto>[]` | factory-assembled | `PropertySearchModule` |
+| `PROPERTY_HOST_QUERY_FILTERS` | `QueryFilterStrategy<HostPropertySearchParams>[]` | factory-assembled | `PropertySearchModule` |
+| `PROPERTY_SORT_STRATEGIES` | `SortStrategy<SearchPropertiesDto>[]` | factory-assembled | `PropertySearchModule` |
+| `PROPERTY_HOST_SORT_STRATEGIES` | `SortStrategy<HostPropertySearchParams>[]` | factory-assembled | `PropertySearchModule` |
+
 String tokens (not Symbols):
 
 | Token string | Interface | Provided in |

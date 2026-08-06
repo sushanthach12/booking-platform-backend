@@ -1,7 +1,17 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { PROPERTY_SEARCH_QUEUE } from '../../core/search.tokens';
+import {
+  JOB_DELETE_PROPERTY,
+  JOB_INDEX_PROPERTY,
+  JOB_REINDEX_ALL,
+  PROPERTY_SEARCH_QUEUE,
+} from './constants';
+
+const RETRY_OPTS = {
+  attempts: 5,
+  backoff: { type: 'exponential', delay: 2000 },
+} as const;
 
 /**
  * Single responsibility: know how to enqueue search-indexing jobs.
@@ -16,17 +26,21 @@ export class PropertySearchQueueService {
 
   enqueueIndex(propertyId: string) {
     return this.queue.add(
-      'index-property',
+      JOB_INDEX_PROPERTY,
       { propertyId },
-      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
+      { ...RETRY_OPTS, jobId: `index-${propertyId}` },
     );
   }
 
   enqueueDelete(propertyId: string) {
     return this.queue.add(
-      'delete-property',
+      JOB_DELETE_PROPERTY,
       { propertyId },
-      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
+      { ...RETRY_OPTS, jobId: `delete-${propertyId}` },
     );
+  }
+
+  enqueueReindexAll() {
+    return this.queue.add(JOB_REINDEX_ALL, {}, RETRY_OPTS);
   }
 }

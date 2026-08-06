@@ -18,8 +18,17 @@ export interface SearchResult<T> {
  * module depends on ISearchProvider, never on the OpenSearch SDK directly.
  */
 export interface ISearchProvider {
-  index<T>(indexName: string, id: string, document: T): Promise<void>;
-  bulkIndex<T>(indexName: string, docs: IndexRequest<T>[]): Promise<void>;
+  index<T>(
+    indexName: string,
+    id: string,
+    document: T,
+    refresh?: boolean,
+  ): Promise<void>;
+  bulkIndex<T>(
+    indexName: string,
+    docs: IndexRequest<T>[],
+    refresh?: boolean,
+  ): Promise<void>;
   delete(indexName: string, id: string): Promise<void>;
   search<T>(
     indexName: string,
@@ -27,4 +36,9 @@ export interface ISearchProvider {
   ): Promise<SearchResult<T>>;
   createIndex(indexName: string, body: Record<string, any>): Promise<void>;
   indexExists(indexName: string): Promise<boolean>;
+  /** Points `alias` at `indexName`, atomically removing it from any other index. */
+  putAlias(indexName: string, alias: string): Promise<void>;
+  /** Returns the concrete index name(s) an alias currently points at. */
+  getAliasTargets(alias: string): Promise<string[]>;
+  putMapping(indexName: string, properties: Record<string, any>): Promise<void>;
 }

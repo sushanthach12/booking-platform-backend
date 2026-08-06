@@ -55,6 +55,16 @@ export interface IFindPropertyByIdImplParams {
   id: string;
 }
 
+export interface IFindPropertyForIndexingImplParams {
+  id: string;
+}
+
+export interface IFindPropertyIdsForIndexingImplParams {
+  /** Keyset cursor — return ids after this one, ordered by id. */
+  afterId?: string;
+  limit: number;
+}
+
 export interface IFindPropertiesImplParams {
   page: number;
   limit: number;
@@ -525,6 +535,14 @@ export interface IPropertyRepository {
   findPropertyById(
     params: IFindPropertyByIdImplParams,
   ): Promise<PropertyEntity | null>;
+  /** Loads a property with every relation the search document mapper needs. */
+  findPropertyForIndexing(
+    params: IFindPropertyForIndexingImplParams,
+  ): Promise<PropertyEntity | null>;
+  /** Keyset-paginated id list for the reindex-all backfill job. */
+  findPropertyIdsForIndexing(
+    params: IFindPropertyIdsForIndexingImplParams,
+  ): Promise<string[]>;
   findProperties(params: IFindPropertiesImplParams): Promise<PropertyEntity[]>;
   countProperties(params: ICountPropertiesImplParams): Promise<number>;
   updateProperty(params: IUpdatePropertyImplParams): Promise<PropertyEntity>;

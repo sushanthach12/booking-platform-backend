@@ -1205,9 +1205,46 @@ export class SearchPropertiesDto {
     required: false,
   })
   @IsOptional()
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   @IsArray()
   @IsString({ each: true })
   amenities?: string[];
+
+  @ApiProperty({
+    type: Number,
+    description: 'Map viewport north-east latitude (bounding-box search)',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  neLat?: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Map viewport north-east longitude (bounding-box search)',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  neLon?: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Map viewport south-west latitude (bounding-box search)',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  swLat?: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Map viewport south-west longitude (bounding-box search)',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  swLon?: number;
 
   @ApiProperty({
     type: Number,

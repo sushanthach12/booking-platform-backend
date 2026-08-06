@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -11,17 +12,28 @@ import moment from 'moment';
 import { SlugHelper } from '../../common/helpers/slug.helper';
 import { timeToMinutes } from '../../common/helpers/time.helper';
 import { RequestUser } from '../../common/types/users.types';
+import {
+  PROPERTY_AVAILABILITY_CHANGED,
+  PROPERTY_CREATED,
+  PROPERTY_DELETED,
+  PROPERTY_UPDATED,
+  PropertyChangedPayload,
+} from '../../common/events/property.events';
 import { parseWithZod } from '../../common/zod';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,
   PROPERTY_REPOSITORY,
 } from '../../database';
+import { PROPERTY_SEARCH_FACADE } from '../../search/core/search.tokens';
+import { IPropertySearchFacade } from '../../search/property/interfaces/property-search-facade.interface';
+import { PropertySearchResultMapper } from '../../search/property/mappers/property-search-result.mapper';
 import {
   OnboardingStep2Dto,
   OnboardingStep3Dto,
   OnboardingStep4Dto,
   OnboardingStep5Dto,
 } from '../dto/host-onboarding-steps.dto';
+import { SearchPropertiesDto } from '../dto/property-crud.dto';
 import {
   EPropertyCancellationPolicy,
   EPropertyStatus,
@@ -61,11 +73,16 @@ import { CreatePropertyRequestSchema } from '../validations/schema';
 
 @Injectable()
 export class PropertyService {
+  private readonly logger = new Logger(PropertyService.name);
+
   constructor(
     @Inject(PROPERTY_REPOSITORY)
     private readonly propertyRepository: IPropertyRepository,
     @Inject(AVAILABILITY_CALENDAR_REPOSITORY)
     private readonly availabilityCalendarRepository: IAvailabilityCalendarRepository,
+    @Inject(PROPERTY_SEARCH_FACADE)
+    private readonly searchFacade: IPropertySearchFacade,
+    private readonly searchResultMapper: PropertySearchResultMapper,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -231,6 +248,10 @@ export class PropertyService {
       slug: uniqueSlug,
     });
 
+    this.eventEmitter.emit(PROPERTY_CREATED, {
+      propertyId: propertyMeta.id,
+    } satisfies PropertyChangedPayload);
+
     return {
       id: propertyMeta.id,
       title: propertyMeta.title,
@@ -373,6 +394,10 @@ export class PropertyService {
 
     const saved = await this.availabilityCalendarRepository.upsertMany(rows);
 
+    this.eventEmitter.emit(PROPERTY_AVAILABILITY_CHANGED, {
+      propertyId: p.propertyId,
+    } satisfies PropertyChangedPayload);
+
     return { updated: saved.length };
   }
 
@@ -423,6 +448,10 @@ export class PropertyService {
     }));
 
     const saved = await this.availabilityCalendarRepository.upsertMany(rows);
+
+    this.eventEmitter.emit(PROPERTY_AVAILABILITY_CHANGED, {
+      propertyId: p.propertyId,
+    } satisfies PropertyChangedPayload);
 
     return { updated: saved.length };
   }
@@ -629,6 +658,10 @@ export class PropertyService {
       ...payload,
     });
 
+    this.eventEmitter.emit(PROPERTY_UPDATED, {
+      propertyId: updatedProperty.id,
+    } satisfies PropertyChangedPayload);
+
     return {
       id: updatedProperty.id,
       title: updatedProperty.title,
@@ -663,6 +696,10 @@ export class PropertyService {
       id: propertyId,
       status: EPropertyStatus.DELETED,
     });
+
+    this.eventEmitter.emit(PROPERTY_DELETED, {
+      propertyId,
+    } satisfies PropertyChangedPayload);
   }
 
   async updatePropertyStatus(
@@ -693,9 +730,9 @@ export class PropertyService {
       status: payload.status,
     });
 
-    this.eventEmitter.emit('property.created', {
-      id: updatedProperty.id,
-    } as any);
+    this.eventEmitter.emit(PROPERTY_UPDATED, {
+      propertyId: updatedProperty.id,
+    } satisfies PropertyChangedPayload);
 
     return {
       id: updatedProperty.id,
@@ -709,6 +746,62 @@ export class PropertyService {
   ): Promise<IGetPropertiesResponse> {
     const { payload } = params;
 
+    try {
+      return await this.searchPropertiesViaOpenSearch(payload);
+    } catch (error) {
+      this.logger.error(
+        `OpenSearch property search failed, falling back to Postgres: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return this.searchPropertiesViaPostgres(payload);
+    }
+  }
+
+  private async searchPropertiesViaOpenSearch(
+    payload: ISearchPropertiesRequestParams['payload'],
+  ): Promise<IGetPropertiesResponse> {
+    const query: SearchPropertiesDto = {
+      query: payload.query,
+      location: payload.location,
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      radius: payload.radius,
+      checkIn: payload.checkIn,
+      checkOut: payload.checkOut,
+      guests: payload.guests,
+      propertyType: payload.propertyType as EPropertyType[] | undefined,
+      minPrice: payload.minPrice,
+      maxPrice: payload.maxPrice,
+      amenities: payload.amenities,
+      minBeds: payload.minBeds,
+      minBathrooms: payload.minBathrooms,
+      page: payload.page ?? 1,
+      limit: Math.min(100, payload.limit ?? 10),
+      sortBy: payload.sortBy,
+      sortOrder: payload.sortOrder,
+    };
+
+    const outcome = await this.searchFacade.search(query);
+
+    return {
+      results: outcome.results.map((doc) =>
+        this.searchResultMapper.toResult(doc),
+      ),
+      pagination: {
+        page: outcome.page,
+        limit: outcome.size,
+        total: outcome.total,
+        totalItems: outcome.total,
+        length: outcome.results.length,
+        totalPages: Math.ceil(outcome.total / outcome.size),
+      },
+    };
+  }
+
+  private async searchPropertiesViaPostgres(
+    payload: ISearchPropertiesRequestParams['payload'],
+  ): Promise<IGetPropertiesResponse> {
     const page = payload.page ?? 1;
     const limit = Math.min(100, payload.limit ?? 10);
     const offset = (page - 1) * limit;
@@ -763,6 +856,12 @@ export class PropertyService {
           ? {
               basePrice: property.pricing.basePrice,
               currency: property.pricing.currency,
+            }
+          : null,
+        ratings: property.ratings
+          ? {
+              averageRating: property.ratings.averageRating || 0,
+              totalReviews: property.ratings.totalReviews || 0,
             }
           : null,
         createdAt: property.createdAt,
@@ -1133,6 +1232,10 @@ export class PropertyService {
     const published = await this.propertyRepository.publishDraftProperty({
       propertyId: params.payload.propertyId,
     });
+
+    this.eventEmitter.emit(PROPERTY_CREATED, {
+      propertyId: published.id,
+    } satisfies PropertyChangedPayload);
 
     return {
       id: published.id,

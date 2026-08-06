@@ -6,6 +6,7 @@ import {
   PROPERTY_IMAGE_REPOSITORY,
   PROPERTY_REPOSITORY,
 } from '../database';
+import { PropertySearchModule } from '../search/property/property-search.module';
 import { UserModule } from '../users/user.module';
 import { HostOnboardingController } from './controllers/host-onboarding.controller';
 import { PropertyAmenityController } from './controllers/property-amenity.controller';
@@ -39,6 +40,7 @@ import { PropertyService } from './services/property.service';
 @Module({
   imports: [
     UserModule,
+    PropertySearchModule,
     TypeOrmModule.forFeature([
       PropertyEntity,
       AvailabilityCalenderEntity,

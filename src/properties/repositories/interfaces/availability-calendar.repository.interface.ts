@@ -21,6 +21,12 @@ export interface IUpsertAvailabilityParams {
   blockReason?: string | null;
 }
 
+export interface IFindBlockedDatesParams {
+  propertyId: string;
+  /** Only dates on/after this are considered — keeps the array from growing unbounded. */
+  from: Date;
+}
+
 export interface IAvailabilityCalendarRepository {
   findByRange(
     params: IFindAvailabilityByRangeParams,
@@ -30,4 +36,7 @@ export interface IAvailabilityCalendarRepository {
     rows: IUpsertAvailabilityParams[],
     manager?: EntityManager,
   ): Promise<AvailabilityCalenderEntity[]>;
+
+  /** Dates the calendar explicitly marks unavailable — sparse/negative model, so a missing row means available. */
+  findBlockedDates(params: IFindBlockedDatesParams): Promise<Date[]>;
 }

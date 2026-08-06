@@ -1,31 +1,38 @@
 import { Injectable } from '@nestjs/common';
-import { SearchPropertyDto } from './dto/search-property.dto';
-import { IProperyEntity } from './interfaces/property-document.interface';
+import { SearchPropertiesDto } from '../../properties/dto/property-crud.dto';
+import { HostPropertySearchService } from './host-property-search.service';
+import { HostPropertySearchParams } from './interfaces/host-property-search.params';
+import { IPropertySearchFacade } from './interfaces/property-search-facade.interface';
 import { PropertyIndexingService } from './property-indexing.service';
 import { PropertySearchService } from './property-search.service';
 
 /**
  * Facade: the single surface controllers/listeners/processors talk to,
- * so they don't need to know there are two separate services underneath
- * with different responsibilities (search vs. indexing).
+ * so they don't need to know there are separate services underneath
+ * with different responsibilities (public search, host search, indexing).
  */
 @Injectable()
-export class PropertySearchFacade {
+export class PropertySearchFacade implements IPropertySearchFacade {
   constructor(
     private readonly searchService: PropertySearchService,
+    private readonly hostSearchService: HostPropertySearchService,
     private readonly indexingService: PropertyIndexingService,
   ) {}
 
-  search(query: SearchPropertyDto) {
+  search(query: SearchPropertiesDto) {
     return this.searchService.search(query);
   }
 
-  indexOne(property: IProperyEntity) {
-    return this.indexingService.indexOne(property);
+  searchForHost(params: HostPropertySearchParams) {
+    return this.hostSearchService.search(params);
   }
 
-  indexMany(properties: IProperyEntity[]) {
-    return this.indexingService.indexMany(properties);
+  indexById(propertyId: string) {
+    return this.indexingService.indexOne(propertyId);
+  }
+
+  indexMany(propertyIds: string[]) {
+    return this.indexingService.indexMany(propertyIds);
   }
 
   remove(id: string) {

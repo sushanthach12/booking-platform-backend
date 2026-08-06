@@ -20,6 +20,10 @@ import {
   BOOKING_CONFIRMED,
   BOOKING_PAYMENT_FAILED,
 } from '../../common/events/booking.events';
+import {
+  PROPERTY_AVAILABILITY_CHANGED,
+  PropertyChangedPayload,
+} from '../../common/events/property.events';
 import { IRedisService } from '../../common/redis';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,
@@ -271,6 +275,10 @@ export class BookingService implements IBookingService {
 
         return entity;
       });
+
+      this.eventEmitter.emit(PROPERTY_AVAILABILITY_CHANGED, {
+        propertyId: createBookingRequest.propertyId,
+      } satisfies PropertyChangedPayload);
 
       createdBookingId = booking.id;
 
@@ -533,6 +541,10 @@ export class BookingService implements IBookingService {
 
         return entity;
       });
+
+      this.eventEmitter.emit(PROPERTY_AVAILABILITY_CHANGED, {
+        propertyId: createBookingRequest.propertyId,
+      } satisfies PropertyChangedPayload);
 
       // Generate booking number using a DB sequence to avoid race conditions
       const created = new Date(booking.createdAt);
@@ -1261,6 +1273,9 @@ export class BookingService implements IBookingService {
           bookingId: null,
         })),
       );
+      this.eventEmitter.emit(PROPERTY_AVAILABILITY_CHANGED, {
+        propertyId,
+      } satisfies PropertyChangedPayload);
     } catch (err) {
       this.logger.error(
         `Failed to restore availability calendar: ${err instanceof Error ? err.message : String(err)}`,

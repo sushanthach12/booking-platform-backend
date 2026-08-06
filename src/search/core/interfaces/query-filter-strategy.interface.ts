@@ -1,4 +1,4 @@
-export type FilterClauseTarget = 'must' | 'filter';
+export type FilterClauseTarget = 'must' | 'filter' | 'must_not';
 
 /**
  * Strategy pattern: each filter (text match, price range, geo, etc.) is

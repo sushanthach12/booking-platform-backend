@@ -1,20 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { QueryFilterStrategy } from '../../../core/interfaces/query-filter-strategy.interface';
-import { SearchPropertyDto } from '../../dto/search-property.dto';
+import { SearchPropertiesDto } from '../../../../properties/dto/property-crud.dto';
 
 @Injectable()
-export class GeoDistanceFilter implements QueryFilterStrategy<SearchPropertyDto> {
+export class GeoDistanceFilter implements QueryFilterStrategy<SearchPropertiesDto> {
   readonly target = 'filter' as const;
 
-  supports(params: SearchPropertyDto): boolean {
-    return params.lat != null && params.lon != null && params.radiusKm != null;
+  supports(params: SearchPropertiesDto): boolean {
+    return (
+      params.latitude != null &&
+      params.longitude != null &&
+      params.radius != null
+    );
   }
 
-  toClause(params: SearchPropertyDto) {
+  toClause(params: SearchPropertiesDto) {
     return {
       geo_distance: {
-        distance: `${params.radiusKm}km`,
-        location: { lat: params.lat, lon: params.lon },
+        distance: `${params.radius}km`,
+        location: { lat: params.latitude, lon: params.longitude },
       },
     };
   }

@@ -1,28 +1,58 @@
-export interface PropertyDocument {
-  id: string;
-  title: string;
-  description: string;
-  city: string;
-  location: { lat: number; lon: number };
-  pricePerNight: number;
-  amenities: string[];
-  propertyType: string;
-  rating: number;
-  isAvailable: boolean;
-  createdAt: string;
+import {
+  EPropertyStatus,
+  EPropertyType,
+} from '../../../properties/enums/property.enum';
+
+export interface PropertyBlockedRange {
+  /** ISO date, inclusive — first blocked night. */
+  from: string;
+  /** ISO date, exclusive — the day after the last blocked night. */
+  to: string;
 }
 
-// Just a reference, update once working
-export interface IProperyEntity {
+export interface PropertyDocument {
   id: string;
+  slug: string;
+  hostId: string;
+  status: EPropertyStatus;
+
   title: string;
-  description: string | null;
+  description: string;
+
   city: string;
-  location: { lat: number; lon: number };
-  pricePerNight: number;
+  state: string | null;
+  country: string;
+  addressLine1: string;
+  /** null when the property has no coordinates. */
+  location: { lat: number; lon: number } | null;
+
+  propertyType: EPropertyType;
+
+  basePrice: number;
+  currency: string;
+  cleaningFee: number;
+
+  maxGuests: number;
+  bedrooms: number;
+  beds: number;
+  bathrooms: number;
+
   amenities: string[];
-  propertyType: string;
+  amenitySlugs: string[];
+
   rating: number;
-  isAvailable: boolean;
-  createdAt: Date;
+  totalReviews: number;
+
+  coverImage: string | null;
+  thumbnailUrl: string | null;
+
+  instantBook: boolean;
+  minNights: number;
+  maxNights: number;
+  cancellationPolicy: string;
+
+  blockedRanges: PropertyBlockedRange[];
+
+  createdAt: string;
+  updatedAt: string;
 }

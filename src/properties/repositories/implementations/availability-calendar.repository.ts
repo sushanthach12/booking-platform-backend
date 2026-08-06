@@ -5,6 +5,7 @@ import { AvailabilityCalenderEntity } from '../../entities/availability-calendar
 import {
   IAvailabilityCalendarRepository,
   IFindAvailabilityByRangeParams,
+  IFindBlockedDatesParams,
   IUpsertAvailabilityParams,
 } from '../interfaces/availability-calendar.repository.interface';
 
@@ -77,5 +78,18 @@ export class AvailabilityCalendarRepository implements IAvailabilityCalendarRepo
     }
 
     return saved;
+  }
+
+  async findBlockedDates(params: IFindBlockedDatesParams): Promise<Date[]> {
+    const rows = await this.repository
+      .createQueryBuilder('a')
+      .select('a.date', 'date')
+      .where('a.propertyId = :propertyId', { propertyId: params.propertyId })
+      .andWhere('a.available = false')
+      .andWhere('a.date >= :from', { from: params.from })
+      .orderBy('a.date', 'ASC')
+      .getRawMany<{ date: Date }>();
+
+    return rows.map((r) => r.date);
   }
 }

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Client } from '@opensearch-project/opensearch';
 import { Bulk_RequestBody } from '@opensearch-project/opensearch/api/index.js';
 import {
@@ -16,7 +16,7 @@ import { OPENSEARCH_RAW_CLIENT } from './opensearch-client.provider';
  * substitution: any ISearchProvider implementation is a drop-in swap).
  */
 @Injectable()
-export class OpenSearchAdapter implements ISearchProvider {
+export class OpenSearchAdapter implements ISearchProvider, OnModuleInit {
   private readonly logger = new Logger(OpenSearchAdapter.name);
   constructor(@Inject(OPENSEARCH_RAW_CLIENT) private readonly client: Client) {}
 
@@ -29,18 +29,24 @@ export class OpenSearchAdapter implements ISearchProvider {
     }
   }
 
-  async index<T>(indexName: string, id: string, document: T): Promise<void> {
+  async index<T>(
+    indexName: string,
+    id: string,
+    document: T,
+    refresh = false,
+  ): Promise<void> {
     await this.client.index({
       index: indexName,
       id,
       body: document as any,
-      refresh: false,
+      refresh,
     });
   }
 
   async bulkIndex<T>(
     indexName: string,
     docs: IndexRequest<T>[],
+    refresh = false,
   ): Promise<void> {
     if (!docs.length) return;
 
@@ -49,7 +55,7 @@ export class OpenSearchAdapter implements ISearchProvider {
       document,
     ]) as Record<string, any>[];
 
-    const { body: response } = await this.client.bulk({ body });
+    const { body: response } = await this.client.bulk({ body, refresh });
 
     if (response.errors) {
       const failed = response.items.filter((item: any) => item.index?.error);
@@ -101,5 +107,36 @@ export class OpenSearchAdapter implements ISearchProvider {
       index: indexName,
     });
     return exists;
+  }
+
+  async putAlias(indexName: string, alias: string): Promise<void> {
+    const currentTargets = await this.getAliasTargets(alias);
+    const actions = [
+      ...currentTargets
+        .filter((target) => target !== indexName)
+        .map((target) => ({ remove: { index: target, alias } })),
+      { add: { index: indexName, alias } },
+    ];
+    await this.client.indices.updateAliases({ body: { actions } });
+  }
+
+  async getAliasTargets(alias: string): Promise<string[]> {
+    try {
+      const { body } = await this.client.indices.getAlias({ name: alias });
+      return Object.keys(body);
+    } catch (err: any) {
+      if (err?.meta?.statusCode === 404) return [];
+      throw err;
+    }
+  }
+
+  async putMapping(
+    indexName: string,
+    properties: Record<string, any>,
+  ): Promise<void> {
+    await this.client.indices.putMapping({
+      index: indexName,
+      body: { properties },
+    });
   }
 }

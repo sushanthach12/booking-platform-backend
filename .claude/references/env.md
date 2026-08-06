@@ -66,6 +66,17 @@ Production: set directly in Vercel dashboard or CI secrets.
 | `R2_PUBLIC_BASE_URL` | ✅ | Public bucket URL, e.g. `https://pub-<hash>.r2.dev` or custom domain |
 | `R2_PRESIGN_EXPIRY_SECONDS` | — | Presigned URL TTL in seconds. Default: `300` |
 
+## OpenSearch (Property Search)
+
+| Variable | Required | Notes |
+|---|---|---|
+| `OPENSEARCH_NODE` | ✅ | Full node URL, e.g. Aiven-hosted endpoint. `getOrThrow` — app fails to boot if unset, since `SearchCoreModule` is `@Global` and constructs the client eagerly. |
+| `OPENSEARCH_USER` | ✅ | Basic-auth username. `getOrThrow`. |
+| `OPENSEARCH_PASSWORD` | ✅ | Basic-auth password. `getOrThrow`. |
+| `OPENSEARCH_CA_CERT_PATH` | — | Path to a CA cert file for TLS. If unset or the file doesn't exist, the client connects without a custom CA (current Aiven setup). |
+| `OPENSEARCH_CA_CERT_BASE64` | — | Base64-encoded CA cert; takes precedence over `OPENSEARCH_CA_CERT_PATH`. |
+| `SEARCH_REINDEX_KEY` | — | Shared secret for `POST /api/v1/search/properties/reindex` (`x-search-admin-key` header). No ADMIN role exists yet, so this route is `@Public()` and gated on this key instead. The route refuses to run if unset. |
+
 ## Email (placeholder — not yet wired)
 
 | Variable |

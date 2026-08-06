@@ -1,20 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { QueryFilterStrategy } from '../../../core/interfaces/query-filter-strategy.interface';
-import { SearchPropertyDto } from '../../dto/search-property.dto';
+import { SearchPropertiesDto } from '../../../../properties/dto/property-crud.dto';
 
 @Injectable()
-export class TextMatchFilter implements QueryFilterStrategy<SearchPropertyDto> {
+export class TextMatchFilter implements QueryFilterStrategy<SearchPropertiesDto> {
   readonly target = 'must' as const;
 
-  supports(params: SearchPropertyDto): boolean {
-    return !!params.q;
+  supports(params: SearchPropertiesDto): boolean {
+    return !!params.query;
   }
 
-  toClause(params: SearchPropertyDto) {
+  toClause(params: SearchPropertiesDto) {
     return {
       multi_match: {
-        query: params.q,
-        fields: ['title^3', 'description', 'city^2'],
+        query: params.query,
+        fields: ['title^3', 'city.text^2', 'country', 'state', 'description'],
         fuzziness: 'AUTO',
       },
     };

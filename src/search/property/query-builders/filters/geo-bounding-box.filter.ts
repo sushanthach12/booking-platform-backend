@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { SearchPropertiesDto } from '../../../../properties/dto/property-crud.dto';
 import { QueryFilterStrategy } from '../../../core/interfaces/query-filter-strategy.interface';
-import { SearchPropertyDto } from '../../dto/search-property.dto';
 
 /**
  * Used for map-view search (user pans/zooms) rather than radius search.
@@ -9,16 +9,16 @@ import { SearchPropertyDto } from '../../dto/search-property.dto';
  * it applies based on which params are present.
  */
 @Injectable()
-export class GeoBoundingBoxFilter implements QueryFilterStrategy<SearchPropertyDto> {
+export class GeoBoundingBoxFilter implements QueryFilterStrategy<SearchPropertiesDto> {
   readonly target = 'filter' as const;
 
-  supports(params: SearchPropertyDto): boolean {
+  supports(params: SearchPropertiesDto): boolean {
     return [params.neLat, params.neLon, params.swLat, params.swLon].every(
       (v) => v != null,
     );
   }
 
-  toClause(params: SearchPropertyDto) {
+  toClause(params: SearchPropertiesDto) {
     return {
       geo_bounding_box: {
         location: {

@@ -62,6 +62,8 @@ import {
   // IFindPropertyAmenityByIdImplParams,
   IFindPropertyAmenitiesByPropertyIdImplParams,
   IFindPropertyByIdImplParams,
+  IFindPropertyForIndexingImplParams,
+  IFindPropertyIdsForIndexingImplParams,
   IFindPropertyDetailsByIdImplParams,
   IFindPropertyDetailsByPropertyIdImplParams,
   // IFindPropertyImageByIdImplParams,
@@ -398,6 +400,48 @@ export class PropertyRepository implements IPropertyRepository {
       });
     } catch (error) {
       this.handleDbError(error, 'findPropertyById', 'Property');
+    }
+  }
+
+  async findPropertyForIndexing(
+    params: IFindPropertyForIndexingImplParams,
+  ): Promise<PropertyEntity | null> {
+    try {
+      return await this.propertyRepository.findOne({
+        where: { id: params.id },
+        relations: {
+          location: true,
+          pricing: true,
+          details: true,
+          policies: true,
+          ratings: true,
+          images: true,
+          amenities: { amenity: true },
+        },
+      });
+    } catch (error) {
+      this.handleDbError(error, 'findPropertyForIndexing', 'Property');
+    }
+  }
+
+  async findPropertyIdsForIndexing(
+    params: IFindPropertyIdsForIndexingImplParams,
+  ): Promise<string[]> {
+    try {
+      const qb = this.propertyRepository
+        .createQueryBuilder('property')
+        .select('property.id')
+        .orderBy('property.id', 'ASC')
+        .limit(params.limit);
+
+      if (params.afterId) {
+        qb.where('property.id > :afterId', { afterId: params.afterId });
+      }
+
+      const rows = await qb.getMany();
+      return rows.map((r) => r.id);
+    } catch (error) {
+      this.handleDbError(error, 'findPropertyIdsForIndexing', 'Property');
     }
   }
 

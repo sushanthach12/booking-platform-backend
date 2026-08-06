@@ -1,81 +1,72 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Inject } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PROPERTY_REPOSITORY } from '../../../database';
-import { EPropertyStatus } from '../../../properties/enums/property.enum';
-import { IPropertyRepository } from '../../../properties/repositories';
-import { PROPERTY_SEARCH_QUEUE } from '../../core/search.tokens';
-import { PropertySearchFacade } from '../property-search.facade';
+import { IPropertyRepository } from '../../../properties/repositories/interfaces/property-repository.interfaces';
+import { PROPERTY_SEARCH_FACADE } from '../../core/search.tokens';
+import { IPropertySearchFacade } from '../interfaces/property-search-facade.interface';
+import {
+  JOB_DELETE_PROPERTY,
+  JOB_INDEX_PROPERTY,
+  JOB_REINDEX_ALL,
+  PROPERTY_SEARCH_QUEUE,
+} from './constants';
 
-@Processor(PROPERTY_SEARCH_QUEUE)
+const REINDEX_BATCH_SIZE = 200;
+
+interface IndexJobData {
+  propertyId: string;
+}
+
+@Processor(PROPERTY_SEARCH_QUEUE, { concurrency: 1 })
 export class PropertySearchProcessor extends WorkerHost {
+  private readonly logger = new Logger(PropertySearchProcessor.name);
+
   constructor(
     @Inject(PROPERTY_REPOSITORY)
     private readonly propertyRepo: IPropertyRepository,
-    private readonly searchFacade: PropertySearchFacade,
+    @Inject(PROPERTY_SEARCH_FACADE)
+    private readonly searchFacade: IPropertySearchFacade,
   ) {
     super();
   }
 
-  async process(job: Job<{ propertyId: string }>): Promise<void> {
-    try {
-      if (job.name === 'index-property') {
-        // Fetch fresh from Postgres rather than trusting the job payload —
-        // the property may have been updated again since the job was enqueued.
-        const property = await this.propertyRepo.findPropertyById({
-          id: job.data.propertyId,
-        });
-
-        if (!property) {
-          await this.searchFacade.remove(job.data.propertyId);
-          return;
-        }
-
-        const [propertyLocation, propertyPricing, propertyRatings] =
-          await Promise.all([
-            this.propertyRepo.findPropertyLocationByPropertyId({
-              propertyId: job.data.propertyId,
-            }),
-            this.propertyRepo.findPropertyPricingByPropertyId({
-              propertyId: job.data.propertyId,
-            }),
-            this.propertyRepo.findPropertyRatingByPropertyId({
-              propertyId: job.data.propertyId,
-            }),
-          ]);
-
-        console.log('propertyLocation', propertyLocation);
-        console.log('propertyPricing', propertyPricing);
-        console.log('propertyRatings', propertyRatings);
-
-        await this.searchFacade.indexOne({
-          id: property.id,
-          title: property.title,
-          description: property.description ?? '',
-          city: propertyLocation?.city ?? '',
-          location: {
-            lat: propertyLocation?.latitude ?? 0,
-            lon: propertyLocation?.longitude ?? 0,
-          },
-          pricePerNight: propertyPricing?.basePrice ?? 0,
-          amenities: property.amenities?.map((a) => a.amenity?.name) ?? [],
-          propertyType: property.propertyType,
-          rating: property.ratings?.averageRating ?? 0,
-          isAvailable: property.status === EPropertyStatus.ACTIVE,
-          createdAt: property.createdAt,
-        });
-        console.log(`Indexed property ${property.id} in search backend`);
+  async process(job: Job<IndexJobData>): Promise<void> {
+    switch (job.name) {
+      case JOB_INDEX_PROPERTY:
+        await this.searchFacade.indexById(job.data.propertyId);
         return;
-      }
-
-      if (job.name === 'delete-property') {
+      case JOB_DELETE_PROPERTY:
         await this.searchFacade.remove(job.data.propertyId);
-      }
-    } catch (error) {
-      console.error(
-        `Error processing job ${job.name} for property ${job.data.propertyId}:`,
-        error,
-      );
+        return;
+      case JOB_REINDEX_ALL:
+        await this.reindexAll();
+        return;
+      default:
+        this.logger.warn(`Unknown job name "${job.name}" — skipping.`);
     }
+  }
+
+  private async reindexAll(): Promise<void> {
+    let afterId: string | undefined;
+    let totalIndexed = 0;
+
+    for (;;) {
+      const ids = await this.propertyRepo.findPropertyIdsForIndexing({
+        afterId,
+        limit: REINDEX_BATCH_SIZE,
+      });
+      if (ids.length === 0) break;
+
+      await this.searchFacade.indexMany(ids);
+      totalIndexed += ids.length;
+      afterId = ids[ids.length - 1];
+
+      if (ids.length < REINDEX_BATCH_SIZE) break;
+    }
+
+    this.logger.log(
+      `Reindex-all complete — indexed ${totalIndexed} properties.`,
+    );
   }
 }
