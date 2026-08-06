@@ -144,6 +144,6 @@ const hostSortProviders = [HostFieldSort, HostRelevanceSort];
     PropertySearchQueueService,
     PropertySearchProcessor,
   ],
-  exports: [PROPERTY_SEARCH_FACADE],
+  exports: [PROPERTY_SEARCH_FACADE, PropertySearchResultMapper],
 })
 export class PropertySearchModule {}

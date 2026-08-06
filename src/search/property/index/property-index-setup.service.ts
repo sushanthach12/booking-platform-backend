@@ -23,25 +23,29 @@ export class PropertyIndexSetupService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const exists = await this.searchProvider.indexExists(PROPERTY_INDEX_NAME);
-    if (!exists) {
-      await this.searchProvider.createIndex(
-        PROPERTY_INDEX_NAME,
-        PROPERTY_INDEX_DEFINITION,
-      );
-      this.logger.log(`Created index "${PROPERTY_INDEX_NAME}".`);
-    }
+    try {
+      const exists = await this.searchProvider.indexExists(PROPERTY_INDEX_NAME);
+      if (!exists) {
+        await this.searchProvider.createIndex(
+          PROPERTY_INDEX_NAME,
+          PROPERTY_INDEX_DEFINITION,
+        );
+        this.logger.log(`Created index "${PROPERTY_INDEX_NAME}".`);
+      }
 
-    const aliasTargets =
-      await this.searchProvider.getAliasTargets(PROPERTY_INDEX_ALIAS);
-    if (!aliasTargets.includes(PROPERTY_INDEX_NAME)) {
-      await this.searchProvider.putAlias(
-        PROPERTY_INDEX_NAME,
-        PROPERTY_INDEX_ALIAS,
-      );
-      this.logger.log(
-        `Alias "${PROPERTY_INDEX_ALIAS}" now points at "${PROPERTY_INDEX_NAME}".`,
-      );
+      const aliasTargets =
+        await this.searchProvider.getAliasTargets(PROPERTY_INDEX_ALIAS);
+      if (!aliasTargets.includes(PROPERTY_INDEX_NAME)) {
+        await this.searchProvider.putAlias(
+          PROPERTY_INDEX_NAME,
+          PROPERTY_INDEX_ALIAS,
+        );
+        this.logger.log(
+          `Alias "${PROPERTY_INDEX_ALIAS}" now points at "${PROPERTY_INDEX_NAME}".`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.error('[ERROR]: Indexing setup failed', error.message);
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,
   PROPERTY_REPOSITORY,
@@ -8,7 +8,10 @@ import { IPropertyRepository } from '../../properties/repositories/interfaces/pr
 import { IIndexable } from '../core/interfaces/indexable.interface';
 import { ISearchProvider } from '../core/interfaces/search-provider.interface';
 import { SEARCH_PROVIDER } from '../core/search.tokens';
-import { PROPERTY_INDEX_ALIAS } from './index/property-index.config';
+import {
+  PROPERTY_INDEX_ALIAS,
+  PROPERTY_INDEX_NAME,
+} from './index/property-index.config';
 import { PropertyDocument } from './interfaces/property-document.interface';
 import { collapseBlockedDates } from './mappers/blocked-range.mapper';
 import { PropertyDocumentMapper } from './mappers/property-document.mapper';
@@ -29,6 +32,8 @@ const startOfToday = (): Date => {
  */
 @Injectable()
 export class PropertyIndexingService implements IIndexable<string> {
+  private readonly logger = new Logger(PropertyIndexingService.name);
+
   constructor(
     @Inject(SEARCH_PROVIDER) private readonly searchProvider: ISearchProvider,
     @Inject(PROPERTY_REPOSITORY)
@@ -55,6 +60,7 @@ export class PropertyIndexingService implements IIndexable<string> {
 
   /** Rebuilds and upserts a single property's document; removes it if the property no longer exists. */
   async indexOne(propertyId: string): Promise<void> {
+    this.logger.log('Indexing one property');
     const doc = await this.buildDocument(propertyId);
     if (!doc) {
       await this.remove(propertyId);
@@ -71,10 +77,10 @@ export class PropertyIndexingService implements IIndexable<string> {
       .filter((doc): doc is PropertyDocument => doc != null)
       .map((doc) => ({ id: doc.id, document: doc }));
 
-    await this.searchProvider.bulkIndex(PROPERTY_INDEX_ALIAS, requests);
+    await this.searchProvider.bulkIndex(PROPERTY_INDEX_NAME, requests);
   }
 
   async remove(id: string): Promise<void> {
-    await this.searchProvider.delete(PROPERTY_INDEX_ALIAS, id);
+    await this.searchProvider.delete(PROPERTY_INDEX_NAME, id);
   }
 }

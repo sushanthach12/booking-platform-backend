@@ -9,9 +9,6 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import moment from 'moment';
-import { SlugHelper } from '../../common/helpers/slug.helper';
-import { timeToMinutes } from '../../common/helpers/time.helper';
-import { RequestUser } from '../../common/types/users.types';
 import {
   PROPERTY_AVAILABILITY_CHANGED,
   PROPERTY_CREATED,
@@ -19,6 +16,9 @@ import {
   PROPERTY_UPDATED,
   PropertyChangedPayload,
 } from '../../common/events/property.events';
+import { SlugHelper } from '../../common/helpers/slug.helper';
+import { timeToMinutes } from '../../common/helpers/time.helper';
+import { RequestUser } from '../../common/types/users.types';
 import { parseWithZod } from '../../common/zod';
 import {
   AVAILABILITY_CALENDAR_REPOSITORY,

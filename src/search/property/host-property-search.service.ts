@@ -5,7 +5,7 @@ import {
   SearchOutcome,
 } from '../core/interfaces/searchable.interface';
 import { SEARCH_PROVIDER } from '../core/search.tokens';
-import { PROPERTY_INDEX_ALIAS } from './index/property-index.config';
+import { PROPERTY_INDEX_NAME } from './index/property-index.config';
 import { HostPropertySearchParams } from './interfaces/host-property-search.params';
 import { PropertyDocument } from './interfaces/property-document.interface';
 import { HostPropertyQueryBuilder } from './query-builders/host-property-query.builder';
@@ -30,7 +30,7 @@ export class HostPropertySearchService implements ISearchable<
   ): Promise<SearchOutcome<PropertyDocument>> {
     const body = this.queryBuilder.build(query);
     const result = await this.searchProvider.search<PropertyDocument>(
-      PROPERTY_INDEX_ALIAS,
+      PROPERTY_INDEX_NAME,
       body,
     );
 

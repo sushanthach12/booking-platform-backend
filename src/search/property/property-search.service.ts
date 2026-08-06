@@ -6,7 +6,7 @@ import {
   SearchOutcome,
 } from '../core/interfaces/searchable.interface';
 import { SEARCH_PROVIDER } from '../core/search.tokens';
-import { PROPERTY_INDEX_ALIAS } from './index/property-index.config';
+import { PROPERTY_INDEX_NAME } from './index/property-index.config';
 import { PropertyDocument } from './interfaces/property-document.interface';
 import { PropertyQueryBuilder } from './query-builders/property-query.builder';
 
@@ -30,8 +30,9 @@ export class PropertySearchService implements ISearchable<
     query: SearchPropertiesDto,
   ): Promise<SearchOutcome<PropertyDocument>> {
     const body = this.queryBuilder.build(query);
+
     const result = await this.searchProvider.search<PropertyDocument>(
-      PROPERTY_INDEX_ALIAS,
+      PROPERTY_INDEX_NAME,
       body,
     );
 
