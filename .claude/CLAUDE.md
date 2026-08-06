@@ -37,6 +37,13 @@ NestJS 11 monolith deployed to Vercel serverless. PostgreSQL via TypeORM, Redis 
 **URL pattern:** `POST /api/v1/<resource>`
 Global prefix: `api` | Versioning: URI (`/v1`, `/v2`) | Port: `8001`
 
+### Request Contract Conventions
+
+- **Strict payloads.** `main.ts` installs a global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })`. Undeclared keys in a body **or query** DTO return `400 property <key> should not exist`. Note this applies only to class DTOs — an inline `@Body() body: { reason?: string }` has no metatype and is skipped entirely by the pipe.
+- **Identifier placement.** Prefer query params (`@Query() dto`) over path params for resource identifiers on collection-level routes; keep `:param` only for genuine sub-resources (`/bookings/:bookingId/cancel`, `/properties/:propertyId/calendar`). Host onboarding steps carry `propertyId` in the body so each step is a self-contained payload.
+- **Response envelope.** Controllers return `{ data }`, plus `{ meta }` for paginated lists. `POST /storage/presign` is the one deliberate exception (un-enveloped).
+- Changing a route's path, method, or DTO keys is a **breaking change for `web/`** — update `web/.claude/refs/api.md` in the same change.
+
 ### Module Map
 
 | Module              | Path                         | Responsibility                                         |
