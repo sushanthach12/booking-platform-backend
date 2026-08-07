@@ -741,6 +741,11 @@ export class PropertyService {
     };
   }
 
+  /** City-level destination tiles from the OpenSearch terms aggregation. */
+  async getDestinations(limit: number) {
+    return this.searchFacade.aggregateDestinations(limit);
+  }
+
   async searchProperties(
     params: ISearchPropertiesRequestParams,
   ): Promise<IGetPropertiesResponse> {
@@ -761,6 +766,13 @@ export class PropertyService {
   private async searchPropertiesViaOpenSearch(
     payload: ISearchPropertiesRequestParams['payload'],
   ): Promise<IGetPropertiesResponse> {
+    const hasGeo = payload.latitude != null && payload.longitude != null;
+
+    // 'distance' sort only makes sense with coordinates; otherwise fall back
+    // (mirrors the same rewrite in searchPropertiesViaPostgres below).
+    const sortBy =
+      payload.sortBy === 'distance' && !hasGeo ? 'created_at' : payload.sortBy;
+
     const query: SearchPropertiesDto = {
       query: payload.query,
       location: payload.location,
@@ -778,7 +790,7 @@ export class PropertyService {
       minBathrooms: payload.minBathrooms,
       page: payload.page ?? 1,
       limit: Math.min(100, payload.limit ?? 10),
-      sortBy: payload.sortBy,
+      sortBy: sortBy,
       sortOrder: payload.sortOrder,
     };
 

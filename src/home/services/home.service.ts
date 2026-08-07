@@ -13,16 +13,16 @@ import {
  * a featured rail (top-rated), a nearby rail (most recent, optionally biased
  * by a location string) and city-level destination tiles.
  *
- * It composes existing {@link PropertyService} reads rather than querying the
- * database directly — one listing fetch is sliced/sorted in memory, which is
- * cheap at the homepage's data volume and keeps the persistence layer untouched.
+ * Featured/nearby go through {@link PropertyService.searchProperties} — the
+ * same OpenSearch-backed method the search page uses — so both surfaces agree
+ * on what's live, how location matching works, and image/price fields.
+ * Destinations come from a city aggregation (see {@link PropertyService.getDestinations})
+ * with a Postgres-pool fallback if that aggregation fails.
  */
 @Injectable()
 export class HomeService {
   private readonly logger = new Logger(HomeService.name);
 
-  /** Size of the active-listing pool we derive all three rails from. */
-  private static readonly POOL_SIZE = 50;
   private static readonly DEFAULT_RAIL_SIZE = 8;
   private static readonly MAX_DESTINATIONS = 8;
 
@@ -30,66 +30,86 @@ export class HomeService {
 
   async getHomeData(data: IGetHomeRequestParams): Promise<IGetHomeResponse> {
     const railSize = data.params.limit ?? HomeService.DEFAULT_RAIL_SIZE;
+    const location = data.params.location;
 
-    const { results } = await this.propertyService.getProperties({
-      payload: { page: 1, limit: HomeService.POOL_SIZE },
-    });
+    const [featured, nearby, destinations] = await Promise.all([
+      this.propertyService
+        .searchProperties({
+          payload: {
+            page: 1,
+            limit: railSize,
+            sortBy: 'rating',
+            sortOrder: 'desc',
+          },
+        })
+        .then((res) => res.results.map((p) => this.toSummary(p))),
+      this.buildNearby(railSize, location),
+      this.buildDestinations(),
+    ]);
 
-    return {
-      featured: this.buildFeatured(results, railSize),
-      nearby: this.buildNearby(results, railSize, data.params.location),
-      destinations: this.buildDestinations(results),
-    };
-  }
-
-  /** Highest rated listings first, breaking ties by review volume. */
-  private buildFeatured(
-    pool: IGetPropertiesResult[],
-    railSize: number,
-  ): IHomePropertySummary[] {
-    return [...pool]
-      .sort((a, b) => {
-        const ratingDelta =
-          (b.ratings?.averageRating ?? 0) - (a.ratings?.averageRating ?? 0);
-        if (ratingDelta !== 0) return ratingDelta;
-        return (b.ratings?.totalReviews ?? 0) - (a.ratings?.totalReviews ?? 0);
-      })
-      .slice(0, railSize)
-      .map((p) => this.toSummary(p));
+    return { featured, nearby, destinations };
   }
 
   /**
-   * Most recently listed properties. When a `location` is supplied we narrow to
-   * matching cities/states/countries, falling back to the full pool if nothing
-   * matches so the rail is never empty.
+   * Most recently listed properties, optionally biased by a location string.
+   * Falls back to the location-less result set if the biased search comes
+   * back empty, so the rail is never empty.
    */
-  private buildNearby(
-    pool: IGetPropertiesResult[],
+  private async buildNearby(
     railSize: number,
     location?: string,
-  ): IHomePropertySummary[] {
-    let candidates = pool;
+  ): Promise<IHomePropertySummary[]> {
+    const { results } = await this.propertyService.searchProperties({
+      payload: {
+        page: 1,
+        limit: railSize,
+        location,
+        sortBy: 'created_at',
+        sortOrder: 'desc',
+      },
+    });
 
-    if (location) {
-      const needle = location.toLowerCase();
-      const matches = pool.filter((p) => {
-        if (!p.location) return false;
-        const { city, state, country } = p.location;
-        return [city, state, country]
-          .filter(Boolean)
-          .some((v) => v!.toLowerCase().includes(needle));
-      });
-      if (matches.length > 0) candidates = matches;
+    if (results.length > 0 || !location) {
+      return results.map((p) => this.toSummary(p));
     }
 
-    return [...candidates]
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, railSize)
-      .map((p) => this.toSummary(p));
+    const { results: unbiased } = await this.propertyService.searchProperties({
+      payload: {
+        page: 1,
+        limit: railSize,
+        sortBy: 'created_at',
+        sortOrder: 'desc',
+      },
+    });
+    return unbiased.map((p) => this.toSummary(p));
   }
 
-  /** Group active listings by city into destination tiles. */
-  private buildDestinations(pool: IGetPropertiesResult[]): IHomeDestination[] {
+  /**
+   * City-level destination tiles from the OpenSearch terms aggregation. Falls
+   * back to grouping a Postgres listing pool in memory if the aggregation
+   * fails (e.g. OpenSearch is down).
+   */
+  private async buildDestinations(): Promise<IHomeDestination[]> {
+    try {
+      return await this.propertyService.getDestinations(
+        HomeService.MAX_DESTINATIONS,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Destination aggregation failed, falling back to Postgres pool: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      const { results } = await this.propertyService.getProperties({
+        payload: { page: 1, limit: 50 },
+      });
+      return this.buildDestinationsFromPool(results);
+    }
+  }
+
+  private buildDestinationsFromPool(
+    pool: IGetPropertiesResult[],
+  ): IHomeDestination[] {
     const byCity = new Map<string, IHomeDestination>();
 
     for (const p of pool) {

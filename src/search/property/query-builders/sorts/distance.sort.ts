@@ -8,6 +8,7 @@ export class DistanceSort implements SortStrategy<SearchPropertiesDto> {
 
   supports(params: SearchPropertiesDto): boolean {
     return (
+      params.sortBy === 'distance' &&
       params.latitude != null &&
       params.longitude != null &&
       params.radius != null
@@ -19,7 +20,7 @@ export class DistanceSort implements SortStrategy<SearchPropertiesDto> {
       {
         _geo_distance: {
           location: { lat: params.latitude, lon: params.longitude },
-          order: 'asc',
+          order: params.sortOrder ?? 'asc',
           unit: 'km',
         },
       },

@@ -7,6 +7,7 @@ import { PropertyDocumentMapper } from './mappers/property-document.mapper';
 import { PropertySearchResultMapper } from './mappers/property-search-result.mapper';
 import { HostPropertySearchController } from './host-property-search.controller';
 import { HostPropertySearchService } from './host-property-search.service';
+import { PropertyDestinationsService } from './property-destinations.service';
 import { PropertyIndexingService } from './property-indexing.service';
 import { PropertySearchController } from './property-search.controller';
 import { PropertySearchFacade } from './property-search.facade';
@@ -136,6 +137,7 @@ const hostSortProviders = [HostFieldSort, HostRelevanceSort];
     PropertyIndexingService,
     PropertySearchService,
     HostPropertySearchService,
+    PropertyDestinationsService,
     {
       provide: PROPERTY_SEARCH_FACADE,
       useClass: PropertySearchFacade,

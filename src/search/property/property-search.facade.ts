@@ -3,6 +3,7 @@ import { SearchPropertiesDto } from '../../properties/dto/property-crud.dto';
 import { HostPropertySearchService } from './host-property-search.service';
 import { HostPropertySearchParams } from './interfaces/host-property-search.params';
 import { IPropertySearchFacade } from './interfaces/property-search-facade.interface';
+import { PropertyDestinationsService } from './property-destinations.service';
 import { PropertyIndexingService } from './property-indexing.service';
 import { PropertySearchService } from './property-search.service';
 
@@ -17,6 +18,7 @@ export class PropertySearchFacade implements IPropertySearchFacade {
     private readonly searchService: PropertySearchService,
     private readonly hostSearchService: HostPropertySearchService,
     private readonly indexingService: PropertyIndexingService,
+    private readonly destinationsService: PropertyDestinationsService,
   ) {}
 
   search(query: SearchPropertiesDto) {
@@ -25,6 +27,10 @@ export class PropertySearchFacade implements IPropertySearchFacade {
 
   searchForHost(params: HostPropertySearchParams) {
     return this.hostSearchService.search(params);
+  }
+
+  aggregateDestinations(limit: number) {
+    return this.destinationsService.aggregate(limit);
   }
 
   indexById(propertyId: string) {

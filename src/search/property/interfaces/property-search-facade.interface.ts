@@ -1,6 +1,7 @@
 import { SearchPropertiesDto } from '../../../properties/dto/property-crud.dto';
 import { SearchOutcome } from '../../core/interfaces/searchable.interface';
 import { HostPropertySearchParams } from './host-property-search.params';
+import { PropertyDestination } from './property-destination.interface';
 import { PropertyDocument } from './property-document.interface';
 
 /**
@@ -13,6 +14,7 @@ export interface IPropertySearchFacade {
   searchForHost(
     params: HostPropertySearchParams,
   ): Promise<SearchOutcome<PropertyDocument>>;
+  aggregateDestinations(limit: number): Promise<PropertyDestination[]>;
   indexById(propertyId: string): Promise<void>;
   indexMany(propertyIds: string[]): Promise<void>;
   remove(id: string): Promise<void>;
