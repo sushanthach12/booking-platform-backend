@@ -1,98 +1,219 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Booking Platform — Backend API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS 11 REST API for the Stayly booking platform: property listings, host onboarding, booking lifecycle, payments and host payouts, reviews, and OpenSearch-backed property search.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Stack
 
-## Description
+| Concern      | Technology                                  |
+| ------------ | ------------------------------------------- |
+| Framework    | NestJS 11 (Express platform), TypeScript 5.7 |
+| Database     | PostgreSQL via TypeORM 0.3                  |
+| Cache / jobs | Redis (ioredis) + BullMQ                    |
+| Search       | OpenSearch                                  |
+| Storage      | Cloudflare R2 (S3-compatible, presigned URLs) |
+| Auth         | JWT (`@nestjs/jwt`) + Google ID token verification |
+| Payments     | Cashfree (PG + Payouts)                     |
+| Validation   | `class-validator` DTOs, Zod for internal schemas |
+| Tests        | Jest + Supertest                            |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Requirements
 
-## Project setup
+- Node.js 22
+- pnpm
+- PostgreSQL 14+
+- Redis 6+
+- An OpenSearch endpoint (the app fails to boot without `OPENSEARCH_NODE`/`OPENSEARCH_USER`/`OPENSEARCH_PASSWORD`)
 
-```bash
-$ pnpm install
-```
-
-## Compile and run the project
+## Setup
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm install
+cp .env.example .env.local
 ```
 
-## Run tests
+Fill in `.env.local`. Values that block startup if unset or malformed:
+
+- `JWT_SECRET`
+- `PAYOUT_ENCRYPTION_KEY` — 64-char hex, generate with:
+  ```bash
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  ```
+- `POSTGRES_*` connection variables
+- `OPENSEARCH_NODE`, `OPENSEARCH_USER`, `OPENSEARCH_PASSWORD`
+
+`.env.local` is loaded manually by `loadEnvConfig()` in [src/common/config/env.config.ts](src/common/config/env.config.ts) — it is not read by `ConfigModule`'s default `.env` lookup. In production, environment variables are injected by the runtime and no `.env` file is used.
+
+Full variable reference: [.claude/references/env.md](.claude/references/env.md).
+
+## Running
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm run dev          # watch mode (alias of start:dev)
+pnpm run start        # single run, no watch
+pnpm run build        # compile to dist/
+pnpm run start:prod   # node dist/main (requires build first)
 ```
+
+Default port is `8001` from `.env.example`; the code falls back to `8000` when `PORT` is unset.
+
+## Scripts
+
+| Script                | Purpose                                  |
+| --------------------- | ---------------------------------------- |
+| `pnpm run dev`        | Watch-mode development server            |
+| `pnpm run start:debug`| Watch mode with the Node inspector       |
+| `pnpm run build`      | `nest build` → `dist/`                   |
+| `pnpm run lint`       | ESLint with `--fix`                      |
+| `pnpm run format`     | Prettier over `src/` and `test/`         |
+| `pnpm run test`       | Unit tests (`*.spec.ts` under `src/`)    |
+| `pnpm run test:watch` | Unit tests in watch mode                 |
+| `pnpm run test:cov`   | Coverage report → `coverage/`            |
+| `pnpm run test:e2e`   | E2E tests (`test/jest-e2e.json`)         |
+
+Single test file:
+
+```bash
+pnpm run test -- --testPathPattern=booking.service
+```
+
+## API conventions
+
+- **Base path:** `/api/v1/<resource>` — global prefix `api`, URI versioning with default version `1`.
+- **Health check:** `GET /health` is excluded from the prefix and version-neutral, for uptime probes.
+- **Response envelope:** controllers return `{ data }`, plus `{ meta }` on paginated lists. `POST /api/v1/storage/presign` is the one deliberate exception (un-enveloped).
+- **Strict payloads:** a global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` rejects undeclared keys in body *and* query DTOs with `400 property <key> should not exist`. This applies only to class DTOs — an inline `@Body() body: { reason?: string }` has no metatype and is skipped.
+- **Identifier placement:** collection-level routes take identifiers as query params (`@Query() dto`); `:param` is reserved for genuine sub-resources (`/bookings/:bookingId/cancel`, `/properties/:propertyId/images`).
+- **CORS:** driven by `CORS_ORIGIN` (comma-separated list, `*` by default).
+- **Raw body preserved** at bootstrap so webhook HMAC signatures (Cashfree payouts) verify against the exact signed bytes.
+
+Changing a route path, method, or DTO key is a breaking change for the `web/` client — update `web/.claude/refs/api.md` in the same change.
+
+## Route map
+
+| Route prefix                    | Module              | Responsibility                                     |
+| ------------------------------- | ------------------- | -------------------------------------------------- |
+| `/health`                       | root                | Liveness probe (no prefix, no version)              |
+| `/api/v1/auth`                  | `AuthModule`        | Register, login, Google sign-in, OTP, token refresh |
+| `/api/v1/users`, `/users/me`    | `UserModule`        | Profile, roles, wishlist                            |
+| `/api/v1/properties`            | `PropertyModule`    | Listings, images, amenities, availability calendar   |
+| `/api/v1/host`                  | `PropertyModule`    | Host onboarding steps                               |
+| `/api/v1/home`                  | `HomeModule`        | Home-feed aggregation                               |
+| `/api/v1/bookings`              | `BookingModule`     | Booking lifecycle, pricing, waitlist, slot reservation; host-side booking views |
+| `/api/v1/payments`              | `PaymentModule`     | Checkout, gateway callbacks, transactions           |
+| `/api/v1/payouts`               | `PaymentModule`     | Host wallets, payout accounts, payout dispatch      |
+| `/api/v1/reviews`               | `ReviewModule`      | Guest reviews and host responses                    |
+| `/api/v1/search/properties`     | `SearchModule`      | Public property search + reindex admin route        |
+| `/api/v1/search/host/properties`| `SearchModule`      | Host-scoped property search                         |
+| `/api/v1/storage`               | `StorageModule`     | R2 presigned upload URLs                            |
+| `/api/v1/seed`                  | `SeedModule`        | Development data seeding                            |
+
+## Architecture
+
+### Dependency injection
+
+Cross-module interfaces are provided and consumed through **Symbol tokens** in [src/database/di/symbols.ts](src/database/di/symbols.ts) — never by concrete class.
+
+```typescript
+// Providing
+{ provide: BOOKING_SERVICE, useClass: BookingService }
+
+// Consuming
+@Inject(BOOKING_SERVICE) private readonly bookingService: IBookingService
+```
+
+Full token list: [.claude/references/di-tokens.md](.claude/references/di-tokens.md).
+
+### Global providers
+
+Registered in [src/app.module.ts](src/app.module.ts) and applied to every request:
+
+- `HttpExceptionFilter` — uniform HTTP error shape
+- `JwtAuthGuard`, `RolesGuard`, `RateLimitGuard`
+- `LoggingInterceptor`, `TimeoutInterceptor`
+
+### Queues (BullMQ)
+
+Queue names are declared in [src/queues/queues.module.ts](src/queues/queues.module.ts). All processors run with `concurrency: 1`.
+
+| Queue name                | Processor                        |
+| ------------------------- | -------------------------------- |
+| `booking-payment-timeout` | `BookingPaymentTimeoutProcessor` |
+| `payment-status-sync`     | `PaymentStatusSyncProcessor`     |
+| `booking-details`         | `CreateBookingDetailsProcessor`  |
+| `booking-completion`      | `BookingCompletionProcessor`     |
+| `balance-release`         | `BalanceReleaseProcessor`        |
+| `payout-dispatch`         | `PayoutDispatchProcessor`        |
+| `property-search-index`   | `PropertySearchProcessor` (registered inside `PropertySearchModule`) |
+
+New processors extend `WorkerHost` and use `@Processor(QUEUE_NAME, { concurrency: 1 })`. Processors re-throw errors so BullMQ can retry.
+
+### Database
+
+TypeORM configuration: [src/database/config/typeorm.config.ts](src/database/config/typeorm.config.ts).
+
+- Entities are discovered by the `**/entities/*.entity.{js,ts}` glob.
+- `synchronize` follows `POSTGRES_SYNCHRONIZE` — keep it `false` outside local development.
+- Migration files live in [src/database/migrations/](src/database/migrations/). There is no `typeorm` CLI script wired into `package.json` yet; run migrations with the TypeORM CLI against a data source of your own if you need them applied manually.
+- Every entity is reached through a repository class injected by Symbol token — services never touch `EntityManager` directly.
+
+### Payments and payouts
+
+`PaymentGatewayFactory` ([src/payments/factories/](src/payments/factories/)) resolves the concrete gateway at runtime; Cashfree is the current implementation. Payouts are a separate Cashfree product with its own credentials (`CASHFREE_PAYOUT_*`). Payout account fields are encrypted at rest with AES-256-GCM using `PAYOUT_ENCRYPTION_KEY`.
+
+Commission and payout behaviour is driven by `PLATFORM_COMMISSION_PERCENT`, `MIN_PAYOUT_THRESHOLD`, and `PAYOUT_RESERVE_AMOUNT`.
+
+### Events
+
+`EventEmitterModule` is global. Event definitions live in [src/common/events/](src/common/events/); listeners are co-located in the consuming module.
+
+### Search
+
+OpenSearch powers property search. `SearchCoreModule` is `@Global` and builds its client eagerly, so missing OpenSearch credentials fail the boot rather than degrading at query time. Reindexing is exposed at `POST /api/v1/search/properties/reindex`, guarded by the `x-search-admin-key` header matched against `SEARCH_REINDEX_KEY` (no ADMIN role exists yet). The route refuses to run when that variable is unset.
+
+## Project layout
+
+```
+src/
+├── main.ts              # Bootstrap: env load, CORS, prefix, versioning, validation
+├── app.module.ts        # Root module, global filters/guards/interceptors
+├── auth/                # JWT + Google auth
+├── users/               # Profile, roles, wishlist
+├── properties/          # Listings, images, amenities, calendar, host onboarding
+├── bookings/            # Lifecycle, pricing, waitlist + booking-jobs/ processors
+├── payments/            # Gateways, transactions, wallets, payouts, jobs/
+├── reviews/             # Guest reviews, host responses
+├── search/              # OpenSearch core + property search & indexing queue
+├── home/                # Home-feed aggregation
+├── storage/             # R2 presigned uploads
+├── seed/                # Development seeding
+├── queues/              # Shared BullMQ queue registrations
+├── common/              # Config, filters, guards helpers, events, redis, email, zod
+└── database/            # TypeORM config, DI symbols, migrations
+```
+
+Each feature module follows the same internal shape: `controllers/`, `services/`, `repositories/{implementations,interfaces}/`, `dto/`, `entities/`, `enums/`, `interfaces/`.
+
+Detailed tree: [.claude/references/directory.md](.claude/references/directory.md).
+
+## Conventions
+
+- **Logging:** NestJS `Logger` (`new Logger(ClassName.name)`), never `console.log`.
+- **Errors:** services throw NestJS HTTP exceptions; `HttpExceptionFilter` normalizes the response.
+- **Validation:** `class-validator` on request DTOs; Zod ([src/common/zod/](src/common/zod/)) for internal schema validation.
+- **Enums:** `E`-prefixed enum names with lowercase string values; no magic strings.
+- **Before opening a PR:** `pnpm run lint && pnpm run build`.
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Multi-stage [Dockerfile](Dockerfile) on `node:22-alpine`:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+docker build -t booking-platform-api .
+docker run --env-file .env.local -p 8000:8000 booking-platform-api
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+The image sets `NODE_ENV=production`, exposes `8000`, and starts `node dist/src/main`. Native modules (`bcrypt`, `msgpackr-extract`) are rebuilt in both stages. Supply every required environment variable at run time — no `.env` file is baked into the image.
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED — private project.
