@@ -20,7 +20,7 @@ Production: set directly in Vercel dashboard or CI secrets.
 | `POSTGRES_USERNAME` | ✅ | DB user |
 | `POSTGRES_PASSWORD` | ✅ | DB password |
 | `POSTGRES_DATABASE` | ✅ | Database name |
-| `POSTGRES_SYNCHRONIZE` | — | `true` only in local dev; **never production** |
+| `POSTGRES_SYNCHRONIZE` | — | `true` only in local dev; **never production**. Costs a full `information_schema`/`pg_catalog` introspection + DDL diff across all entities on *every* boot — this is the single biggest bootstrap-time cost in dev. Migrations in `src/database/migrations/` already carry the schema, so setting this to `false` day-to-day (flipping to `true` only when entity shapes change) is the fastest way to cut boot time without losing schema sync. |
 | `POSTGRES_LOGGING` | — | `true` to log SQL queries |
 | `POSTGRES_SSL` | — | `true` to enable SSL |
 | `POSTGRES_CA_CERTIFICATE` | — | CA cert string when SSL is enabled |

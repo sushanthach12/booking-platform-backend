@@ -22,7 +22,14 @@ export class PropertyIndexSetupService implements OnModuleInit {
     @Inject(SEARCH_PROVIDER) private readonly searchProvider: ISearchProvider,
   ) {}
 
-  async onModuleInit(): Promise<void> {
+  onModuleInit(): void {
+    // Fire-and-forget, same reasoning as OpenSearchAdapter.onModuleInit: this
+    // rides three sequential round-trips to the remote OpenSearch cluster and
+    // must not gate app.listen(). Errors are already caught and logged below.
+    void this.setup();
+  }
+
+  private async setup(): Promise<void> {
     try {
       const exists = await this.searchProvider.indexExists(PROPERTY_INDEX_NAME);
       if (!exists) {

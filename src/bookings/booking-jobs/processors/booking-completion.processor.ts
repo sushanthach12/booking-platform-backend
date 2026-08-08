@@ -37,16 +37,28 @@ export class BookingCompletionProcessor
     super();
   }
 
-  async onModuleInit(): Promise<void> {
-    await this.completionQueue.add(
-      JOB_COMPLETE_PAST_BOOKINGS,
-      {},
-      {
-        repeat: { pattern: '0 * * * *' }, // hourly at :00 (UTC)
-        jobId: JOB_COMPLETE_PAST_BOOKINGS,
-      },
-    );
-    this.logger.debug('Booking completion scheduler registered (hourly)');
+  onModuleInit(): void {
+    // Registration is idempotent (fixed jobId), so it doesn't need to gate
+    // app.listen(). Not awaited — must stay .catch()'d or a rejection here
+    // hits the process-level unhandledRejection handler and exits the app.
+    this.completionQueue
+      .add(
+        JOB_COMPLETE_PAST_BOOKINGS,
+        {},
+        {
+          repeat: { pattern: '0 * * * *' }, // hourly at :00 (UTC)
+          jobId: JOB_COMPLETE_PAST_BOOKINGS,
+        },
+      )
+      .then(() => {
+        this.logger.debug('Booking completion scheduler registered (hourly)');
+      })
+      .catch((error: unknown) => {
+        this.logger.error(
+          'Failed to register booking completion scheduler',
+          error,
+        );
+      });
   }
 
   async process(job: Job): Promise<void> {

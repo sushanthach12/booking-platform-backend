@@ -45,16 +45,30 @@ export class BalanceReleaseProcessor
     super();
   }
 
-  async onModuleInit(): Promise<void> {
-    await this.releaseQueue.add(
-      JOB_RELEASE_SWEEP,
-      {},
-      {
-        repeat: { pattern: '0 1 * * *', tz: 'UTC' }, // daily at 01:00 UTC
-        jobId: JOB_RELEASE_SWEEP,
-      },
-    );
-    this.logger.debug('Balance release scheduler registered (daily 01:00 UTC)');
+  onModuleInit(): void {
+    // Registration is idempotent (fixed jobId), so it doesn't need to gate
+    // app.listen(). Not awaited — must stay .catch()'d or a rejection here
+    // hits the process-level unhandledRejection handler and exits the app.
+    this.releaseQueue
+      .add(
+        JOB_RELEASE_SWEEP,
+        {},
+        {
+          repeat: { pattern: '0 1 * * *', tz: 'UTC' }, // daily at 01:00 UTC
+          jobId: JOB_RELEASE_SWEEP,
+        },
+      )
+      .then(() => {
+        this.logger.debug(
+          'Balance release scheduler registered (daily 01:00 UTC)',
+        );
+      })
+      .catch((error: unknown) => {
+        this.logger.error(
+          'Failed to register balance release scheduler',
+          error,
+        );
+      });
   }
 
   async process(job: Job): Promise<void> {

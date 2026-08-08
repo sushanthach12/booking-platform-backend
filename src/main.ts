@@ -54,7 +54,7 @@ async function bootstrap() {
   // Enable shutdown hooks
   app.enableShutdownHooks();
 
-  const PORT = process.env.PORT ?? 8000;
+  const PORT = process.env.PORT ?? 8001;
 
   await app.listen(PORT, () => {
     logger.debug(`Core service is running on port ${PORT}`);
@@ -99,7 +99,7 @@ bootstrap().catch((error: Error) => {
     // Check for common error types
     if (error.message.includes('EADDRINUSE')) {
       logger.error(
-        `Port ${process.env.PORT ?? 8000} is already in use. Please use a different port.`,
+        `Port ${process.env.PORT ?? 8001} is already in use. Please use a different port.`,
       );
     } else if (error.message.includes('ECONNREFUSED')) {
       logger.error(

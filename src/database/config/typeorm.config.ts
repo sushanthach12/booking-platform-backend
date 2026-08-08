@@ -25,7 +25,7 @@ export const getTypeOrmConfig = (
     database: configService.getOrThrow<string>('POSTGRES_DATABASE'),
     entities: [__dirname + '/../../**/entities/*.entity.{js,ts}'],
     synchronize: configService.get<string>('POSTGRES_SYNCHRONIZE') === 'true',
-    migrations: [__dirname + '/../../migrations/*.{js,ts}'],
+    migrations: [__dirname + '/../migrations/*.{js,ts}'],
     logging: configService.get<string>('POSTGRES_LOGGING') === 'true',
     ssl: sslConfig,
   };

@@ -33,6 +33,10 @@ export const openSearchClientProvider: Provider = {
         password: configService.getOrThrow('OPENSEARCH_PASSWORD'),
       },
       ssl: ca ? { ca, rejectUnauthorized: true } : undefined,
+      // Bound how long an unreachable/slow Aiven cluster can hang a request —
+      // bootstrap no longer awaits this client, but individual search calls
+      // (and the fire-and-forget onModuleInit hooks) still need a ceiling.
+      requestTimeout: 5000,
     });
   },
 };

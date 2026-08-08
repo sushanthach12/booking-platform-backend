@@ -20,7 +20,15 @@ export class OpenSearchAdapter implements ISearchProvider, OnModuleInit {
   private readonly logger = new Logger(OpenSearchAdapter.name);
   constructor(@Inject(OPENSEARCH_RAW_CLIENT) private readonly client: Client) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    // Fire-and-forget: OpenSearch is the only remote (Aiven, over the
+    // internet) dependency in bootstrap. Awaiting it here would gate
+    // app.listen() on a TLS round-trip to a cloud host; errors are already
+    // caught and logged, so the app boots regardless of reachability.
+    void this.ping();
+  }
+
+  private async ping(): Promise<void> {
     try {
       await this.client.ping();
       this.logger.debug('Successfully connected to OpenSearch');
