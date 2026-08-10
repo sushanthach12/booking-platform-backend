@@ -1,9 +1,20 @@
+# Never bake env files into the image — Vercel/runtime injects them
+.env
+.env.*
+*.env
+
 node_modules
 dist
-.env*
-!.env.example
 coverage
 test
 *.md
 .git
 .gitignore
+.github
+.vscode
+.claude
+Dockerfile
+.dockerignore
+docker-compose*.yml
+*.log
+.DS_Store
