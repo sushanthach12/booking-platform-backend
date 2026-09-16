@@ -7,9 +7,9 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --no-frozen-lockfile --ignore-scripts
-RUN pnpm rebuild bcrypt msgpackr-extract
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
+
+RUN pnpm install --no-frozen-lockfile
 
 COPY . .
 RUN pnpm run build

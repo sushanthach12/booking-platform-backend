@@ -12,7 +12,7 @@ export const getTypeOrmConfig = (
       ca: configService
         .getOrThrow<string>('POSTGRES_CA_CERTIFICATE')
         .replace(/\\n/g, '\n'),
-      rejectUnauthorized: true,
+      rejectUnauthorized: false,
     };
   }
 
