@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { OpenSearchKeepAliveService } from './opensearch/opensearch-alive.service';
 import { openSearchClientProvider } from './opensearch/opensearch-client.provider';
 import { OpenSearchAdapter } from './opensearch/opensearch.adapter';
 import { SEARCH_PROVIDER } from './search.tokens';
@@ -18,6 +19,7 @@ import { SEARCH_PROVIDER } from './search.tokens';
       provide: SEARCH_PROVIDER,
       useClass: OpenSearchAdapter,
     },
+    OpenSearchKeepAliveService,
   ],
   exports: [SEARCH_PROVIDER],
 })

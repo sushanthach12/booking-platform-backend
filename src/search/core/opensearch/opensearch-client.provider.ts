@@ -36,7 +36,18 @@ export const openSearchClientProvider: Provider = {
       // Bound how long an unreachable/slow Aiven cluster can hang a request —
       // bootstrap no longer awaits this client, but individual search calls
       // (and the fire-and-forget onModuleInit hooks) still need a ceiling.
+      // Reuse sockets and probe idle ones so the LB doesn't silently drop them
+      agent: {
+        keepAlive: true,
+        keepAliveMsecs: 30_000,
+        maxSockets: 20,
+        maxFreeSockets: 5,
+      },
+
+      // A stale socket fails fast, then the client retries on a fresh one
+      maxRetries: 3,
       requestTimeout: 5000,
+      pingTimeout: 3000,
     });
   },
 };

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Client } from '@opensearch-project/opensearch';
 import { Bulk_RequestBody } from '@opensearch-project/opensearch/api/index.js';
 import {
@@ -16,26 +16,26 @@ import { OPENSEARCH_RAW_CLIENT } from './opensearch-client.provider';
  * substitution: any ISearchProvider implementation is a drop-in swap).
  */
 @Injectable()
-export class OpenSearchAdapter implements ISearchProvider, OnModuleInit {
+export class OpenSearchAdapter implements ISearchProvider {
   private readonly logger = new Logger(OpenSearchAdapter.name);
   constructor(@Inject(OPENSEARCH_RAW_CLIENT) private readonly client: Client) {}
 
-  onModuleInit(): void {
-    // Fire-and-forget: OpenSearch is the only remote (Aiven, over the
-    // internet) dependency in bootstrap. Awaiting it here would gate
-    // app.listen() on a TLS round-trip to a cloud host; errors are already
-    // caught and logged, so the app boots regardless of reachability.
-    void this.ping();
-  }
+  // onModuleInit(): void {
+  //   // Fire-and-forget: OpenSearch is the only remote (Aiven, over the
+  //   // internet) dependency in bootstrap. Awaiting it here would gate
+  //   // app.listen() on a TLS round-trip to a cloud host; errors are already
+  //   // caught and logged, so the app boots regardless of reachability.
+  //   void this.ping();
+  // }
 
-  private async ping(): Promise<void> {
-    try {
-      await this.client.ping();
-      this.logger.debug('Successfully connected to OpenSearch');
-    } catch (error) {
-      this.logger.error('Error occurred while pinging OpenSearch:', error);
-    }
-  }
+  // private async ping(): Promise<void> {
+  //   try {
+  //     await this.client.ping();
+  //     this.logger.debug('Successfully connected to OpenSearch');
+  //   } catch (error) {
+  //     this.logger.error('Error occurred while pinging OpenSearch:', error);
+  //   }
+  // }
 
   async index<T>(
     indexName: string,
